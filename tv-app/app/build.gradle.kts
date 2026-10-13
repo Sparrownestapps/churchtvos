@@ -14,8 +14,8 @@ android {
         applicationId = "com.churchtvos.tv"
         minSdk = 25 // Fire OS 6 and newer
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.5.0"
+        versionCode = 1
+        versionName = "1.0.0"
     }
 
     val signing = rootProject.file("keystore/keystore.properties").takeIf { it.exists() }?.let { file ->
