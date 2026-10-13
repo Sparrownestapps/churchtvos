@@ -89,7 +89,8 @@ export default function SettingsPage() {
             Reset colours
           </button>
         </div>
-        <p className="muted">Colours apply to this dashboard and to the pairing and home screens on your TVs.</p>
+        <p className="muted">Colours apply to this dashboard and to the pairing, home, countdown and lyrics screens on your TVs.</p>
+        <BrandPreview name={name} logo={logo} primary={primary} accent={accent} />
 
         <h3>YouTube (Kids)</h3>
         <label className="field">
@@ -198,6 +199,37 @@ function EntitlementRow({ module, current, orgId, onSaved }: { module: Module; c
       <button className="btn align-end" onClick={save}>
         Save
       </button>
+    </div>
+  )
+}
+
+function luminance(hex: string) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/** Live mock-ups of what the TVs will show with the chosen logo and colours. */
+function BrandPreview({ name, logo, primary, accent }: { name: string; logo: string; primary: string; accent: string }) {
+  const tooLight = luminance(primary) > 0.45
+  const mark = logo ? <img src={logo} alt="" className="tv-logo" /> : <span className="tv-name">{name.toUpperCase()}</span>
+  return (
+    <div className="stack-sm">
+      <div className="tv-previews">
+        <div className="tv-mock" style={{ background: '#fff' }}>
+          {mark}
+          <div className="tv-center">
+            <div className="tv-title" style={{ color: primary }}>Pair this TV</div>
+            <div className="tv-code" style={{ background: primary }}>RJH CM5</div>
+          </div>
+        </div>
+        <div className="tv-mock" style={{ background: primary }}>
+          <div className="tv-center">
+            <div className="tv-kicker" style={{ color: accent }}>SERVICE STARTS IN</div>
+            <div className="tv-clock">4:59</div>
+          </div>
+        </div>
+      </div>
+      {tooLight && <p className="notice warn">Your primary colour is quite light. White text on the TV countdown and lyrics screens may be hard to read.</p>}
     </div>
   )
 }
