@@ -165,7 +165,7 @@ tr.faded td { opacity: 0.45; }
 .upload progress { flex: 1; }
 .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-top: 14px; }
 .media-tile { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
-.media-tile img, .media-tile video { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #111; display: block; }
+.media-tile img, .media-tile video, .poster { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #111; display: block; }
 .media-info { padding: 10px; display: grid; gap: 4px; font-size: 14px; }
 .media-info b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--primary); }
 
@@ -256,3 +256,42 @@ tr.faded td { opacity: 0.45; }
 .tv-splash-logo { max-width: 55%; max-height: 45%; object-fit: contain; }
 .tv-tag { position: absolute; right: 6px; bottom: 4px; font-size: 9px; color: rgba(255, 255, 255, 0.7); }
 .tv-tag.dark { color: rgba(0, 0, 0, 0.45); }
+
+/* Sites: per-application location sections */
+.loc-section { border-top: 1px solid var(--line); padding-top: 12px; }
+.badge { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: var(--tint-primary); color: var(--primary); font-size: 12px; font-weight: 700; }
+
+/* Media library: folders, list view, selection, dialogs */
+.media-tile { position: relative; }
+.media-tile.selected, .media-row.selected { outline: 2px solid var(--primary); outline-offset: -2px; background: var(--tint-primary); }
+.media-tile .pick { position: absolute; top: 8px; left: 8px; width: 22px; height: 22px; padding: 0; z-index: 2; }
+.poster { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #111; overflow: hidden; }
+.poster video, .poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.poster .play { position: absolute; right: 6px; bottom: 6px; font-size: 11px; color: #fff; background: rgba(0, 0, 0, 0.55); border-radius: 4px; padding: 1px 5px; }
+.folder-tile { background: var(--tint-primary); }
+.folder-open { display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; border: 0; background: none; cursor: pointer; }
+.folder-icon { font-size: 52px; line-height: 1; }
+.folder-open.small { width: 72px; aspect-ratio: 16 / 9; font-size: 28px; flex-shrink: 0; }
+.drop-on { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--tint); }
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.crumb { background: none; border: 0; padding: 6px 4px; font-weight: 700; color: var(--primary); cursor: pointer; border-radius: 6px; }
+.crumb:disabled { color: var(--grey); cursor: default; }
+.selection-bar { background: var(--tint-primary); border-radius: 8px; padding: 8px 12px; }
+.media-list { display: grid; }
+.media-row { display: flex; align-items: center; gap: 12px; padding: 8px 6px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.media-row-main { flex: 1; min-width: 160px; display: grid; gap: 2px; font-size: 14px; }
+.media-row-main b, .row-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--primary); text-align: left; }
+.row-thumb { width: 72px; flex-shrink: 0; }
+.row-thumb img, .row-thumb .poster { width: 72px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; display: block; }
+.pick-space { width: 13px; flex-shrink: 0; }
+.usage-names { white-space: normal; }
+.modal-scrim { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.4); display: grid; place-items: center; padding: 16px; }
+.modal { width: min(440px, 100%); max-height: 80vh; display: flex; flex-direction: column; }
+.picker-list { overflow-y: auto; display: grid; border: 1px solid var(--line); border-radius: 8px; }
+.picker-row { text-align: left; background: #fff; border: 0; border-bottom: 1px solid var(--line); padding: 12px; cursor: pointer; color: var(--primary); font-weight: 700; }
+.picker-row:hover:not(:disabled) { background: var(--tint-primary); }
+.picker-row:disabled { color: var(--grey); cursor: default; }
+@media (max-width: 760px) {
+  .media-row-main { flex-basis: calc(100% - 140px); }
+  .media-tile .pick { width: 26px; height: 26px; }
+}

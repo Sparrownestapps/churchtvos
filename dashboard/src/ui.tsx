@@ -16,9 +16,10 @@ export function ScopeSelect({ value, onChange }: { value: string | null; onChang
   )
 }
 
-/** <option>s for every location the user can see, grouped by site. */
-export function LocationOptions() {
-  const { mySites, locations } = useApp()
+/** <option>s for every location the user can see, grouped by site. Pass `module` to only offer locations tagged for that application. */
+export function LocationOptions({ module }: { module?: Module } = {}) {
+  const { mySites, locations: all } = useApp()
+  const locations = module ? all.filter((l) => l.modules.includes(module)) : all
   return (
     <>
       {mySites.map((site) => (
@@ -42,15 +43,38 @@ export function useDefaultScope() {
   return allSites ? null : mySites[0]?.id ?? null
 }
 
-const MODULE_TITLE: Record<Module, string> = { kids: 'Kids', signage: 'Signage' }
+/** Toggle chips for choosing applications (location tags). */
+export function ModuleChips({ value, onChange }: { value: Module[]; onChange: (v: Module[]) => void }) {
+  const { modules } = useApp()
+  return (
+    <span className="days">
+      {modules.map((m) => {
+        const on = value.includes(m.id)
+        return (
+          <button
+            type="button"
+            key={m.id}
+            className={`day ${on ? 'on' : ''}`}
+            aria-pressed={on}
+            onClick={() => onChange(on ? value.filter((x) => x !== m.id) : [...value, m.id])}
+          >
+            {m.name}
+          </button>
+        )
+      })}
+    </span>
+  )
+}
 
 /** Friendly notice for a module the church's plan doesn't include. */
 export function ModuleOff({ module }: { module: Module }) {
+  const { moduleName } = useApp()
+  const title = moduleName(module)
   return (
     <div className="card stack-sm">
-      <h3>{MODULE_TITLE[module]} isn't enabled for your church</h3>
+      <h3>{title} isn't enabled for your church</h3>
       <p className="muted">
-        This church doesn't have the {MODULE_TITLE[module]} module switched on right now. If you think it should be,
+        This church doesn't have the {title} module switched on right now. If you think it should be,
         ask your church's owner or the Church TV OS team to enable it.
       </p>
     </div>

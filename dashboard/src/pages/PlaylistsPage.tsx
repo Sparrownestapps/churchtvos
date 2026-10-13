@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useApp } from '../context'
 import { supabase } from '../supabase'
-import type { Media, Playlist, PlaylistItem } from '../types'
-import { attempt, moveItem, must, scopeLabel, useLoad } from '../lib'
+import type { Media, MediaFolder, Playlist, PlaylistItem } from '../types'
+import { attempt, fetchAll, moveItem, must, scopeLabel, useLoad } from '../lib'
 import { ScopeSelect, useDefaultScope } from '../ui'
+import { MediaSelect } from '../MediaSelect'
 import { YouTubeItemEditor, newYouTubeItem } from '../YouTubeItem'
 
 const KIND_LABEL: Record<PlaylistItem['type'], string> = {
@@ -20,11 +21,12 @@ export default function PlaylistsPage() {
   const [editing, setEditing] = useState<Playlist | 'new' | null>(null)
 
   const { data, reload } = useLoad(async () => {
-    const [playlists, media] = await Promise.all([
+    const [playlists, media, folders] = await Promise.all([
       supabase.from('playlists').select('*').eq('organization_id', org.id).order('updated_at', { ascending: false }),
-      supabase.from('media').select('*').eq('organization_id', org.id).order('title'),
+      fetchAll<Media>((a, b) => supabase.from('media').select('*').eq('organization_id', org.id).eq('module', 'kids').order('title').range(a, b)),
+      fetchAll<MediaFolder>((a, b) => supabase.from('media_folders').select('*').eq('organization_id', org.id).eq('module', 'kids').order('name').range(a, b)),
     ])
-    return { playlists: must(playlists) as Playlist[], media: must(media) as Media[] }
+    return { playlists: must(playlists) as Playlist[], media, folders }
   })
 
   if (editing) {
@@ -32,6 +34,7 @@ export default function PlaylistsPage() {
       <PlaylistEditor
         playlist={editing === 'new' ? null : editing}
         media={data?.media ?? []}
+        folders={data?.folders ?? []}
         onDone={() => (setEditing(null), reload())}
       />
     )
@@ -96,7 +99,7 @@ export default function PlaylistsPage() {
   )
 }
 
-function PlaylistEditor({ playlist, media, onDone }: { playlist: Playlist | null; media: Media[]; onDone: () => void }) {
+function PlaylistEditor({ playlist, media, folders, onDone }: { playlist: Playlist | null; media: Media[]; folders: MediaFolder[]; onDone: () => void }) {
   const { org } = useApp()
   const defaultScope = useDefaultScope()
   const channelId = org.branding.youtube_channel_id || null
@@ -104,9 +107,6 @@ function PlaylistEditor({ playlist, media, onDone }: { playlist: Playlist | null
   const [scope, setScope] = useState(playlist ? playlist.site_id : defaultScope)
   const [items, setItems] = useState<PlaylistItem[]>(playlist?.items ?? [])
   const [saving, setSaving] = useState(false)
-
-  const videos = media.filter((m) => m.kind === 'video')
-  const images = media.filter((m) => m.kind === 'image')
 
   const update = (i: number, item: PlaylistItem) => setItems((list) => list.map((x, j) => (j === i ? item : x)))
   const move = (i: number, by: number) => setItems((list) => moveItem(list, i, by))
@@ -187,14 +187,7 @@ function PlaylistEditor({ playlist, media, onDone }: { playlist: Playlist | null
             <div className="row wrap">
               <label className="field grow">
                 <span>{item.type === 'video' ? 'Video' : 'Slide'}</span>
-                <select value={item.media_id} onChange={(e) => pickMedia(i, item, e.target.value)}>
-                  <option value="">Choose…</option>
-                  {(item.type === 'video' ? videos : images).map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.title}
-                    </option>
-                  ))}
-                </select>
+                <MediaSelect media={media} folders={folders} kind={item.type} value={item.media_id} onChange={(id) => pickMedia(i, item, id)} />
               </label>
               {item.type === 'image' && (
                 <label className="field">

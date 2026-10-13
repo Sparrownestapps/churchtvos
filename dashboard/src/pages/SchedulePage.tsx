@@ -30,7 +30,8 @@ export default function SchedulePage() {
   const playlist = playlists.find((p) => p.id === playlistId)
   // A site-only playlist can only go to that site's locations.
   const visibleSites = mySites.filter((s) => (!playlist?.site_id || playlist.site_id === s.id) && canEditContent('kids', s.id))
-  const visibleLocations = locations.filter((l) => visibleSites.some((s) => s.id === l.site_id))
+  // Only rooms tagged for Kids can run a Kids schedule.
+  const visibleLocations = locations.filter((l) => l.modules.includes('kids') && visibleSites.some((s) => s.id === l.site_id))
 
   const toggle = (id: string) => setLocationIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
 
@@ -96,6 +97,7 @@ export default function SchedulePage() {
           <div className="room-picker">
             {visibleSites.map((site) => {
               const siteLocations = visibleLocations.filter((l) => l.site_id === site.id)
+              if (siteLocations.length === 0) return null
               const allOn = siteLocations.every((l) => locationIds.includes(l.id))
               return (
                 <div key={site.id} className="room-group">
@@ -124,6 +126,9 @@ export default function SchedulePage() {
               )
             })}
           </div>
+          {visibleLocations.length === 0 && (
+            <p className="muted">No locations are tagged for Kids yet. Tag them under Sites & Locations.</p>
+          )}
         </div>
         <div>
           <button className="btn primary" onClick={create}>

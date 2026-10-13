@@ -1,4 +1,8 @@
-export type Module = 'kids' | 'signage'
+/** An application id from the `modules` table ('kids', 'signage', ...). */
+export type Module = string
+
+/** One row of the `modules` registry. */
+export type ModuleDef = { id: Module; name: string; sort: number; available: boolean }
 export type Role = 'owner' | 'admin' | 'editor' | 'operator'
 export type ScreenModule = Module | 'off'
 export type Orientation = 'landscape' | 'portrait' | 'portrait_flipped'
@@ -56,17 +60,31 @@ export type Entitlement = {
 }
 
 export type Site = { id: string; organization_id: string; name: string; timezone: string }
-export type Location = { id: string; organization_id: string; site_id: string; name: string }
+/** `modules` tags which applications use the location (it may carry several, or none). */
+export type Location = { id: string; organization_id: string; site_id: string; name: string; modules: Module[] }
 
 export type Media = {
   id: string
   organization_id: string
   site_id: string | null
+  module: Module
+  folder_id: string | null
   title: string
   kind: 'video' | 'image'
   storage_path: string
   url: string
   size_bytes: number | null
+  created_at: string
+}
+
+export type MediaFolder = {
+  id: string
+  organization_id: string
+  module: Module
+  parent_id: string | null
+  /** null = all sites */
+  site_id: string | null
+  name: string
   created_at: string
 }
 

@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { Entitlement, Location, Membership, Module, Organization, Role, Site } from './types'
+import type { Entitlement, Location, Membership, Module, ModuleDef, Organization, Role, Site } from './types'
 
 export type AppState = {
   userId: string
@@ -19,6 +19,10 @@ export type AppState = {
   /** Owner / admin / editor: may edit content. */
   canEditRole: boolean
   entitlements: Entitlement[]
+  /** Available applications from the `modules` registry (static fallback if it can't be read). */
+  modules: ModuleDef[]
+  /** Display name of an application id. */
+  moduleName: (id: string) => string
   /** The member has been given this module. */
   hasModule: (m: Module) => boolean
   /** The member has it AND the church's plan enables it. */

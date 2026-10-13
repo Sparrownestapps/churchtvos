@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Entitlement, Location, Role, ScreenModule, Site } from './types'
+import type { Entitlement, Location, MediaFolder, ModuleDef, Role, ScreenModule, Site } from './types'
 
 /** Unwraps a Supabase response, throwing its error so callers can show it. */
 export function must<T>(res: { data: T; error: { message: string } | null }): T {
@@ -129,7 +129,40 @@ export const WEEK = [
   { value: 0, short: 'Sun' },
 ]
 
-export const MODULE_NAME: Record<ScreenModule, string> = { kids: 'Kids', signage: 'Signage', off: 'Off (black screen)' }
+/** Used until / unless the `modules` registry loads. */
+export const FALLBACK_MODULES: ModuleDef[] = [
+  { id: 'kids', name: 'Kids', sort: 1, available: true },
+  { id: 'signage', name: 'Signage', sort: 2, available: true },
+]
+
+export const MODULE_NAME: Record<ScreenModule, string> = new Proxy({ kids: 'Kids', signage: 'Signage', off: 'Off (black screen)' } as Record<string, string>, {
+  get: (t, k: string) => t[k] ?? (typeof k === 'string' ? k.charAt(0).toUpperCase() + k.slice(1) : ''),
+})
+
+// ───────── Media folders ─────────
+
+/** 'Curriculum / Fall 2026' for a folder id ('' for the top level). */
+export function folderPath(id: string | null, byId: Map<string, MediaFolder>): string {
+  const names: string[] = []
+  const seen = new Set<string>()
+  for (let f = id ? byId.get(id) : undefined; f && !seen.has(f.id); f = f.parent_id ? byId.get(f.parent_id) : undefined) {
+    seen.add(f.id)
+    names.unshift(f.name)
+  }
+  return names.join(' / ')
+}
+
+/** Reads every row of a query, past the 1000-row default page limit. */
+export async function fetchAll<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  const all: T[] = []
+  for (let from = 0; ; from += 1000) {
+    const rows = must(await page(from, from + 999)) ?? []
+    all.push(...(rows as T[]))
+    if (rows.length < 1000) return all
+  }
+}
 
 /** "08:00:00" -> "8:00" */
 export function shortTime(t: string) {

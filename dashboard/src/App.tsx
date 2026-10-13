@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState, type ComponentType, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { AppContext, useApp, type AppState } from './context'
-import type { Entitlement, Location, Membership, Module, Organization, Role, Site } from './types'
-import { entitled, isHex, must, roleLabel, slugify, useLoad } from './lib'
+import type { Entitlement, Location, Membership, Module, ModuleDef, Organization, Role, Site } from './types'
+import { FALLBACK_MODULES, entitled, isHex, must, roleLabel, slugify, useLoad } from './lib'
 import { ModuleOff } from './ui'
 import SchedulePage from './pages/SchedulePage'
 import PlaylistsPage from './pages/PlaylistsPage'
@@ -15,26 +15,50 @@ import SitesPage from './pages/SitesPage'
 import PeoplePage from './pages/PeoplePage'
 import SettingsPage from './pages/SettingsPage'
 
-type PageDef = { label: string; component: ComponentType; module?: Module; anyModule?: boolean; adminOnly?: boolean }
+type PageDef = { label: string; title?: string; render: () => ReactNode; module?: Module; adminOnly?: boolean }
 
-const PAGES: Record<string, PageDef> = {
-  'kids-schedule': { label: 'Schedule', component: SchedulePage, module: 'kids' },
-  'kids-playlists': { label: 'Playlists', component: PlaylistsPage, module: 'kids' },
-  'signage-playlists': { label: 'Playlists', component: SignagePlaylistsPage, module: 'signage' },
-  'signage-slots': { label: 'Slots & schedule', component: SignageSlotsPage, module: 'signage' },
-  media: { label: 'Media', component: MediaPage, anyModule: true },
-  screens: { label: 'Screens', component: ScreensPage },
-  sites: { label: 'Sites & Locations', component: SitesPage },
-  people: { label: 'People', component: PeoplePage, adminOnly: true },
-  settings: { label: 'Settings', component: SettingsPage, adminOnly: true },
+/**
+ * Pages each application contributes to its nav group. Adding an application = one row in the `modules`
+ * table plus an entry here; an application without an entry still gets its Media library.
+ */
+const MODULE_PAGES: Record<string, { slug: string; label: string; render: () => ReactNode }[]> = {
+  kids: [
+    { slug: 'schedule', label: 'Schedule', render: () => <SchedulePage /> },
+    { slug: 'playlists', label: 'Playlists', render: () => <PlaylistsPage /> },
+  ],
+  signage: [
+    { slug: 'playlists', label: 'Playlists', render: () => <SignagePlaylistsPage /> },
+    { slug: 'slots', label: 'Slots & schedule', render: () => <SignageSlotsPage /> },
+  ],
 }
 
-const NAV: { title: string; module?: Module; anyModule?: boolean; pages: string[] }[] = [
-  { title: 'Kids', module: 'kids', pages: ['kids-schedule', 'kids-playlists'] },
-  { title: 'Signage', module: 'signage', pages: ['signage-playlists', 'signage-slots'] },
-  { title: 'Library', anyModule: true, pages: ['media'] },
-  { title: 'Manage', pages: ['screens', 'sites', 'people', 'settings'] },
-]
+const MANAGE_PAGES: Record<string, PageDef> = {
+  screens: { label: 'Screens', render: () => <ScreensPage /> },
+  sites: { label: 'Sites & Locations', render: () => <SitesPage /> },
+  people: { label: 'People', render: () => <PeoplePage />, adminOnly: true },
+  settings: { label: 'Settings', render: () => <SettingsPage />, adminOnly: true },
+}
+
+/** Page definitions and nav groups, derived from the application registry. */
+function buildNav(modules: ModuleDef[]) {
+  const pages: Record<string, PageDef> = {}
+  const groups: { title: string; module?: Module; pages: string[] }[] = []
+  for (const m of modules) {
+    const keys: string[] = []
+    for (const p of MODULE_PAGES[m.id] ?? []) {
+      const key = `${m.id}-${p.slug}`
+      pages[key] = { label: p.label, render: p.render, module: m.id }
+      keys.push(key)
+    }
+    const key = `${m.id}-media`
+    pages[key] = { label: 'Media', title: `${m.name} media`, render: () => <MediaPage key={m.id} module={m.id} />, module: m.id }
+    keys.push(key)
+    groups.push({ title: m.name, module: m.id, pages: keys })
+  }
+  Object.assign(pages, MANAGE_PAGES)
+  groups.push({ title: 'Manage', pages: Object.keys(MANAGE_PAGES) })
+  return { pages, groups }
+}
 
 const ORG_KEY = 'churchtvos.org'
 const readStoredOrg = () => {
@@ -163,17 +187,24 @@ function OrgApp(props: OrgAppProps) {
   const { uid, email, org, orgs, membership, isPlatformAdmin } = props
 
   const { data, error, reload } = useLoad(async () => {
-    const [sites, locations, entitlements] = await Promise.all([
+    const [sites, locations, entitlements, modules] = await Promise.all([
       supabase.from('sites').select('*').eq('organization_id', org.id).order('name'),
       supabase.from('locations').select('*').eq('organization_id', org.id).order('name'),
       supabase.from('entitlements').select('*').eq('organization_id', org.id),
+      supabase.from('modules').select('*').eq('available', true).order('sort'),
     ])
     return {
+      // If the registry can't be read, fall back to the built-in applications rather than locking people out.
+      modules: modules.error || !modules.data?.length ? FALLBACK_MODULES : (modules.data as ModuleDef[]),
       sites: must(sites) as Site[],
       locations: must(locations) as Location[],
       entitlements: must(entitlements) as Entitlement[],
     }
   })
+
+  const modules = data?.modules ?? FALLBACK_MODULES
+  const nav = useMemo(() => buildNav(modules), [modules])
+  const PAGES = nav.pages
 
   const [page, setPage] = useState(() => location.hash.slice(1))
   const [menuOpen, setMenuOpen] = useState(false)
@@ -217,6 +248,8 @@ function OrgApp(props: OrgAppProps) {
       isAdmin,
       canEditRole,
       entitlements: data.entitlements,
+      modules: data.modules,
+      moduleName: (id) => data.modules.find((m) => m.id === id)?.name ?? id.charAt(0).toUpperCase() + id.slice(1),
       hasModule,
       moduleOn,
       allSites,
@@ -236,10 +269,9 @@ function OrgApp(props: OrgAppProps) {
       if (!state) return false
       if (def.adminOnly && !state.isAdmin) return false
       if (def.module && !state.hasModule(def.module)) return false
-      if (def.anyModule && !state.hasModule('kids') && !state.hasModule('signage')) return false
       return true
     },
-    [state],
+    [state, PAGES],
   )
 
   const firstPage = Object.keys(PAGES).find(visible) ?? 'screens'
@@ -265,8 +297,7 @@ function OrgApp(props: OrgAppProps) {
   if (!state) return null
 
   const def = PAGES[current]
-  const Page = def.component
-  const notEnabled = def.module ? !state.moduleOn(def.module) : def.anyModule ? !state.moduleOn('kids') && !state.moduleOn('signage') : false
+    const notEnabled = def.module ? !state.moduleOn(def.module) : false
   const logo = org.branding.logo_url
 
   return (
@@ -281,13 +312,9 @@ function OrgApp(props: OrgAppProps) {
         </header>
         <div className="body">
           <nav className={`sidebar ${menuOpen ? 'open' : ''}`}>
-            {NAV.map((group) => {
+            {nav.groups.map((group) => {
               const pages = group.pages.filter(visible)
-              const showGroup = group.module
-                ? state.hasModule(group.module)
-                : group.anyModule
-                  ? state.hasModule('kids') || state.hasModule('signage')
-                  : true
+              const showGroup = group.module ? state.hasModule(group.module) : true
               if (!showGroup || pages.length === 0) return null
               const locked = group.module ? !state.moduleOn(group.module) : false
               return (
@@ -319,10 +346,10 @@ function OrgApp(props: OrgAppProps) {
           {menuOpen && <div className="scrim" onClick={() => setMenuOpen(false)} />}
           <main className="content">
             <div className="topbar">
-              <h1>{def.label}</h1>
+              <h1>{def.title ?? def.label}</h1>
               {logo && <img className="org-logo" src={logo} alt={org.name} />}
             </div>
-            {notEnabled ? <ModuleOff module={def.module ?? (state.hasModule('kids') ? 'kids' : 'signage')} /> : <Page />}
+            {notEnabled && def.module ? <ModuleOff module={def.module} /> : def.render()}
           </main>
         </div>
       </div>

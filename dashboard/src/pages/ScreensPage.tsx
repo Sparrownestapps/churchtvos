@@ -178,7 +178,7 @@ function ScreenCard({
   onToggle: () => void
   reload: () => void
 }) {
-  const { sites, locations } = useApp()
+  const { sites, locations, modules } = useApp()
   const online = isOnline(s)
   const group = data.groups.find((g) => g.id === s.group_id)
   const own = data.schedules.filter((r) => r.screen_id === s.id)
@@ -285,8 +285,11 @@ function ScreenCard({
                 <label className="field">
                   <span>Default module</span>
                   <select value={form.default_module} onChange={(e) => set('default_module', e.target.value as ScreenModule)}>
-                    <option value="kids">Kids</option>
-                    <option value="signage">Signage</option>
+                    {modules.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
                     <option value="off">Off (black screen)</option>
                   </select>
                 </label>

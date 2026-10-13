@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useApp } from '../context'
 import { supabase } from '../supabase'
-import type { Media, SignageItem, SignagePlaylist } from '../types'
-import { attempt, moveItem, must, scopeLabel, useLoad } from '../lib'
+import type { Media, MediaFolder, SignageItem, SignagePlaylist } from '../types'
+import { attempt, fetchAll, moveItem, must, scopeLabel, useLoad } from '../lib'
 import { ScopeSelect, useDefaultScope } from '../ui'
+import { MediaSelect } from '../MediaSelect'
 
 export default function SignagePlaylistsPage() {
   const { org, sites, canEditContent } = useApp()
@@ -11,11 +12,12 @@ export default function SignagePlaylistsPage() {
   const [editing, setEditing] = useState<SignagePlaylist | 'new' | null>(null)
 
   const { data, reload } = useLoad(async () => {
-    const [playlists, media] = await Promise.all([
+    const [playlists, media, folders] = await Promise.all([
       supabase.from('signage_playlists').select('*').eq('organization_id', org.id).order('updated_at', { ascending: false }),
-      supabase.from('media').select('*').eq('organization_id', org.id).order('title'),
+      fetchAll<Media>((a, b) => supabase.from('media').select('*').eq('organization_id', org.id).eq('module', 'signage').order('title').range(a, b)),
+      fetchAll<MediaFolder>((a, b) => supabase.from('media_folders').select('*').eq('organization_id', org.id).eq('module', 'signage').order('name').range(a, b)),
     ])
-    return { playlists: must(playlists) as SignagePlaylist[], media: must(media) as Media[] }
+    return { playlists: must(playlists) as SignagePlaylist[], media, folders }
   })
 
   if (editing) {
@@ -23,6 +25,7 @@ export default function SignagePlaylistsPage() {
       <Editor
         playlist={editing === 'new' ? null : editing}
         media={data?.media ?? []}
+        folders={data?.folders ?? []}
         onDone={() => (setEditing(null), reload())}
       />
     )
@@ -84,7 +87,7 @@ export default function SignagePlaylistsPage() {
   )
 }
 
-function Editor({ playlist, media, onDone }: { playlist: SignagePlaylist | null; media: Media[]; onDone: () => void }) {
+function Editor({ playlist, media, folders, onDone }: { playlist: SignagePlaylist | null; media: Media[]; folders: MediaFolder[]; onDone: () => void }) {
   const { org } = useApp()
   const defaultScope = useDefaultScope()
   const [name, setName] = useState(playlist?.name ?? '')
@@ -154,16 +157,7 @@ function Editor({ playlist, media, onDone }: { playlist: SignagePlaylist | null;
             {item.url && (item.type === 'image' ? <img className="thumb" src={item.url} alt="" /> : <video className="thumb" src={`${item.url}#t=1`} preload="metadata" muted />)}
             <label className="field grow">
               <span>{item.type === 'image' ? 'Image' : 'Video'} from the library</span>
-              <select value={item.media_id} onChange={(e) => pick(i, item, e.target.value)}>
-                <option value="">Choose…</option>
-                {media
-                  .filter((m) => m.kind === item.type)
-                  .map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.title}
-                    </option>
-                  ))}
-              </select>
+              <MediaSelect media={media} folders={folders} kind={item.type} value={item.media_id} onChange={(id) => pick(i, item, id)} />
             </label>
             {item.type === 'image' && (
               <label className="field">
@@ -190,7 +184,7 @@ function Editor({ playlist, media, onDone }: { playlist: SignagePlaylist | null;
         <button className="btn" onClick={() => add('video')}>
           + Video
         </button>
-        {media.length === 0 && <span className="muted">Upload images and videos on the Media page first.</span>}
+        {media.length === 0 && <span className="muted">Upload images and videos under Signage, then Media, first.</span>}
       </div>
 
       <div className="row">
