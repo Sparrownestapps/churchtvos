@@ -1,0 +1,501 @@
+import { useCallback, useEffect, useMemo, useState, type ComponentType, type FormEvent } from 'react'
+import type { Session } from '@supabase/supabase-js'
+import { supabase } from './supabase'
+import { AppContext, useApp, type AppState } from './context'
+import type { Entitlement, Location, Membership, Module, Organization, Role, Site } from './types'
+import { entitled, isHex, must, roleLabel, slugify, useLoad } from './lib'
+import { ModuleOff } from './ui'
+import SchedulePage from './pages/SchedulePage'
+import PlaylistsPage from './pages/PlaylistsPage'
+import MediaPage from './pages/MediaPage'
+import SignagePlaylistsPage from './pages/SignagePlaylistsPage'
+import SignageSlotsPage from './pages/SignageSlotsPage'
+import ScreensPage from './pages/ScreensPage'
+import SitesPage from './pages/SitesPage'
+import PeoplePage from './pages/PeoplePage'
+import SettingsPage from './pages/SettingsPage'
+
+type PageDef = { label: string; component: ComponentType; module?: Module; anyModule?: boolean; adminOnly?: boolean }
+
+const PAGES: Record<string, PageDef> = {
+  'kids-schedule': { label: 'Schedule', component: SchedulePage, module: 'kids' },
+  'kids-playlists': { label: 'Playlists', component: PlaylistsPage, module: 'kids' },
+  'signage-playlists': { label: 'Playlists', component: SignagePlaylistsPage, module: 'signage' },
+  'signage-slots': { label: 'Slots & schedule', component: SignageSlotsPage, module: 'signage' },
+  media: { label: 'Media', component: MediaPage, anyModule: true },
+  screens: { label: 'Screens', component: ScreensPage },
+  sites: { label: 'Sites & Locations', component: SitesPage },
+  people: { label: 'People', component: PeoplePage, adminOnly: true },
+  settings: { label: 'Settings', component: SettingsPage, adminOnly: true },
+}
+
+const NAV: { title: string; module?: Module; anyModule?: boolean; pages: string[] }[] = [
+  { title: 'Kids', module: 'kids', pages: ['kids-schedule', 'kids-playlists'] },
+  { title: 'Signage', module: 'signage', pages: ['signage-playlists', 'signage-slots'] },
+  { title: 'Library', anyModule: true, pages: ['media'] },
+  { title: 'Manage', pages: ['screens', 'sites', 'people', 'settings'] },
+]
+
+const ORG_KEY = 'churchtvos.org'
+const readStoredOrg = () => {
+  try {
+    return localStorage.getItem(ORG_KEY)
+  } catch {
+    return null
+  }
+}
+
+export default function App() {
+  const [session, setSession] = useState<Session | null>()
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    const { data } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    return () => data.subscription.unsubscribe()
+  }, [])
+
+  if (session === undefined) return null
+  if (!session) return <Login />
+  return <SignedIn session={session} />
+}
+
+function Wordmark() {
+  return <span className="wordmark">Church TV OS</span>
+}
+
+/** Loads who you are and which churches you can see, then picks the active one. */
+function SignedIn({ session }: { session: Session }) {
+  const uid = session.user.id
+  const email = session.user.email ?? ''
+  const [orgId, setOrgId] = useState<string | null>(readStoredOrg)
+  const [creating, setCreating] = useState(false)
+
+  const { data, error, reload } = useLoad(async () => {
+    const [orgs, memberships, platform] = await Promise.all([
+      supabase.from('organizations').select('*').order('name'),
+      supabase.from('memberships').select('*').eq('user_id', uid),
+      supabase.rpc('is_platform_admin'),
+    ])
+    return {
+      orgs: must(orgs) as Organization[],
+      memberships: must(memberships) as Membership[],
+      platform: must(platform) === true,
+    }
+  }, [uid])
+
+  const signOut = () => supabase.auth.signOut()
+
+  function switchOrg(id: string) {
+    setOrgId(id)
+    setCreating(false)
+    try {
+      localStorage.setItem(ORG_KEY, id)
+    } catch {
+      /* private mode: the choice just isn't remembered */
+    }
+  }
+
+  if (error)
+    return (
+      <div className="center-screen">
+        <div className="card narrow">
+          <Wordmark />
+          <p className="error">Couldn't load your account: {error}</p>
+          <button className="btn" onClick={reload}>
+            Try again
+          </button>
+          <button className="link" onClick={signOut}>
+            Sign out
+          </button>
+        </div>
+      </div>
+    )
+  if (!data) return null
+
+  const org = data.orgs.find((o) => o.id === orgId) ?? data.orgs[0]
+  if (!org || creating) {
+    return (
+      <CreateOrg
+        email={email}
+        canCancel={!!org}
+        onCancel={() => setCreating(false)}
+        onCreated={(id) => {
+          reload()
+          switchOrg(id)
+        }}
+        signOut={signOut}
+      />
+    )
+  }
+
+  return (
+    <OrgApp
+      key={org.id}
+      uid={uid}
+      email={email}
+      org={org}
+      orgs={data.orgs}
+      membership={data.memberships.find((m) => m.organization_id === org.id) ?? null}
+      isPlatformAdmin={data.platform}
+      switchOrg={switchOrg}
+      startCreateOrg={() => setCreating(true)}
+      reloadOrgs={reload}
+      signOut={signOut}
+    />
+  )
+}
+
+type OrgAppProps = {
+  uid: string
+  email: string
+  org: Organization
+  orgs: Organization[]
+  membership: Membership | null
+  isPlatformAdmin: boolean
+  switchOrg: (id: string) => void
+  startCreateOrg: () => void
+  reloadOrgs: () => void
+  signOut: () => void
+}
+
+/** Everything inside one church: its sites, locations, plan and navigation. */
+function OrgApp(props: OrgAppProps) {
+  const { uid, email, org, orgs, membership, isPlatformAdmin } = props
+
+  const { data, error, reload } = useLoad(async () => {
+    const [sites, locations, entitlements] = await Promise.all([
+      supabase.from('sites').select('*').eq('organization_id', org.id).order('name'),
+      supabase.from('locations').select('*').eq('organization_id', org.id).order('name'),
+      supabase.from('entitlements').select('*').eq('organization_id', org.id),
+    ])
+    return {
+      sites: must(sites) as Site[],
+      locations: must(locations) as Location[],
+      entitlements: must(entitlements) as Entitlement[],
+    }
+  })
+
+  const [page, setPage] = useState(() => location.hash.slice(1))
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  // Apply the church's colours to the whole dashboard.
+  useEffect(() => {
+    const root = document.documentElement
+    const { primary_color: primary, accent_color: accent } = org.branding
+    if (isHex(primary)) root.style.setProperty('--primary', primary)
+    if (isHex(accent)) root.style.setProperty('--accent', accent)
+    const meta = document.querySelector('meta[name="theme-color"]')
+    if (meta && isHex(primary)) meta.setAttribute('content', primary)
+    return () => {
+      root.style.removeProperty('--primary')
+      root.style.removeProperty('--accent')
+      meta?.setAttribute('content', '#1f3a5f')
+    }
+  }, [org.branding])
+
+  const role: Role = membership?.role ?? 'owner' // platform admins without a membership act as owners
+  const isAdmin = role === 'owner' || role === 'admin'
+  const canEditRole = isAdmin || role === 'editor'
+  const allSites = isAdmin || !membership || membership.site_ids === null
+
+  const state = useMemo<AppState | null>(() => {
+    if (!data) return null
+    const hasModule = (m: Module) => isAdmin || !!membership?.modules.includes(m)
+    const moduleOn = (m: Module) => hasModule(m) && entitled(data.entitlements.find((e) => e.module === m))
+    const mySites = allSites ? data.sites : data.sites.filter((s) => membership?.site_ids?.includes(s.id))
+    return {
+      userId: uid,
+      email,
+      org,
+      orgs,
+      switchOrg: props.switchOrg,
+      startCreateOrg: props.startCreateOrg,
+      reloadOrgs: props.reloadOrgs,
+      isPlatformAdmin,
+      membership,
+      role,
+      isAdmin,
+      canEditRole,
+      entitlements: data.entitlements,
+      hasModule,
+      moduleOn,
+      allSites,
+      mySites,
+      canEditContent: (m, siteId) =>
+        canEditRole && moduleOn(m) && (allSites || (siteId !== null && !!membership?.site_ids?.includes(siteId))),
+      sites: data.sites,
+      locations: data.locations,
+      reloadOrg: reload,
+      signOut: props.signOut,
+    }
+  }, [data, org, orgs, membership, isPlatformAdmin, uid, email, role, isAdmin, canEditRole, allSites, reload, props])
+
+  const visible = useCallback(
+    (key: string) => {
+      const def = PAGES[key]
+      if (!state) return false
+      if (def.adminOnly && !state.isAdmin) return false
+      if (def.module && !state.hasModule(def.module)) return false
+      if (def.anyModule && !state.hasModule('kids') && !state.hasModule('signage')) return false
+      return true
+    },
+    [state],
+  )
+
+  const firstPage = Object.keys(PAGES).find(visible) ?? 'screens'
+  const current = page in PAGES && visible(page) ? page : firstPage
+
+  useEffect(() => {
+    location.hash = current
+    setMenuOpen(false)
+  }, [current])
+
+  if (error)
+    return (
+      <div className="center-screen">
+        <div className="card narrow">
+          <Wordmark />
+          <p className="error">Couldn't load {org.name}: {error}</p>
+          <button className="btn" onClick={reload}>
+            Try again
+          </button>
+        </div>
+      </div>
+    )
+  if (!state) return null
+
+  const def = PAGES[current]
+  const Page = def.component
+  const notEnabled = def.module ? !state.moduleOn(def.module) : def.anyModule ? !state.moduleOn('kids') && !state.moduleOn('signage') : false
+  const logo = org.branding.logo_url
+
+  return (
+    <AppContext.Provider value={state}>
+      <div className="layout">
+        <header className="appbar">
+          <button className="menu-btn" aria-label="Menu" onClick={() => setMenuOpen((o) => !o)}>
+            {menuOpen ? '✕' : '☰'}
+          </button>
+          <Wordmark />
+          <OrgSwitcher />
+        </header>
+        <div className="body">
+          <nav className={`sidebar ${menuOpen ? 'open' : ''}`}>
+            {NAV.map((group) => {
+              const pages = group.pages.filter(visible)
+              const showGroup = group.module
+                ? state.hasModule(group.module)
+                : group.anyModule
+                  ? state.hasModule('kids') || state.hasModule('signage')
+                  : true
+              if (!showGroup || pages.length === 0) return null
+              const locked = group.module ? !state.moduleOn(group.module) : false
+              return (
+                <div key={group.title} className="nav-group">
+                  <div className="nav-title">
+                    {group.title}
+                    {locked && <span title="Not enabled for your church"> 🔒</span>}
+                  </div>
+                  {pages.map((key) => (
+                    <button
+                      key={key}
+                      className={`nav-item ${current === key ? 'active' : ''}`}
+                      onClick={() => setPage(key)}
+                    >
+                      {PAGES[key].label}
+                    </button>
+                  ))}
+                </div>
+              )
+            })}
+            <div className="sidebar-foot">
+              <div className="sidebar-email">{email}</div>
+              <span className="muted">{state.isPlatformAdmin ? 'Platform admin' : roleLabel(role)}</span>
+              <button className="link" onClick={state.signOut}>
+                Sign out
+              </button>
+            </div>
+          </nav>
+          {menuOpen && <div className="scrim" onClick={() => setMenuOpen(false)} />}
+          <main className="content">
+            <div className="topbar">
+              <h1>{def.label}</h1>
+              {logo && <img className="org-logo" src={logo} alt={org.name} />}
+            </div>
+            {notEnabled ? <ModuleOff module={def.module ?? (state.hasModule('kids') ? 'kids' : 'signage')} /> : <Page />}
+          </main>
+        </div>
+      </div>
+    </AppContext.Provider>
+  )
+}
+
+function OrgSwitcher() {
+  const { org, orgs, switchOrg, startCreateOrg, isPlatformAdmin } = useApp()
+  if (orgs.length <= 1 && !isPlatformAdmin) return <span className="pill org-pill">{org.name}</span>
+  return (
+    <select
+      className="org-select"
+      value={org.id}
+      aria-label="Church"
+      onChange={(e) => (e.target.value === '__new__' ? startCreateOrg() : switchOrg(e.target.value))}
+    >
+      {orgs.map((o) => (
+        <option key={o.id} value={o.id}>
+          {o.name}
+        </option>
+      ))}
+      {isPlatformAdmin && <option value="__new__">+ New church…</option>}
+    </select>
+  )
+}
+
+function CreateOrg({
+  email,
+  canCancel,
+  onCancel,
+  onCreated,
+  signOut,
+}: {
+  email: string
+  canCancel: boolean
+  onCancel: () => void
+  onCreated: (id: string) => void
+  signOut: () => void
+}) {
+  const [name, setName] = useState('')
+  const [slug, setSlug] = useState('')
+  const [slugTouched, setSlugTouched] = useState(false)
+  const [site, setSite] = useState('Main Campus')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    const { data, error } = await supabase.rpc('create_organization', {
+      p_name: name.trim(),
+      p_slug: slug.trim(),
+      p_site: site.trim() || 'Main Campus',
+    })
+    setBusy(false)
+    if (error) {
+      setError(/organizations_slug/.test(error.message) ? 'That web address is already taken. Try another.' : error.message)
+      return
+    }
+    onCreated(data as string)
+  }
+
+  return (
+    <div className="center-screen primary">
+      <form className="card narrow" onSubmit={submit}>
+        <Wordmark />
+        <h2>Create your church</h2>
+        <p className="muted">
+          You're signed in as <b>{email}</b>, which isn't part of a church yet. Create one and you'll be its owner. If
+          you were invited to an existing church, sign out and use the email address you were invited with.
+        </p>
+        <label className="field">
+          <span>Church name</span>
+          <input
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value)
+              if (!slugTouched) setSlug(slugify(e.target.value))
+            }}
+            required
+            autoFocus
+          />
+        </label>
+        <label className="field">
+          <span>Short name (letters, numbers, dashes)</span>
+          <input
+            value={slug}
+            onChange={(e) => (setSlugTouched(true), setSlug(slugify(e.target.value)))}
+            pattern="[a-z0-9][a-z0-9\-]{1,38}"
+            title="2-39 characters: lowercase letters, numbers and dashes"
+            required
+          />
+        </label>
+        <label className="field">
+          <span>First site (campus)</span>
+          <input value={site} onChange={(e) => setSite(e.target.value)} required />
+        </label>
+        {error && <p className="error">{error}</p>}
+        <button className="btn primary wide" disabled={busy}>
+          {busy ? 'Creating…' : 'Create church'}
+        </button>
+        {canCancel && (
+          <button type="button" className="link" onClick={onCancel}>
+            Cancel
+          </button>
+        )}
+        <button type="button" className="link" onClick={signOut}>
+          Sign out
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function Login() {
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    setMessage(null)
+    if (mode === 'signin') {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) setError(error.message)
+    } else {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: location.origin },
+      })
+      if (error) setError(error.message)
+      else if (!data.session) setMessage('Check your email for a confirmation link, then come back and sign in.')
+    }
+    setBusy(false)
+  }
+
+  return (
+    <div className="center-screen primary">
+      <form className="card narrow" onSubmit={submit}>
+        <Wordmark />
+        <h2>{mode === 'signin' ? 'Sign in' : 'Create your account'}</h2>
+        <label className="field">
+          <span>Email</span>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus autoComplete="email" />
+        </label>
+        <label className="field">
+          <span>Password</span>
+          <input
+            type="password"
+            value={password}
+            minLength={8}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+          />
+        </label>
+        {error && <p className="error">{error}</p>}
+        {message && <p className="notice">{message}</p>}
+        <button className="btn primary wide" disabled={busy}>
+          {mode === 'signin' ? 'Sign in' : 'Create account'}
+        </button>
+        <button type="button" className="link" onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}>
+          {mode === 'signin' ? 'First time? Create an account' : 'Have an account? Sign in'}
+        </button>
+      </form>
+    </div>
+  )
+}

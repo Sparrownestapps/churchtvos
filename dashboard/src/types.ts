@@ -1,0 +1,136 @@
+export type Module = 'kids' | 'signage'
+export type Role = 'owner' | 'admin' | 'editor' | 'operator'
+export type ScreenModule = Module | 'off'
+export type Orientation = 'landscape' | 'portrait' | 'portrait_flipped'
+
+export type Branding = {
+  logo_url?: string
+  primary_color?: string
+  accent_color?: string
+  /** YouTube channel (UC…) used by the Kids YouTube picker and "Live now" items. */
+  youtube_channel_id?: string
+}
+
+export type Organization = {
+  id: string
+  name: string
+  slug: string
+  branding: Branding
+  created_at: string
+}
+
+export type Membership = {
+  id: string
+  organization_id: string
+  user_id: string | null
+  email: string
+  role: Role
+  modules: Module[]
+  /** null = all sites */
+  site_ids: string[] | null
+  created_at: string
+}
+
+export type Entitlement = {
+  organization_id: string
+  module: Module
+  status: 'trialing' | 'active' | 'past_due' | 'canceled'
+  tv_limit: number
+  plan: string
+  grace_ends_at: string | null
+  current_period_end: string | null
+}
+
+export type Site = { id: string; organization_id: string; name: string; timezone: string }
+export type Location = { id: string; organization_id: string; site_id: string; name: string }
+
+export type Media = {
+  id: string
+  organization_id: string
+  site_id: string | null
+  title: string
+  kind: 'video' | 'image'
+  storage_path: string
+  url: string
+  size_bytes: number | null
+  created_at: string
+}
+
+// Must match PlaylistItem in the TV app (Model.kt).
+export type PlaylistItem =
+  | { type: 'video'; title: string; url: string; media_id: string }
+  | { type: 'image'; title: string; url: string; media_id: string; seconds: number | null }
+  | { type: 'countdown'; title: string; seconds: number }
+  | { type: 'lyrics'; title: string; slides: string[] }
+  // video_id null + channel_id set = whatever that channel is live-streaming when the item plays
+  | { type: 'youtube'; title: string; video_id: string | null; channel_id: string | null; start: number | null }
+
+export type Playlist = {
+  id: string
+  organization_id: string
+  site_id: string | null
+  name: string
+  items: PlaylistItem[]
+  updated_at: string
+}
+
+export type Schedule = {
+  id: string
+  organization_id: string
+  location_id: string
+  playlist_id: string
+  starts_at: string
+  ends_at: string | null
+}
+
+export type SignageItem = {
+  type: 'image' | 'video'
+  title: string
+  url: string
+  /** Images: how long to show. Videos play to the end (null). */
+  seconds: number | null
+  media_id: string
+}
+
+export type SignagePlaylist = {
+  id: string
+  organization_id: string
+  site_id: string | null
+  name: string
+  items: SignageItem[]
+  updated_at: string
+}
+
+export type ScreenGroup = { id: string; organization_id: string; name: string }
+
+export type Screen = {
+  id: string
+  organization_id: string | null
+  location_id: string | null
+  group_id: string | null
+  name: string | null
+  orientation: Orientation
+  default_module: ScreenModule
+  signage_default_playlist_id: string | null
+  pairing_code: string | null
+  model: string | null
+  app_version: string | null
+  last_seen_at: string | null
+  created_at: string
+}
+
+/** Shared shape of screen_schedules and signage_slots rows. */
+type RuleBase = {
+  id: string
+  organization_id: string
+  screen_id: string | null
+  group_id: string | null
+  /** 0 = Sunday */
+  days: number[]
+  start_time: string
+  end_time: string
+  priority: number
+  created_at: string
+}
+export type ScreenSchedule = RuleBase & { module: ScreenModule }
+export type SignageSlot = RuleBase & { playlist_id: string }

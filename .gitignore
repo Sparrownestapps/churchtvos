@@ -1,0 +1,9 @@
+.DS_Store
+node_modules/
+dist/
+.env
+.env.local
+.netlify/
+.supabase/
+supabase/.temp/
+supabase/.branches/
