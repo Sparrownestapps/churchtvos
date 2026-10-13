@@ -3,6 +3,7 @@ package com.churchtvos.tv
 import android.net.Uri
 import android.view.LayoutInflater
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
@@ -30,6 +31,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -46,15 +48,16 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.delay
 
+/** [onExit] is Back; [onFinished] is reaching the end of the slides (signage loops, demo restarts). */
 @Composable
-fun PlayerScreen(slides: List<Slide>, onExit: () -> Unit) {
+fun PlayerScreen(slides: List<Slide>, onExit: () -> Unit, onFinished: () -> Unit = onExit) {
     val context = LocalContext.current
     val rotated = LocalRotated.current
     var index by remember { mutableIntStateOf(0) }
     val slide = slides.getOrNull(index)
 
     val next by rememberUpdatedState {
-        if (index < slides.lastIndex) index++ else onExit()
+        if (index < slides.lastIndex) index++ else onFinished()
     }
     val previous = { if (index > 0) index-- }
 
@@ -79,6 +82,10 @@ fun PlayerScreen(slides: List<Slide>, onExit: () -> Unit) {
             player.clearMediaItems()
         }
         if (slide is Slide.Image && slide.seconds != null) {
+            delay(slide.seconds * 1000L)
+            next()
+        }
+        if (slide is Slide.Bundled) {
             delay(slide.seconds * 1000L)
             next()
         }
@@ -134,6 +141,12 @@ fun PlayerScreen(slides: List<Slide>, onExit: () -> Unit) {
             when (slide) {
                 is Slide.Image -> AsyncImage(
                     model = slide.file,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize().background(Color.Black),
+                )
+                is Slide.Bundled -> Image(
+                    painter = painterResource(slide.res),
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize().background(Color.Black),

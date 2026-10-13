@@ -46,7 +46,7 @@ type Props =
  * or "which Signage playlist plays when" (signage_slots). The highest priority wins when rules overlap.
  */
 export default function ScheduleRules(props: Props) {
-  const { org } = useApp()
+  const { org, modules } = useApp()
   const { kind, target, canEdit, onChanged } = props
   const table = kind === 'module' ? 'screen_schedules' : 'signage_slots'
   const [module, setModule] = useState<ScreenModule>('signage')
@@ -55,16 +55,36 @@ export default function ScheduleRules(props: Props) {
   const [start, setStart] = useState('00:00')
   const [end, setEnd] = useState('23:59')
   const [priority, setPriority] = useState(0)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const playlistName = (id: string) => (props.kind === 'slot' ? props.playlists.find((p) => p.id === id)?.name : undefined) ?? '—'
+
+  function resetForm() {
+    setEditingId(null)
+    setModule('signage')
+    setPlaylistId('')
+    setDays([0, 1, 2, 3, 4, 5, 6])
+    setStart('00:00')
+    setEnd('23:59')
+    setPriority(0)
+  }
+
+  function startEdit(r: ScreenSchedule | SignageSlot) {
+    setEditingId(r.id)
+    if ('module' in r) setModule(r.module)
+    else setPlaylistId(r.playlist_id)
+    setDays(r.days)
+    setStart(r.start_time.slice(0, 5))
+    setEnd(r.end_time.slice(0, 5))
+    setPriority(r.priority)
+  }
 
   async function add() {
     if (days.length === 0) return alert('Choose at least one day.')
     if (end <= start) return alert('The end time must be after the start time.')
     if (kind === 'slot' && !playlistId) return alert('Choose a playlist.')
     const row: Record<string, unknown> = {
-      organization_id: org.id,
-      ...target,
+      ...(editingId ? {} : { organization_id: org.id, ...target }),
       days,
       start_time: start,
       end_time: end === '23:59' ? '23:59:59' : end,
@@ -72,12 +92,21 @@ export default function ScheduleRules(props: Props) {
     }
     if (kind === 'module') row.module = module
     else row.playlist_id = playlistId
-    if (await attempt(async () => must(await supabase.from(table).insert(row)))) onChanged()
+    const ok = await attempt(async () =>
+      must(editingId ? await supabase.from(table).update(row).eq('id', editingId) : await supabase.from(table).insert(row)),
+    )
+    if (ok) {
+      resetForm()
+      onChanged()
+    }
   }
 
   async function remove(id: string) {
     if (!confirm('Remove this rule?')) return
-    if (await attempt(async () => must(await supabase.from(table).delete().eq('id', id)))) onChanged()
+    if (await attempt(async () => must(await supabase.from(table).delete().eq('id', id)))) {
+      if (id === editingId) resetForm()
+      onChanged()
+    }
   }
 
   const rules = [...props.rules].sort((a, b) => b.priority - a.priority)
@@ -99,23 +128,31 @@ export default function ScheduleRules(props: Props) {
             {r.priority !== 0 && <span className="muted"> · priority {r.priority}</span>}
           </span>
           {canEdit && (
-            <button className="link danger" onClick={() => remove(r.id)}>
-              Remove
-            </button>
+            <span className="row">
+              <button className="link" onClick={() => startEdit(r)}>
+                Edit
+              </button>
+              <button className="link danger" onClick={() => remove(r.id)}>
+                Remove
+              </button>
+            </span>
           )}
         </div>
       ))}
 
       {canEdit && (
         <div className="stack-sm rule-form">
-          <span className="field-label">Add a rule</span>
+          <span className="field-label">{editingId ? 'Edit rule' : 'Add a rule'}</span>
           <div className="row wrap">
             {kind === 'module' ? (
               <label className="field">
                 <span>Run</span>
                 <select value={module} onChange={(e) => setModule(e.target.value as ScreenModule)}>
-                  <option value="signage">Signage</option>
-                  <option value="kids">Kids</option>
+                  {modules.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
                   <option value="off">Off (black screen)</option>
                 </select>
               </label>
@@ -146,10 +183,15 @@ export default function ScheduleRules(props: Props) {
             </label>
           </div>
           <DayPicker value={days} onChange={setDays} />
-          <div>
+          <div className="row">
             <button className="btn primary" onClick={add}>
-              Add rule
+              {editingId ? 'Save changes' : 'Add rule'}
             </button>
+            {editingId && (
+              <button className="btn" onClick={resetForm}>
+                Cancel
+              </button>
+            )}
           </div>
           <p className="muted">
             Times are in the site's time zone. When rules overlap, the higher priority wins. Nothing matching means

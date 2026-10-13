@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 
 @Composable
-fun PairingScreen(code: String, offline: Boolean) {
+fun PairingScreen(code: String, offline: Boolean, onSettings: () -> Unit = {}) {
     BrandedScreen {
         Text("Pair this TV", style = TextStyle(fontFamily = JuliusSansOne, fontSize = 40.sp, color = BrandPrimary))
         Spacer(Modifier.height(20.dp))
@@ -37,6 +37,8 @@ fun PairingScreen(code: String, offline: Boolean) {
             "In the Church TV OS dashboard ($DASHBOARD_HOST),\ngo to Screens → Pair a TV, enter this code and choose the location.",
             style = TextStyle(fontFamily = Lato, fontSize = 18.sp, lineHeight = 28.sp, color = Greyscale, textAlign = TextAlign.Center),
         )
+        Spacer(Modifier.height(16.dp))
+        Text("Menu button: settings and demo mode", style = TextStyle(fontFamily = Lato, fontSize = 13.sp, color = Greyscale))
         if (offline) {
             Spacer(Modifier.height(16.dp))
             Text("⚠ Can't reach the internet. Check this TV's Wi-Fi.", style = TextStyle(fontFamily = Lato, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = BrandAccent))

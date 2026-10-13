@@ -20,7 +20,7 @@ data class TvUiState(
 
 /** Keeps the TV in step with the dashboard: polls its schedules (Kids and Signage) and pre-downloads the media. */
 class TvSync(private val appContext: Context, private val cache: MediaCache) {
-    private val store = DeviceStore(appContext)
+    val store = DeviceStore(appContext)
     private val api = SupabaseApi()
 
     private val _state = MutableStateFlow(TvUiState(device = store.cachedState?.let(::decode)))

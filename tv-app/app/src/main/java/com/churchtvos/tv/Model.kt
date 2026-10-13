@@ -54,6 +54,8 @@ sealed interface Slide {
     data class Video(val file: File) : Slide
     data class Image(val file: File, val seconds: Int?) : Slide
     data class Countdown(val title: String, val seconds: Int) : Slide
+    /** A picture shipped inside the app (demo mode). */
+    data class Bundled(@androidx.annotation.DrawableRes val res: Int, val seconds: Int) : Slide
     data class Lyric(val song: String, val text: String, val number: Int, val count: Int) : Slide
     data class YouTube(val videoId: String?, val channelId: String?, val start: Int?) : Slide
 }

@@ -173,10 +173,15 @@ class DeviceStore(context: Context) {
         get() = prefs.getString("state", null)
         set(value) = prefs.edit().putString("state", value).apply()
 
-    /** Whether the TV opens the app by itself when switched on. Off by default only once the app is in a store. */
+    /** Whether the TV opens the app by itself when switched on. Opt-in (the Appstore requires it): asked once after pairing, changeable in Settings. */
     var autoLaunch: Boolean
-        get() = prefs.getBoolean("auto_launch", true)
+        get() = prefs.getBoolean("auto_launch", false)
         set(value) = prefs.edit().putBoolean("auto_launch", value).apply()
+
+    /** True once the "open automatically?" question has been answered, so it is only asked once. */
+    var autoLaunchAsked: Boolean
+        get() = prefs.getBoolean("auto_launch_asked", false)
+        set(value) = prefs.edit().putBoolean("auto_launch_asked", value).apply()
 
     /** Forget everything so the TV registers again with a fresh pairing code. */
     fun reset() = prefs.edit().clear().commit()

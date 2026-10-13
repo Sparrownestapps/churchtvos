@@ -28,6 +28,12 @@ object AutoLaunch {
         if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(intent) else context.startService(intent)
     }
 
+    /** Turns auto-launch on or off right away (starts or stops the background watcher). */
+    fun setEnabled(context: Context, enabled: Boolean) {
+        DeviceStore(context).also { it.autoLaunch = enabled; it.autoLaunchAsked = true }
+        if (enabled) start(context) else context.stopService(Intent(context, WakeWatcherService::class.java))
+    }
+
     fun bringToFront(context: Context) {
         if (!isEnabled(context)) return
         context.startActivity(

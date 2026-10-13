@@ -1,6 +1,9 @@
 package com.churchtvos.tv
 
 import android.os.Bundle
+import android.view.KeyEvent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -23,6 +26,17 @@ import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
+    private var settingsOpen by mutableStateOf(false)
+
+    // The remote's Menu button opens (and closes) Settings from anywhere.
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_MENU) {
+            settingsOpen = !settingsOpen
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AutoLaunch.start(applicationContext)
@@ -43,7 +57,7 @@ class MainActivity : ComponentActivity() {
                     onExit = { finish() },
                 )
             } else {
-                App(sync, cache)
+                App(sync, cache, settingsOpen, onSettingsChange = { settingsOpen = it })
             }
         }
     }
@@ -52,7 +66,8 @@ class MainActivity : ComponentActivity() {
 private val whenFormat = DateTimeFormatter.ofPattern("EEE MMM d · h:mm a").withZone(ZoneId.systemDefault())
 
 @Composable
-fun App(sync: TvSync, cache: MediaCache) {
+fun App(sync: TvSync, cache: MediaCache, settingsOpen: Boolean, onSettingsChange: (Boolean) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val state by sync.state.collectAsState()
     LaunchedEffect(Unit) { sync.run() }
 
@@ -65,11 +80,37 @@ fun App(sync: TvSync, cache: MediaCache) {
     }
 
     val device = state.device
+    var demo by remember { mutableStateOf<String?>(null) }
+    var demoMenu by remember { mutableStateOf(false) }
+    var autoLaunch by remember { mutableStateOf(sync.store.autoLaunch) }
+    var asked by remember { mutableStateOf(sync.store.autoLaunchAsked) }
+    val demoNow = demo
+
     BrandTheme(device?.brand() ?: Brand()) {
         Oriented(device?.screen?.orientation ?: "landscape") {
             when {
+                demoNow != null -> {
+                    var loop by remember { mutableIntStateOf(0) }
+                    key(demoNow, loop) {
+                        PlayerScreen(Demo.slides(demoNow), onExit = { demo = null }, onFinished = { loop++ })
+                    }
+                }
+                demoMenu -> DemoMenu(onPick = { demo = it; demoMenu = false; onSettingsChange(false) }, onClose = { demoMenu = false })
+                settingsOpen -> SettingsScreen(
+                    autoLaunch = autoLaunch,
+                    paired = device?.paired == true,
+                    detail = "Version ${BuildConfig.VERSION_NAME}" + (device?.screen?.name?.let { "  ·  $it" } ?: "") + "  ·  $DASHBOARD_HOST",
+                    onToggleAutoLaunch = { autoLaunch = !autoLaunch; AutoLaunch.setEnabled(context, autoLaunch); asked = true },
+                    onDemo = { demoMenu = true },
+                    onClose = { onSettingsChange(false) },
+                )
                 device == null -> MessageScreen("Connecting…", state.error)
                 !device.paired -> PairingScreen(device.pairingCode ?: "······", state.offline)
+                !asked -> AutoLaunchPrompt { yes ->
+                    AutoLaunch.setEnabled(context, yes)
+                    autoLaunch = yes
+                    asked = true
+                }
                 else -> {
                     val module = device.moduleNow(now.toEpochMilli())
                     // Each module can have its own look, and its own splash when the TV starts or switches into it.
