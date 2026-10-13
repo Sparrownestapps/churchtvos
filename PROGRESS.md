@@ -12,10 +12,15 @@
 3. Sign up in the dashboard with keith@sparrownest.com (platform admin is pre-seeded), create Forward Church, grant entitlements (kind=internal).
 4. Supabase Auth Site URL + redirect URLs -> https://app.churchtvos.com.
 5. Decide the real icon/logo (current is placeholder; Fire TV caches the launcher icon from first install).
-6. Move Forward Church data from the old project, re-pair TVs.
+6. ~~Move Forward Church data~~ Decided 2026-10-13: no migration, Forward Church starts from scratch in the new dashboard. Re-pair TVs when ready.
 
 ## Known gaps
 - YouTube slides and portrait rotation: video layer is behind the window, so YouTube will not rotate.
 - Auto-launch is on by default (pref exists, no UI yet); make it opt-in before Appstore.
 - No demo mode yet. Test TV (172.16.51.189) was unreachable from here.
 - One stray unpaired test screen row from the emulator may remain in `screens`.
+
+## Update (later 2026-10-13)
+- Live: https://app.churchtvos.com (Netlify site churchtvos-app, team Sparrownest; GoDaddy CNAME app -> churchtvos-app.netlify.app).
+- Keith signed up (platform admin); Forward Church org created with internal-plan entitlements (kids + signage, 50 TVs).
+- Icon concept A chosen and built in. Branding v2 shipped: dark logo, per-module looks, full-screen splash (untested on a real TV).
