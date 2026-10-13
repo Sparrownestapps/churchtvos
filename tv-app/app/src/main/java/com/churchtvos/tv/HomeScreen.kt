@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Button
@@ -110,13 +112,36 @@ fun HomeScreen(
     }
 }
 
+/** Full-screen logo on the brand's primary colour. */
+@Composable
+fun SplashScreen() {
+    val brand = LocalBrand.current
+    val logo = brand.logoOn(brand.primary)
+    Box(Modifier.fillMaxSize().background(brand.primary), contentAlignment = Alignment.Center) {
+        if (logo != null) {
+            AsyncImage(
+                model = logo,
+                contentDescription = brand.orgName,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxWidth(0.55f).fillMaxHeight(0.5f),
+            )
+        } else {
+            Text(
+                brand.orgName.uppercase(),
+                style = TextStyle(fontFamily = JuliusSansOne, fontSize = 56.sp, letterSpacing = 6.sp, color = Color.White, textAlign = TextAlign.Center),
+            )
+        }
+    }
+}
+
 /** The church's logo, or its name when no logo is set. 300dp keeps it legible from across a room. */
 @Composable
 fun OrgLogo(modifier: Modifier = Modifier) {
     val brand = LocalBrand.current
-    if (brand.logoUrl != null) {
+    val logo = brand.logoOn(Color.White)
+    if (logo != null) {
         AsyncImage(
-            model = brand.logoUrl,
+            model = logo,
             contentDescription = brand.orgName,
             contentScale = ContentScale.Fit,
             alignment = Alignment.CenterStart,

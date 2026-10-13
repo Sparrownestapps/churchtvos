@@ -70,14 +70,29 @@ fun App(sync: TvSync, cache: MediaCache) {
             when {
                 device == null -> MessageScreen("Connecting…", state.error)
                 !device.paired -> PairingScreen(device.pairingCode ?: "······", state.offline)
-                else -> when (val module = device.moduleNow(now.toEpochMilli())) {
-                    Module.OFF -> Box(Modifier.fillMaxSize().background(Color.Black))
-                    !in device.enabledModules -> MessageScreen(
-                        "This screen is set to ${module.replaceFirstChar { it.uppercase() }}",
-                        "That module isn't switched on for ${device.organization?.name ?: "this church"}. Ask your church's admin.",
-                    )
-                    Module.SIGNAGE -> SignageModule(device, now, cache)
-                    else -> KidsModule(device, state, now, cache)
+                else -> {
+                    val module = device.moduleNow(now.toEpochMilli())
+                    // Each module can have its own look, and its own splash when the TV starts or switches into it.
+                    BrandTheme(device.brand(module)) {
+                        val brand = LocalBrand.current
+                        var splashDone by remember(module) { mutableStateOf(brand.splashSeconds == null || module == Module.OFF) }
+                        LaunchedEffect(module) {
+                            if (!splashDone) {
+                                delay((brand.splashSeconds ?: 0) * 1000L)
+                                splashDone = true
+                            }
+                        }
+                        when {
+                            !splashDone -> SplashScreen()
+                            module == Module.OFF -> Box(Modifier.fillMaxSize().background(Color.Black))
+                            module !in device.enabledModules -> MessageScreen(
+                                "This screen is set to ${module.replaceFirstChar { it.uppercase() }}",
+                                "That module isn't switched on for ${device.organization?.name ?: "this church"}. Ask your church's admin.",
+                            )
+                            module == Module.SIGNAGE -> SignageModule(device, now, cache)
+                            else -> KidsModule(device, state, now, cache)
+                        }
+                    }
                 }
             }
         }

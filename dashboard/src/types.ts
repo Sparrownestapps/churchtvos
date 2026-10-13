@@ -3,10 +3,24 @@ export type Role = 'owner' | 'admin' | 'editor' | 'operator'
 export type ScreenModule = Module | 'off'
 export type Orientation = 'landscape' | 'portrait' | 'portrait_flipped'
 
-export type Branding = {
+export type SplashSettings = {
+  enabled?: boolean
+  /** How long the full-screen logo shows when the TV starts or switches into the module. */
+  seconds?: number
+}
+
+/** One look: the church's default, or an override for a single module. Unset fields inherit. */
+export type Look = {
   logo_url?: string
+  /** Logo for dark backgrounds (falls back to logo_url). */
+  logo_dark_url?: string
   primary_color?: string
   accent_color?: string
+  splash?: SplashSettings
+}
+
+export type Branding = Look & {
+  modules?: { kids?: Look; signage?: Look }
   /** YouTube channel (UC…) used by the Kids YouTube picker and "Live now" items. */
   youtube_channel_id?: string
 }

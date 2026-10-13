@@ -39,11 +39,30 @@ data class DeviceState(
 @Serializable
 data class OrganizationInfo(val name: String, val branding: BrandingInfo = BrandingInfo())
 
+/** One look: the church default (top level) or an override for a module. Unset fields inherit. */
+@Serializable
+data class SplashInfo(val enabled: Boolean? = null, val seconds: Int? = null)
+
+@Serializable
+data class LookInfo(
+    @SerialName("logo_url") val logoUrl: String? = null,
+    @SerialName("logo_dark_url") val logoDarkUrl: String? = null,
+    @SerialName("primary_color") val primaryColor: String? = null,
+    @SerialName("accent_color") val accentColor: String? = null,
+    val splash: SplashInfo? = null,
+)
+
+@Serializable
+data class ModuleLooks(val kids: LookInfo? = null, val signage: LookInfo? = null)
+
 @Serializable
 data class BrandingInfo(
     @SerialName("logo_url") val logoUrl: String? = null,
+    @SerialName("logo_dark_url") val logoDarkUrl: String? = null,
     @SerialName("primary_color") val primaryColor: String? = null,
     @SerialName("accent_color") val accentColor: String? = null,
+    val splash: SplashInfo? = null,
+    val modules: ModuleLooks? = null,
 )
 
 @Serializable

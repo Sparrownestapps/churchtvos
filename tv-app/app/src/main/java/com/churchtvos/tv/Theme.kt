@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -13,8 +14,14 @@ data class Brand(
     val primary: Color = Color(0xFF1B2A4A),
     val accent: Color = Color(0xFFF2A33A),
     val logoUrl: String? = null,
+    val logoDarkUrl: String? = null,
     val orgName: String = "Church TV OS",
-)
+    val splashSeconds: Int? = null, // null = no splash
+) {
+    /** Logo for [background]: the dark-background logo on dark colours, else the normal one (falling back either way). */
+    fun logoOn(background: Color): String? =
+        if (background.luminance() < 0.4f) logoDarkUrl ?: logoUrl else logoUrl ?: logoDarkUrl
+}
 
 val LocalBrand = compositionLocalOf { Brand() }
 
@@ -33,14 +40,26 @@ val JuliusSansOne = FontFamily(Font(R.font.julius_sans_one))
 private fun parseColor(hex: String?, fallback: Color): Color =
     runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(fallback)
 
-fun DeviceState.brand(): Brand {
+/** The church's look, with [module]'s own settings (if any) laid over it. */
+fun DeviceState.brand(module: String? = null): Brand {
     val base = Brand()
-    val b = organization?.branding
+    val org = organization?.branding
+    val own = when (module) {
+        Module.KIDS -> org?.modules?.kids
+        Module.SIGNAGE -> org?.modules?.signage
+        else -> null
+    }
+    val splash = SplashInfo(
+        enabled = own?.splash?.enabled ?: org?.splash?.enabled,
+        seconds = own?.splash?.seconds ?: org?.splash?.seconds,
+    )
     return Brand(
-        primary = parseColor(b?.primaryColor, base.primary),
-        accent = parseColor(b?.accentColor, base.accent),
-        logoUrl = b?.logoUrl,
+        primary = parseColor(own?.primaryColor ?: org?.primaryColor, base.primary),
+        accent = parseColor(own?.accentColor ?: org?.accentColor, base.accent),
+        logoUrl = own?.logoUrl ?: org?.logoUrl,
+        logoDarkUrl = own?.logoDarkUrl ?: org?.logoDarkUrl,
         orgName = organization?.name ?: base.orgName,
+        splashSeconds = if (splash.enabled == true) (splash.seconds ?: 5).coerceIn(2, 30) else null,
     )
 }
 
