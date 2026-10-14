@@ -17,10 +17,10 @@ How it differs from Kids: Kids plays a curriculum playlist. Slides is a designer
    - Mitigation: a deliberately small layout system: percent-based boxes, text sized as a percent of screen height, a fixed auto-fit rule (shrink text until it fits the box, minimum size), fixed margins and safe area. Write the rules once in a short spec file and test both renderers against shared sample slides (golden screenshots).
 2. **Backgrounds as layers.** Layer 1 background (colour/gradient/image/video), layer 2 optional dim overlay (0-80%), layer 3 text/media. Consecutive slides that share the same video background keep it playing (no restart or flash).
 3. **Video backgrounds are played with ExoPlayer under the text.** Unlike YouTube this works with Compose text on top; use the TextureView path in portrait (already in place). Cache videos on the TV like other media; show a "downloading" status; fall back to the slide's colour if the file is missing.
-4. **Songs are data, not files.** A song = title, authors, CCLI number, copyright line, sections (label + text), and an arrangement (ordered list of sections). Slide generation is a function of song + theme + "lines per slide", so changing the theme or line count regenerates them.
+4. **Songs are data, not files, and shared with Kids** (see 8a). A song = title, authors, CCLI number, copyright line, sections (label + text), and an arrangement (ordered list of sections). Slide generation is a function of song + theme + "lines per slide", so changing the theme or line count regenerates them.
 5. **Two ways to run a deck** (build the first, design for the second):
    - **Scheduled**: assign a deck to a location or screen (dated, like Kids schedules) and it runs with per-slide timing or remote-advance.
-   - **Live operated**: a person advances slides from a phone or the TV remote (next, back, jump, blank). Needs a realtime channel (Supabase Realtime) and uses the existing **operator** role, which is read-only today.
+   - **Operated from the TV remote** (v1 decision): next, back, jump list, blank; see 8b. A phone controller (Supabase Realtime, operator role) is a later phase.
 6. **Media library**: Slides gets its own library and folders (already supported per module: add the `slides` module id and it works).
 7. **Billing**: a separate module entitlement like Kids and Signage.
 
@@ -86,8 +86,8 @@ Neither offers an open developer API today, so plan for several routes and rank 
 **Phase 3: live feeds (size: medium, see `NEXT-BUILD.md`)**
 - HLS stream slide first (works with BoxCast static links), then native NDI after the licence check and spike.
 
-**Phase 4: live operation (size: medium)**
-- Realtime session per screen: current slide index and state; TV subscribes; phone-friendly controller page (next, back, jump, blank, "start deck on this screen"); remote-control keys on the TV; operator role gets playback control without edit rights.
+**Phase 4 (later, not in v1): phone remote and live operation (size: medium)**
+- v1 is TV-remote only (see 8b). Later: a realtime session per screen (current slide and state), a phone-friendly controller page (next, back, jump, blank, "start deck on this screen"), and playback control for the operator role without edit rights.
 
 **Phase 5: integrations and extras**
 - Planning Center songs and service-plan import; CCLI/MultiTracks direct import if partnerships exist; PowerPoint/Keynote/PDF import as image slides; shared template packs; translations/second-language lines; stage-display layouts for the Production module.
@@ -99,11 +99,26 @@ Neither offers an open developer API today, so plan for several routes and rank 
 - Amazon review: an update with a new module needs a resubmission; the Slides module should ship hidden until ready.
 - Scope creep: PowerPoint-style freeform design tools. Keep v1 to fixed layouts and themes.
 
-## 8. Decisions needed before building
-1. **Name:** "Slides" or "Presentations"? (Slides is shorter; the module id would be `slides`.)
-2. **Playback model for v1:** scheduled decks (like Kids), live-operated from a phone (Phase 4), or both in v1?
-3. **Scheduling:** dated schedules per location (Kids style), or weekly recurring slots (Signage style), or both?
-4. **Song sources for v1:** paste plus file import only, or include Planning Center import in v1? Do you want to contact CCLI and MultiTracks yourself (they will likely respond faster to a church account holder)?
-5. **Backgrounds:** are image and video backgrounds both required in v1 (recommended), with gradients as a bonus?
-6. **Existing Kids "lyrics" items:** later, migrate them to song slides, or keep them separate?
-7. **Pricing:** a separate module price, or bundled with Signage?
+## 8. Decisions (answered by Keith, 2026-10-14)
+1. **Name:** Slides (module id `slides`).
+2. **Playback:** operated from the **TV remote only** in v1, kept simple. No phone controller in v1 (the realtime controller moves to "later").
+3. **Scheduling:** dated schedules per location, like Kids (`deck_schedules`), with the same Now showing / Up next home screen and a Play button.
+4. **Song sources for v1:** paste and file import only. Planning Center import stays a later phase. CCLI and MultiTracks outreach is optional and not blocking.
+5. **Backgrounds:** image and video backgrounds are both in v1 (colour and gradient too).
+6. **Songs are one shared library** used by both Kids and Slides (see 8a).
+7. **Pricing:** Slides is its own module entitlement. Bundles later.
+
+### 8a. Shared song library (Kids and Slides)
+- `songs` is an organization-level library, not owned by a module. Nav: a top-level **Songs** page (not under Kids or Slides). Visible and editable by members who have the Kids or Slides module (editor role or above to edit).
+- **Slides** uses songs as song slides (theme and background applied by Slides).
+- **Kids** keeps its existing "lyrics" playlist item, with a new option: pick a song from the library. The playlist stores `{"type":"lyrics","title":"...","song_id":"...","arrangement":"default"}` and the server expands it into the same `slides: [...]` text the TV already understands when it builds `device_state`. **No TV change is needed for Kids**, and old TVs keep working. Existing hand-typed lyrics items stay as they are.
+- Editing a song in the library updates every playlist or deck that uses it.
+- Delete protection like media: a song used by a playlist or deck cannot be deleted until it is removed there (or show "used in N").
+- Song usage logging (for CCLI reporting) counts plays from both modules.
+
+### 8b. TV-remote operation (v1 proposal, adjust as needed)
+- **Home screen** (like Kids): "Now showing" / "Up next" deck, status (downloading, ready) and a **Play** button.
+- While presenting: **Right** = next slide, **Left** = previous slide, **OK/Select** = open a slide list to jump to any slide (songs show their section labels), **Play/Pause** = black screen toggle (blank/unblank), **Back** = stop and return to the home screen. Fast-forward/rewind could jump section to section (songs) as a bonus.
+- Menu stays the global Settings/Demo shortcut.
+- Auto-advance: slides with a duration set advance by themselves; slides with none wait for the remote (default for song slides).
+- At the end of a deck: return to the home screen (or optionally loop, a deck setting).
