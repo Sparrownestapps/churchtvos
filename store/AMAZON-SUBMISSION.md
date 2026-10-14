@@ -27,6 +27,7 @@ Everything below is ready to paste. Console labels change over time; match them 
 - **Target:** Fire TV only. Deselect phones and tablets if offered.
 - **Device support:** whatever the console computes for an Android/Fire OS APK. Expect Fire OS devices only (newer Vega OS sticks cannot run it).
 - **Keywords:** church, signage, digital signage, kids, classroom, display, announcements, lyrics, countdown
+- **Account deletion URL:** https://app.churchtvos.com/delete-account.html
 - **Short description (up to ~120 characters):**
   Run kids-room displays and church signage on your TVs, scheduled from the web or your phone.
 - **Long description:**
