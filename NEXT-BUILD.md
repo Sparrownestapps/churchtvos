@@ -144,3 +144,72 @@ TVs on 1.0.0 cannot parse a playlist containing an unknown item type (the whole 
 - Old TV builds are protected (tolerant decoding + dashboard warning).
 - NDI attribution and trademark notices are present in the app and listing.
 - The HLS stream slide ships first; NDI follows once the spike and licence check pass.
+
+---
+
+# Feature plan: weekly Calendar page and dark mode (dashboard)
+
+Planned 2026-10-15. Dashboard and database only, so **no TV update or Amazon review is needed**. Decisions from Keith: one Calendar page for everything; Kids schedules can repeat weekly, with a different playlist per repeat; 15-minute snapping; one drag can schedule several screens; dark mode defaults to the system setting.
+
+## A. Calendar page (replaces the schedule pages as the main way to schedule; keep the old list pages as a "List" view)
+
+### What the user sees
+- New nav item **Calendar** (top level, above the module groups). A week grid (Mon-Sun, hours down the side), with previous/next week, "today", and a week/day toggle.
+- A **view picker**: one screen, a screen group, or a location. The grid shows that target's blocks. Colour by type: Kids, Signage, Slides (later), and module-switch rules; a faint background band shows which module is active at each hour.
+- **Create**: drag across an empty slot to make a window (snaps to 15 minutes). A side panel (a bottom sheet on phones) asks:
+  1. What plays: a Kids playlist, a Signage playlist, or "switch this screen to [module]" (and later a Slides deck).
+  2. Which screens: this screen, several screens, or a whole group. (One drag can schedule many screens.)
+  3. Repeat: this week only, every week on chosen days, until a date, or a rotation (see B).
+- **Edit**: drag a block to move it, drag top or bottom edge to resize, click to edit, delete, or duplicate. Recurring blocks ask "this one, or all in the series?".
+- **Copy week**: copy this week's blocks to the next week or a date range.
+- **Overlaps**: flag clashes; show which block wins using the existing priority rule (highest priority, then latest created). An "Add as higher priority" toggle in the panel.
+- Times are in the site's time zone (shown in the header); a screen in a different zone than the user's browser is labelled.
+- **Permissions**: blocks the user cannot edit show locked/read-only (module rules need owner or admin; Kids content needs editor and the site; Signage slots need an all-sites editor, per current row security). No block exists that the user can edit without the right role.
+- **Phone**: show 1-3 days at a time, horizontal swipe between days, long-press to drag, and a tap on an empty slot opens the panel as a plain form (always works without precise dragging).
+
+### Data it reads and writes (existing tables unless noted)
+| Block type | Table | Notes |
+|---|---|---|
+| Signage playlist | `signage_slots` | weekly recurring already; target screen or group |
+| Module switching | `screen_schedules` | weekly recurring already; target screen or group |
+| Kids one-off | `schedules` | dated, per location (a TV's Kids blocks come from its location) |
+| Kids repeating (new) | `kids_series` + `kids_series_exceptions` (see B) | the server expands them into the same dated list the TV already reads |
+
+### Build approach
+- Use FullCalendar's free core packages (`@fullcalendar/react`, `daygrid`, `timegrid`, `interaction`; MIT licence) for the grid, drag, resize and touch handling, and style it to the dashboard (check licence terms for the packages used before adding; avoid the paid "premium" resource views). Fallback if bundle size or touch handling is a problem: a custom CSS-grid calendar with pointer events.
+- Lazy-load the calendar page so the main bundle (already about 565 kB) does not grow.
+- One component with three adapters (Signage slots, module rules, Kids schedules/series) that turn rows into events and events back into inserts/updates.
+- Writes use the existing row-security rules; multi-screen creates are one batch per target.
+
+### Done when
+- Dragging a window creates the right rows for 1 screen, 3 screens, and a group; moving and resizing update them; deleting removes them.
+- A weekly Signage slot, a module switch, and a Kids playlist for one location all appear together for a screen and the TV follows them.
+- Works with a mouse and with touch on a phone; locked blocks cannot be edited; overlap flags are right.
+
+## B. Kids repeats, with a different playlist per repeat
+Meaning: a **series** that repeats weekly, where each occurrence can use a different playlist. Two ways, both supported:
+1. **Rotation (curriculum)**: choose an ordered list of playlists (Week 1, Week 2, Week 3...). Occurrence 1 plays the first, occurrence 2 the second, and so on; at the end either **stop** or **loop back to the start**.
+2. **Per-occurrence override**: in the calendar, open one occurrence and change just that one's playlist, or skip it (for a holiday).
+
+### Data model (new migration)
+- `kids_series`: `id, organization_id, location_id, days int[] (0 = Sunday), start_time, end_time, start_date, end_date null, playlist_ids uuid[] (the rotation), on_end ('stop'|'loop'), priority, created_at`.
+- `kids_series_exceptions`: `series_id, on_date, action ('skip'|'playlist'), playlist_id null`.
+- Decision still open: when an occurrence is **skipped** for a holiday, does the rotation advance or wait? Recommend **wait** (the skipped week's playlist moves to the next occurrence) with a "skip and advance" option.
+- `device_state` expands each series into dated entries for the next 14 days in the existing `kids.schedules` shape (`starts_at`, `ends_at`, `playlist`), working out which playlist applies to each date from the series start. Dated one-offs in `schedules` take precedence over series when they overlap. **No TV change.**
+- Use the site's time zone for times and DST (do not store as UTC offsets). Test across a daylight-saving change.
+- Calendar shows the series occurrences as blocks labelled with the playlist (for example "Week 3: Noah").
+
+## C. Dark mode
+- Header switch: **Light / Dark / System** (default System), remembered per browser in `localStorage` (wrapped in try/catch) and applied before first paint to avoid a flash.
+- Move the dashboard's colours to a shared set of CSS variables for both themes (background, surfaces, borders, text, muted text, inputs, buttons, notices, calendar colours). Audit the styles for any hard-coded colours (the branding preview mock-ups, thumbnails, drag highlights, tables).
+- **Church colours on dark**: the primary colour is used for buttons and accents; compute a readable tint for dark mode so a dark navy primary does not disappear against a dark background. Keep a contrast check (the Settings preview already warns about light colours; add the dark-background equivalent).
+- Use the church's **logo for dark backgrounds** in the header in dark mode (falls back to the normal logo).
+- Leave the TV-style preview mock-ups in Settings unchanged (they show the TV, not the dashboard); set `color-scheme` so form controls, scrollbars and date/time pickers follow the theme; update the `theme-color` meta tag and the iPhone home-screen status bar.
+- **Done when:** every page is readable in both themes (check each page, the media library, the calendar, dialogs), no flash of the wrong theme on load, and brand colours stay legible.
+
+## Order and sizing
+1. Dark mode (small to medium, independent).
+2. Calendar read-only view with Signage slots and module rules (medium).
+3. Calendar create/move/resize and multi-screen scheduling (medium to large).
+4. Kids series with rotation and exceptions, plus the server expansion (medium).
+5. Polish: copy week, overlap hints, phone behaviour, tests across a daylight-saving change.
