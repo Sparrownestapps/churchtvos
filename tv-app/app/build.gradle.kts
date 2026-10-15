@@ -14,8 +14,8 @@ android {
         applicationId = "com.churchtvos.tv"
         minSdk = 25 // Fire OS 6 and newer
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
     }
 
     val signing = rootProject.file("keystore/keystore.properties").takeIf { it.exists() }?.let { file ->
@@ -66,10 +66,15 @@ dependencies {
     implementation("androidx.tv:tv-material:1.1.0")
 
     implementation("androidx.media3:media3-exoplayer:1.11.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.11.1")
     implementation("androidx.media3:media3-ui:1.11.1")
 
     implementation("io.coil-kt.coil3:coil-compose:3.6.3")
+    // Without a network module Coil cannot load https images (church logos).
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+
+    testImplementation("junit:junit:4.13.2")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }

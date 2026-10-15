@@ -16,8 +16,15 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.modules.SerializersModule
 
-val AppJson = Json { ignoreUnknownKeys = true }
+val AppJson = Json {
+    ignoreUnknownKeys = true
+    // A playlist item type newer than this app decodes as PlaylistItem.Unknown (and is skipped) instead of failing everything.
+    serializersModule = SerializersModule {
+        polymorphicDefaultDeserializer(PlaylistItem::class) { PlaylistItem.Unknown.serializer() }
+    }
+}
 
 /** What the server says this TV should show (see device_state in the foundation migration). */
 @Serializable

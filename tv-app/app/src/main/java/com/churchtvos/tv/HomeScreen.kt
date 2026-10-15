@@ -46,41 +46,35 @@ fun HomeScreen(
     LaunchedEffect(canPlay) {
         if (canPlay) playFocus.requestFocus()
     }
+    val portrait = LocalRotated.current
 
-    // 48dp/27dp keeps everything inside the TV-safe area (5% overscan).
-    Row(
-        Modifier
-            .fillMaxSize()
-            .background(Color.White)
-            .padding(horizontal = 48.dp, vertical = 27.dp),
-        horizontalArrangement = Arrangement.spacedBy(40.dp),
-    ) {
-        Column(
-            Modifier.weight(1f).fillMaxHeight(),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            OrgLogo()
-            Column {
-                Text(site.uppercase(), style = TextStyle(fontFamily = Lato, fontWeight = FontWeight.Bold, fontSize = 14.sp, letterSpacing = 2.sp, color = BrandAccent))
-                Text(location, style = TextStyle(fontFamily = JuliusSansOne, fontSize = 44.sp, color = BrandPrimary))
-            }
-            Text(
-                "OK or Play to start  ·  Left / Right to move between slides  ·  Back to stop",
-                style = TextStyle(fontFamily = Lato, fontSize = 12.sp, color = Greyscale),
-            )
+    @Composable
+    fun Identity() {
+        Column {
+            Text(site.uppercase(), style = TextStyle(fontFamily = Lato, fontWeight = FontWeight.Bold, fontSize = if (portrait) 18.sp else 14.sp, letterSpacing = 2.sp, color = BrandAccent))
+            Text(location, style = TextStyle(fontFamily = JuliusSansOne, fontSize = if (portrait) 56.sp else 44.sp, color = BrandPrimary))
         }
+    }
 
+    @Composable
+    fun Hint() {
+        Text(
+            "OK or Play to start  ·  Left / Right to move between slides  ·  Back to stop",
+            style = TextStyle(fontFamily = Lato, fontSize = if (portrait) 14.sp else 12.sp, color = Greyscale),
+        )
+    }
+
+    @Composable
+    fun PlaylistCard(modifier: Modifier) {
         Column(
-            Modifier
-                .weight(1f)
-                .fillMaxHeight()
+            modifier
                 .background(Paper, RoundedCornerShape(16.dp))
                 .padding(28.dp),
         ) {
             Text(heading, style = TextStyle(fontFamily = Lato, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 2.sp, color = BrandAccent))
             Text(playlist?.name ?: "—", style = TextStyle(fontFamily = Lato, fontWeight = FontWeight.Black, fontSize = 28.sp, color = BrandPrimary))
             Spacer(Modifier.height(16.dp))
-            playlist?.items.orEmpty().take(8).forEach { item ->
+            playlist?.items.orEmpty().filter { it !is PlaylistItem.Unknown }.take(if (portrait) 14 else 8).forEach { item ->
                 Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         item.kindLabel,
@@ -108,6 +102,41 @@ fun HomeScreen(
             ) {
                 Text("Play", style = TextStyle(fontFamily = Lato, fontWeight = FontWeight.Bold, fontSize = 18.sp))
             }
+        }
+    }
+
+    // 48dp/27dp keeps everything inside the TV-safe area (5% overscan).
+    if (portrait) {
+        // A portrait-mounted TV: one column, logo and place on top, the playlist card filling the rest.
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(Color.White)
+                .padding(horizontal = 40.dp, vertical = 48.dp),
+            verticalArrangement = Arrangement.spacedBy(28.dp),
+        ) {
+            OrgLogo()
+            Identity()
+            PlaylistCard(Modifier.weight(1f).fillMaxWidth())
+            Hint()
+        }
+    } else {
+        Row(
+            Modifier
+                .fillMaxSize()
+                .background(Color.White)
+                .padding(horizontal = 48.dp, vertical = 27.dp),
+            horizontalArrangement = Arrangement.spacedBy(40.dp),
+        ) {
+            Column(
+                Modifier.weight(1f).fillMaxHeight(),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                OrgLogo()
+                Identity()
+                Hint()
+            }
+            PlaylistCard(Modifier.weight(1f).fillMaxHeight())
         }
     }
 }
@@ -163,4 +192,7 @@ private val PlaylistItem.kindLabel: String
         is PlaylistItem.Countdown -> "COUNTDOWN"
         is PlaylistItem.Lyrics -> "LYRICS"
         is PlaylistItem.YouTube -> if (videoId == null) "LIVE" else "YOUTUBE"
+        is PlaylistItem.Sign -> "SIGN"
+        is PlaylistItem.Stream -> "STREAM"
+        is PlaylistItem.Unknown -> "—"
     }

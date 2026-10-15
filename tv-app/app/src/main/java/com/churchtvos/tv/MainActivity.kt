@@ -44,8 +44,34 @@ class MainActivity : ComponentActivity() {
         val sync = TvSync(applicationContext, cache)
         // Debug builds only: `adb shell am start -n com.churchtvos.tv/.MainActivity --es debug_youtube <id|live:CHANNEL>`
         val debugYouTube = if (BuildConfig.DEBUG) intent.getStringExtra("debug_youtube") else null
+        // Debug builds only: --es debug_sign '<sign item json>' and/or --es debug_home 1, with --es debug_orientation portrait|portrait_flipped
+        val debugSign = if (BuildConfig.DEBUG) {
+            // adb strips quotes from JSON, so a base64 form is accepted too (debug_sign_b64).
+            intent.getStringExtra("debug_sign")
+                ?: intent.getStringExtra("debug_sign_b64")?.let { String(android.util.Base64.decode(it, android.util.Base64.DEFAULT)) }
+        } else null
+        val debugHome = if (BuildConfig.DEBUG) intent.getStringExtra("debug_home") != null else false
+        val debugOrientation = if (BuildConfig.DEBUG) intent.getStringExtra("debug_orientation") else null
         setContent {
-            if (debugYouTube != null) {
+            if (debugSign != null || debugHome) {
+                val branding = if (BuildConfig.DEBUG) intent.getStringExtra("debug_brand") else null
+                BrandTheme(Brand(primary = parseHexColor(branding) ?: Brand().primary, logoUrl = intent.getStringExtra("debug_logo"))) {
+                    Oriented(debugOrientation ?: "landscape") {
+                        if (debugSign != null) {
+                            val item = AppJson.decodeFromString<PlaylistItem>(debugSign)
+                            PlayerScreen(Playlist("debug", "debug", listOf(item)).toSlides(cache), onExit = { finish() })
+                        } else {
+                            val sample = Playlist("debug", "Week 3: Noah and the Ark", listOf(
+                                PlaylistItem.Countdown("Service starts in", 300),
+                                PlaylistItem.Video("Bible story", "https://example.com/a.mp4"),
+                                PlaylistItem.Lyrics("Sample song", listOf("Verse", "Chorus")),
+                                PlaylistItem.Stream("Main room live", "https://example.com/live.m3u8"),
+                            ))
+                            HomeScreen("Cambridge", "Room 201", "NOW SHOWING", sample, "✓ Ready to play", true) {}
+                        }
+                    }
+                }
+            } else if (debugYouTube != null) {
                 val slide = if (debugYouTube.startsWith("live:")) {
                     Slide.YouTube(null, debugYouTube.removePrefix("live:"), null)
                 } else {
@@ -188,6 +214,7 @@ private fun SignageModule(device: DeviceState, now: Instant, cache: MediaCache) 
         when (item) {
             is PlaylistItem.Video -> cache.fileFor(item.url).exists()
             is PlaylistItem.Image -> cache.fileFor(item.url).exists()
+            is PlaylistItem.Unknown -> false
             else -> true
         }
     })
@@ -199,7 +226,13 @@ private fun SignageModule(device: DeviceState, now: Instant, cache: MediaCache) 
     // A new loop (or changed content) starts the playlist from the top.
     key(playable, loop) {
         val slides = remember(playable) {
-            playable.copy(items = playable.items.map { if (it is PlaylistItem.Image && it.seconds == null) it.copy(seconds = 10) else it })
+            playable.copy(items = playable.items.map {
+                when {
+                    it is PlaylistItem.Image && it.seconds == null -> it.copy(seconds = 10)
+                    it is PlaylistItem.Stream && it.seconds == null -> it.copy(seconds = 30) // a loop must move on
+                    else -> it
+                }
+            })
                 .toSlides(cache)
         }
         PlayerScreen(slides, onExit = { loop++ })

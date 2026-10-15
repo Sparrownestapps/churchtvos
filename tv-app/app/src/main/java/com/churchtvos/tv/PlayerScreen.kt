@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -61,20 +63,46 @@ fun PlayerScreen(slides: List<Slide>, onExit: () -> Unit, onFinished: () -> Unit
     }
     val previous = { if (index > 0) index-- }
 
+    val currentSlide by rememberUpdatedState(slide)
+    var streamFailed by remember { mutableStateOf(false) }
+
     val player = remember { ExoPlayer.Builder(context).build() }
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_ENDED) next()
             }
+
+            // A dead or unreachable live stream never leaves a blank room: skip it, or hold a notice for a few seconds then skip.
+            override fun onPlayerError(error: PlaybackException) {
+                val s = currentSlide
+                if (s is Slide.Stream) {
+                    if (s.fallback == "hold") streamFailed = true else next()
+                }
+            }
         }
         player.addListener(listener)
         onDispose { player.release() }
     }
 
+    LaunchedEffect(streamFailed) {
+        if (streamFailed) {
+            delay(10_000)
+            streamFailed = false
+            next()
+        }
+    }
+
     LaunchedEffect(index) {
+        streamFailed = false
         if (slide is Slide.Video) {
+            player.volume = 1f
             player.setMediaItem(MediaItem.fromUri(Uri.fromFile(slide.file)))
+            player.prepare()
+            player.play()
+        } else if (slide is Slide.Stream) {
+            player.volume = if (slide.audio) 1f else 0f
+            player.setMediaItem(MediaItem.fromUri(slide.url))
             player.prepare()
             player.play()
         } else {
@@ -86,6 +114,14 @@ fun PlayerScreen(slides: List<Slide>, onExit: () -> Unit, onFinished: () -> Unit
             next()
         }
         if (slide is Slide.Bundled) {
+            delay(slide.seconds * 1000L)
+            next()
+        }
+        if (slide is Slide.Sign) {
+            delay(slide.seconds * 1000L)
+            next()
+        }
+        if (slide is Slide.Stream && slide.seconds != null) {
             delay(slide.seconds * 1000L)
             next()
         }
@@ -112,7 +148,7 @@ fun PlayerScreen(slides: List<Slide>, onExit: () -> Unit, onFinished: () -> Unit
                     Key.DirectionRight, Key.MediaNext, Key.MediaFastForward -> { next(); true }
                     Key.DirectionLeft, Key.MediaPrevious, Key.MediaRewind -> { previous(); true }
                     Key.DirectionCenter, Key.Enter, Key.MediaPlayPause -> {
-                        if (slide is Slide.Video) player.playWhenReady = !player.playWhenReady
+                        if (slide is Slide.Video || slide is Slide.Stream) player.playWhenReady = !player.playWhenReady
                         if (slide is Slide.YouTube) youtube.togglePause()
                         true
                     }
@@ -154,9 +190,21 @@ fun PlayerScreen(slides: List<Slide>, onExit: () -> Unit, onFinished: () -> Unit
                 is Slide.Countdown -> CountdownSlide(slide, onDone = { next() })
                 is Slide.Lyric -> LyricSlide(slide)
                 is Slide.YouTube -> YouTubeSlide(slide, youtube, onEnded = { next() })
+                is Slide.Sign -> SignSlide(slide)
+                is Slide.Stream -> if (streamFailed) StreamNotice(slide)
                 is Slide.Video, null -> Unit
             }
         }
+    }
+}
+
+@Composable
+private fun StreamNotice(slide: Slide.Stream) {
+    Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+        Text(
+            "Waiting for the live feed…",
+            style = TextStyle(fontFamily = Lato, fontWeight = FontWeight.Bold, fontSize = 28.sp, color = Color.White, textAlign = TextAlign.Center),
+        )
     }
 }
 
