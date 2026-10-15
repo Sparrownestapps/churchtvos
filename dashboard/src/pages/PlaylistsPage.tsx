@@ -6,6 +6,7 @@ import { attempt, fetchAll, moveItem, must, scopeLabel, useLoad } from '../lib'
 import { ScopeSelect, useDefaultScope } from '../ui'
 import { MediaSelect } from '../MediaSelect'
 import { YouTubeItemEditor, newYouTubeItem } from '../YouTubeItem'
+import { StreamItemEditor, newStreamItem, validStreamUrl } from '../StreamItem'
 
 const KIND_LABEL: Record<PlaylistItem['type'], string> = {
   video: 'Video',
@@ -13,6 +14,7 @@ const KIND_LABEL: Record<PlaylistItem['type'], string> = {
   countdown: 'Countdown',
   lyrics: 'Lyrics',
   youtube: 'YouTube',
+  stream: 'Live stream',
 }
 
 export default function PlaylistsPage() {
@@ -119,6 +121,7 @@ function PlaylistEditor({ playlist, media, folders, onDone }: { playlist: Playli
       countdown: { type: 'countdown', title: 'Service starts in', seconds: 300 },
       lyrics: { type: 'lyrics', title: '', slides: [] },
       youtube: newYouTubeItem(channelId, org.name),
+      stream: newStreamItem(null),
     }
     setItems((list) => [...list, blank[type]])
   }
@@ -135,6 +138,8 @@ function PlaylistEditor({ playlist, media, folders, onDone }: { playlist: Playli
     if (missing >= 0) return alert(`Item ${missing + 1} needs a video or slide chosen.`)
     const noYouTube = items.findIndex((i) => i.type === 'youtube' && !i.video_id && !i.channel_id)
     if (noYouTube >= 0) return alert(`Item ${noYouTube + 1} needs a YouTube video chosen.`)
+    const badStream = items.findIndex((i) => i.type === 'stream' && !validStreamUrl(i.url))
+    if (badStream >= 0) return alert(`Item ${badStream + 1} needs a stream link (starting with https://).`)
     const cleaned = items.map((i) =>
       i.type === 'lyrics' ? { ...i, slides: i.slides.map((s) => s.trim()).filter(Boolean) } : i,
     )
@@ -232,6 +237,8 @@ function PlaylistEditor({ playlist, media, folders, onDone }: { playlist: Playli
             </div>
           )}
 
+          {item.type === 'stream' && <StreamItemEditor item={item} onChange={(next) => update(i, next)} />}
+
           {item.type === 'youtube' && <YouTubeItemEditor item={item} onChange={(next) => update(i, next)} />}
 
           {item.type === 'lyrics' && (
@@ -271,7 +278,13 @@ function PlaylistEditor({ playlist, media, folders, onDone }: { playlist: Playli
         <button className="btn" onClick={() => add('youtube')}>
           + YouTube
         </button>
+        <button className="btn" onClick={() => add('stream')}>
+          + Live stream
+        </button>
       </div>
+      <p className="muted">
+        Tip: for screens turned to portrait, use portrait media (1080 x 1920). YouTube items don't rotate on portrait screens.
+      </p>
 
       <div className="row">
         <button className="btn primary" onClick={save} disabled={saving}>

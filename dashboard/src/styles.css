@@ -1,20 +1,69 @@
-/* Church TV OS. --primary and --accent are replaced by each church's branding once loaded. */
+/*
+ * Church TV OS. Colours are CSS variables: light values on :root, dark values on :root[data-theme="dark"]
+ * (set by index.html / theme.ts from Light / Dark / System). Use these names, never hard-coded colours.
+ *
+ *   --primary      church primary: headings, links, buttons. In dark mode a lightened tint (App.tsx recomputes it)
+ *   --on-primary   text/icon colour on a --primary fill (white or near-black, whichever reads)
+ *   --accent       church accent (labels, highlights); tinted for dark mode like --primary
+ *   --bg           page background            --card      cards, app bar, sidebar, dialogs
+ *   --surface      inputs, buttons, chips     --line      borders and dividers
+ *   --grey         body text                  --muted     secondary text
+ *   --ok / --danger / --warn   status text    --dot-off   offline indicator
+ *   --tint         accent wash (active nav, drop targets)   --tint-primary  primary wash (selection, hover)
+ *   --hero         full-screen background behind sign-in / create-church cards
+ *   --media-bg     letterbox behind thumbnails and video (dark in both themes)
+ *   --scrim        modal / drawer overlay      --shadow    drawer shadow
+ *   --radius, --appbar   sizes
+ * The TV-style previews in Settings (.tv-*) deliberately ignore the theme: they depict the TV, not the dashboard.
+ */
 :root {
+  color-scheme: light;
   --primary: #1f3a5f;
+  --on-primary: #ffffff;
   --accent: #e8833a;
   --grey: #4a4f57;
+  --muted: #6f7379;
   --ok: #2e7d5b;
+  --danger: #b3261e;
+  --warn: #8a5a00;
   --bg: #f4f5f7;
   --card: #ffffff;
+  --surface: #ffffff;
   --line: #e1e3e6;
-  --danger: #b3261e;
-  --tint: color-mix(in srgb, var(--accent) 12%, white);
-  --tint-primary: color-mix(in srgb, var(--primary) 8%, white);
+  --dot-off: #c4c6c9;
+  --hero: var(--primary);
+  --media-bg: #111;
+  --scrim: rgba(0, 0, 0, 0.4);
+  --shadow: rgba(0, 0, 0, 0.12);
+  --tint: color-mix(in srgb, var(--accent) 12%, var(--card));
+  --tint-primary: color-mix(in srgb, var(--primary) 8%, var(--card));
   --radius: 10px;
   --appbar: 56px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   color: var(--grey);
   background: var(--bg);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  /* Fallbacks for the default brand colours; App.tsx overrides these with a tint of the church's own. */
+  --primary: #9db8e3;
+  --on-primary: #111111;
+  --accent: #f0a26b;
+  --grey: #d3d7dd;
+  --muted: #9aa1ab;
+  --ok: #5fcf9f;
+  --danger: #ff8a80;
+  --warn: #e6b450;
+  --bg: #101317;
+  --card: #1a1e24;
+  --surface: #232830;
+  --line: #313741;
+  --dot-off: #4a505a;
+  --hero: #0b0d10;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --shadow: rgba(0, 0, 0, 0.5);
+  --tint: color-mix(in srgb, var(--accent) 16%, var(--card));
+  --tint-primary: color-mix(in srgb, var(--primary) 14%, var(--card));
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -31,7 +80,7 @@ input, select, textarea {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px 10px;
-  background: #fff;
+  background: var(--surface);
   min-width: 0;
 }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
@@ -49,7 +98,7 @@ input.color { padding: 2px; width: 64px; height: 40px; }
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #fff;
+  background: var(--card);
   border-bottom: 1px solid var(--line);
 }
 .menu-btn { display: none; background: none; border: 0; font-size: 24px; width: 44px; height: 44px; margin-left: -10px; cursor: pointer; color: var(--primary); }
@@ -59,7 +108,7 @@ input.color { padding: 2px; width: 64px; height: 40px; }
 .sidebar {
   width: 230px;
   flex-shrink: 0;
-  background: #fff;
+  background: var(--card);
   border-right: 1px solid var(--line);
   padding: 16px 14px;
   display: flex;
@@ -86,13 +135,13 @@ input.color { padding: 2px; width: 64px; height: 40px; }
 .nav-item:hover { background: var(--bg); }
 .nav-item.active { background: var(--tint); border-left-color: var(--accent); }
 .sidebar-foot { margin-top: auto; padding: 0 8px; font-size: 13px; display: grid; gap: 4px; justify-items: start; }
-.sidebar-email { color: #8a8c8f; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.sidebar-email { color: var(--muted); overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .scrim { display: none; }
 
 .content { flex: 1; padding: 24px 32px 60px; max-width: 1100px; min-width: 0; }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .org-logo { max-height: 40px; max-width: 160px; object-fit: contain; }
-.thumb { width: 120px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; background: #111; }
+.thumb { width: 120px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; background: var(--media-bg); }
 .logo-preview { width: 120px; aspect-ratio: auto; max-height: 60px; object-fit: contain; background: none; }
 
 /* Building blocks */
@@ -108,15 +157,15 @@ input.color { padding: 2px; width: 64px; height: 40px; }
 .field { display: grid; gap: 5px; font-size: 14px; }
 .field > span { font-weight: 700; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--grey); }
 .card.narrow .field { width: 100%; }
-.muted { color: #8a8c8f; font-size: 13px; }
+.muted { color: var(--muted); font-size: 13px; }
 .error { color: var(--danger); font-size: 14px; }
 .notice { color: var(--ok); font-size: 14px; }
-.pill { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-weight: 700; color: var(--primary); }
+.pill { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-weight: 700; color: var(--primary); }
 .tag { font-weight: 900; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); }
 
 .btn {
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   border-radius: 8px;
   padding: 8px 16px;
   font-weight: 700;
@@ -124,7 +173,7 @@ input.color { padding: 2px; width: 64px; height: 40px; }
   white-space: nowrap;
 }
 .btn:hover { border-color: var(--primary); }
-.btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .btn.primary:hover { filter: brightness(1.15); }
 .btn.danger { color: var(--danger); }
 .btn.wide { width: 100%; padding: 11px; }
@@ -135,7 +184,7 @@ input.color { padding: 2px; width: 64px; height: 40px; }
 .icon:disabled { opacity: 0.3; cursor: default; }
 
 .center-screen { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
-.center-screen.primary { background: var(--primary); }
+.center-screen.primary { background: var(--hero); }
 
 table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
 th { text-align: left; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; padding: 8px; border-bottom: 2px solid var(--primary); color: var(--primary); }
@@ -143,7 +192,7 @@ td { padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: mi
 tr.faded td { opacity: 0.45; }
 .status { font-weight: 700; font-size: 13px; }
 .status.live { color: var(--ok); }
-.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #c4c6c9; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--dot-off); }
 .dot.on { background: var(--ok); }
 .list-row { padding: 6px 0; border-bottom: 1px solid var(--line); }
 
@@ -165,7 +214,7 @@ tr.faded td { opacity: 0.45; }
 .upload progress { flex: 1; }
 .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-top: 14px; }
 .media-tile { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
-.media-tile img, .media-tile video, .poster { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #111; display: block; }
+.media-tile img, .media-tile video, .poster { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--media-bg); display: block; }
 .media-info { padding: 10px; display: grid; gap: 4px; font-size: 14px; }
 .media-info b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--primary); }
 
@@ -175,8 +224,8 @@ tr.faded td { opacity: 0.45; }
 
 /* YouTube picker */
 .segmented { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; justify-self: start; }
-.segmented button { border: 0; background: #fff; padding: 8px 16px; font-weight: 700; cursor: pointer; color: var(--primary); }
-.segmented button.on { background: var(--primary); color: #fff; }
+.segmented button { border: 0; background: var(--surface); padding: 8px 16px; font-weight: 700; cursor: pointer; color: var(--primary); }
+.segmented button.on { background: var(--primary); color: var(--on-primary); }
 .field-label { font-weight: 700; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
 .yt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .yt-tile { border: 2px solid transparent; border-radius: 8px; padding: 0; background: none; cursor: pointer; text-align: left; overflow: hidden; }
@@ -200,8 +249,8 @@ tr.faded td { opacity: 0.45; }
 .panel { border-top: 1px dashed var(--line); padding-top: 14px; }
 .rule-form { background: var(--tint-primary); border-radius: 8px; padding: 12px; }
 .days { display: flex; flex-wrap: wrap; gap: 6px; }
-.day { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 8px 12px; min-width: 48px; font-weight: 700; cursor: pointer; color: var(--primary); }
-.day.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.day { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 12px; min-width: 48px; font-weight: 700; cursor: pointer; color: var(--primary); }
+.day.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .wrap-sm { flex-wrap: wrap; }
 .segmented button:disabled { opacity: 0.4; cursor: default; }
 .field > span { text-transform: uppercase; }
@@ -220,10 +269,10 @@ tr.faded td { opacity: 0.45; }
     transform: translateX(-100%);
     transition: transform 0.2s ease;
     padding-bottom: calc(16px + env(safe-area-inset-bottom));
-    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.12);
+    box-shadow: 4px 0 20px var(--shadow);
   }
   .sidebar.open { transform: none; }
-  .scrim { display: block; position: fixed; inset: 0; z-index: 35; background: rgba(0, 0, 0, 0.35); }
+  .scrim { display: block; position: fixed; inset: 0; z-index: 35; background: var(--scrim); }
   .content { padding: 16px 16px calc(40px + env(safe-area-inset-bottom)); }
   h1 { font-size: 22px; }
   input, select, textarea { font-size: 16px; padding: 11px 12px; }
@@ -252,7 +301,7 @@ tr.faded td { opacity: 0.45; }
 .tv-code { color: #fff; font-weight: 900; font-size: 22px; letter-spacing: 0.12em; padding: 2px 14px; border-radius: 8px; }
 .tv-kicker { font-size: 9px; font-weight: 700; letter-spacing: 0.2em; }
 .tv-clock { color: #fff; font-size: 38px; }
-.notice.warn { color: #8a5a00; }
+.notice.warn { color: var(--warn); }
 .tv-splash-logo { max-width: 55%; max-height: 45%; object-fit: contain; }
 .tv-tag { position: absolute; right: 6px; bottom: 4px; font-size: 9px; color: rgba(255, 255, 255, 0.7); }
 .tv-tag.dark { color: rgba(0, 0, 0, 0.45); }
@@ -265,7 +314,7 @@ tr.faded td { opacity: 0.45; }
 .media-tile { position: relative; }
 .media-tile.selected, .media-row.selected { outline: 2px solid var(--primary); outline-offset: -2px; background: var(--tint-primary); }
 .media-tile .pick { position: absolute; top: 8px; left: 8px; width: 22px; height: 22px; padding: 0; z-index: 2; }
-.poster { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #111; overflow: hidden; }
+.poster { position: relative; width: 100%; aspect-ratio: 16 / 9; background: var(--media-bg); overflow: hidden; }
 .poster video, .poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .poster .play { position: absolute; right: 6px; bottom: 6px; font-size: 11px; color: #fff; background: rgba(0, 0, 0, 0.55); border-radius: 4px; padding: 1px 5px; }
 .folder-tile { background: var(--tint-primary); }
@@ -285,13 +334,38 @@ tr.faded td { opacity: 0.45; }
 .row-thumb img, .row-thumb .poster { width: 72px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; display: block; }
 .pick-space { width: 13px; flex-shrink: 0; }
 .usage-names { white-space: normal; }
-.modal-scrim { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.4); display: grid; place-items: center; padding: 16px; }
+.modal-scrim { position: fixed; inset: 0; z-index: 60; background: var(--scrim); display: grid; place-items: center; padding: 16px; }
 .modal { width: min(440px, 100%); max-height: 80vh; display: flex; flex-direction: column; }
 .picker-list { overflow-y: auto; display: grid; border: 1px solid var(--line); border-radius: 8px; }
-.picker-row { text-align: left; background: #fff; border: 0; border-bottom: 1px solid var(--line); padding: 12px; cursor: pointer; color: var(--primary); font-weight: 700; }
+.picker-row { text-align: left; background: var(--surface); border: 0; border-bottom: 1px solid var(--line); padding: 12px; cursor: pointer; color: var(--primary); font-weight: 700; }
 .picker-row:hover:not(:disabled) { background: var(--tint-primary); }
 .picker-row:disabled { color: var(--grey); cursor: default; }
 @media (max-width: 760px) {
   .media-row-main { flex-basis: calc(100% - 140px); }
   .media-tile .pick { width: 26px; height: 26px; }
 }
+
+/* Theme switch (app bar) */
+.theme-select { flex-shrink: 0; font-weight: 700; color: var(--primary); padding: 6px 8px; }
+.appbar .org-select, .appbar .org-pill { margin-left: auto; }
+
+/* Notices on playlist items (needs newer TV app, portrait tips) */
+.note { font-size: 13px; line-height: 1.45; color: var(--muted); background: var(--tint-primary); border-radius: 8px; padding: 8px 12px; }
+.note.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--card)); }
+.help { font-size: 13px; line-height: 1.5; color: var(--muted); }
+.help ul { margin: 4px 0 0; padding-left: 18px; }
+.test-result { font-size: 13px; }
+.test-result.ok { color: var(--ok); }
+.test-result.hint { color: var(--warn); }
+
+/* Sign slide editor + preview (the mock-ups depict the TV, so their colours are set inline from the chosen background) */
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.swatch { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; }
+.swatch.on { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sign-previews { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.sign-mock { position: relative; container-type: inline-size; border-radius: 8px; border: 1px solid var(--line); overflow: hidden; display: flex; flex-direction: column; justify-content: center; padding: 8% 9%; gap: 4%; }
+.sign-mock.land { width: min(320px, 100%); aspect-ratio: 16 / 9; }
+.sign-mock.port { width: 120px; aspect-ratio: 9 / 16; }
+.sign-mock .sign-title { font-weight: 800; line-height: 1.1; overflow-wrap: anywhere; }
+.sign-mock .sign-sub { line-height: 1.25; opacity: 0.85; overflow-wrap: anywhere; }
+.sign-mock .sign-logo { max-width: 40%; max-height: 16%; object-fit: contain; position: absolute; left: 9%; top: 7%; }

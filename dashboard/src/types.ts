@@ -96,6 +96,30 @@ export type PlaylistItem =
   | { type: 'lyrics'; title: string; slides: string[] }
   // video_id null + channel_id set = whatever that channel is live-streaming when the item plays
   | { type: 'youtube'; title: string; video_id: string | null; channel_id: string | null; start: number | null }
+  | StreamItem
+
+/** Live HLS (.m3u8) feed. Must match the TV app (needs app 1.1.0+). */
+export type StreamItem = {
+  type: 'stream'
+  title: string
+  url: string
+  /** null = until the viewer presses next (Kids) / the playlist loops past it (Signage). */
+  seconds: number | null
+  audio: boolean
+  /** If the feed is down: move on, or show a "waiting for feed" card for a while first. */
+  fallback: 'skip' | 'hold'
+}
+
+/** A text-only sign slide (Signage only). Must match the TV app (needs app 1.1.0+). */
+export type SignSlide = {
+  type: 'sign'
+  title: string
+  subtext: string
+  background: string
+  seconds: number
+  align: 'left' | 'center'
+  logo: boolean
+}
 
 export type Playlist = {
   id: string
@@ -115,7 +139,9 @@ export type Schedule = {
   ends_at: string | null
 }
 
-export type SignageItem = {
+export type SignageItem = SignageMediaItem | StreamItem | SignSlide
+
+export type SignageMediaItem = {
   type: 'image' | 'video'
   title: string
   url: string

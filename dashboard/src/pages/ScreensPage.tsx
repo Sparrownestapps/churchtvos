@@ -250,6 +250,11 @@ function ScreenCard({
           {s.model ? ` · ${s.model}` : ''}
         </span>
       </div>
+      {s.orientation !== 'landscape' && (
+        <p className="note">
+          Portrait screen: use portrait media (1080 x 1920). YouTube items do not rotate on portrait screens.
+        </p>
+      )}
       <p className="muted">
         Schedule: {summarizeRules([...inherited, ...own], s.default_module)}
         {inherited.length > 0 && ' (includes group rules)'}

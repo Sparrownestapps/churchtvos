@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import { useApp } from '../context'
 import { supabase } from '../supabase'
 import type { Playlist, Schedule } from '../types'
 import { attempt, fmtWhen, must, nextSundayAt, locationLabel, toLocalInput, useLoad } from '../lib'
 import { ReadOnlyNote } from '../ui'
+
+const SeriesManager = lazy(() => import('../calendar/SeriesManager'))
 
 export default function SchedulePage() {
   const { org, mySites, locations, sites, canEditContent } = useApp()
@@ -184,6 +186,13 @@ export default function SchedulePage() {
             </tbody>
           </table>
         )}
+      </div>
+      <div className="card stack-sm">
+        <h3>Repeating schedules</h3>
+        <p className="muted">Weekly schedules with a playlist rotation. They are also drawn on the Calendar.</p>
+        <Suspense fallback={<p className="muted">Loading…</p>}>
+          <SeriesManager />
+        </Suspense>
       </div>
     </div>
   )

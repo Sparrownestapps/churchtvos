@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { AppContext, useApp, type AppState } from './context'
 import type { Entitlement, Location, Membership, Module, ModuleDef, Organization, Role, Site } from './types'
 import { FALLBACK_MODULES, entitled, isHex, must, roleLabel, slugify, useLoad } from './lib'
 import { ModuleOff } from './ui'
+import { onColor, readableOnDark, setThemeMode, useTheme, type ThemeMode } from './theme'
 import SchedulePage from './pages/SchedulePage'
 import PlaylistsPage from './pages/PlaylistsPage'
 import MediaPage from './pages/MediaPage'
@@ -15,7 +16,10 @@ import SitesPage from './pages/SitesPage'
 import PeoplePage from './pages/PeoplePage'
 import SettingsPage from './pages/SettingsPage'
 
-type PageDef = { label: string; title?: string; render: () => ReactNode; module?: Module; adminOnly?: boolean }
+// The calendar (and FullCalendar) loads on first visit so the main bundle stays small.
+const CalendarPage = lazy(() => import('./calendar/CalendarPage'))
+
+type PageDef = { label: string; title?: string; render: () => ReactNode; module?: Module; adminOnly?: boolean; /** Shown to anyone who has at least one of these applications. */ anyModule?: Module[] }
 
 /**
  * Pages each application contributes to its nav group. Adding an application = one row in the `modules`
@@ -55,6 +59,16 @@ function buildNav(modules: ModuleDef[]) {
     keys.push(key)
     groups.push({ title: m.name, module: m.id, pages: keys })
   }
+  pages.calendar = {
+    label: 'Calendar',
+    anyModule: ['kids', 'signage'],
+    render: () => (
+      <Suspense fallback={<p className="muted">Loading the calendar…</p>}>
+        <CalendarPage />
+      </Suspense>
+    ),
+  }
+  groups.unshift({ title: 'Schedule', pages: ['calendar'] })
   Object.assign(pages, MANAGE_PAGES)
   groups.push({ title: 'Manage', pages: Object.keys(MANAGE_PAGES) })
   return { pages, groups }
@@ -209,20 +223,24 @@ function OrgApp(props: OrgAppProps) {
   const [page, setPage] = useState(() => location.hash.slice(1))
   const [menuOpen, setMenuOpen] = useState(false)
 
-  // Apply the church's colours to the whole dashboard.
+  // Apply the church's colours to the whole dashboard. In dark mode they are lightened until they read on the dark surface.
+  const { resolved: theme } = useTheme()
   useEffect(() => {
     const root = document.documentElement
     const { primary_color: primary, accent_color: accent } = org.branding
-    if (isHex(primary)) root.style.setProperty('--primary', primary)
-    if (isHex(accent)) root.style.setProperty('--accent', accent)
-    const meta = document.querySelector('meta[name="theme-color"]')
-    if (meta && isHex(primary)) meta.setAttribute('content', primary)
+    const dark = theme === 'dark'
+    if (isHex(primary)) {
+      const p = dark ? readableOnDark(primary) : primary
+      root.style.setProperty('--primary', p)
+      root.style.setProperty('--on-primary', onColor(p))
+    }
+    if (isHex(accent)) root.style.setProperty('--accent', dark ? readableOnDark(accent) : accent)
     return () => {
       root.style.removeProperty('--primary')
+      root.style.removeProperty('--on-primary')
       root.style.removeProperty('--accent')
-      meta?.setAttribute('content', '#1f3a5f')
     }
-  }, [org.branding])
+  }, [org.branding, theme])
 
   const role: Role = membership?.role ?? 'owner' // platform admins without a membership act as owners
   const isAdmin = role === 'owner' || role === 'admin'
@@ -269,6 +287,7 @@ function OrgApp(props: OrgAppProps) {
       if (!state) return false
       if (def.adminOnly && !state.isAdmin) return false
       if (def.module && !state.hasModule(def.module)) return false
+      if (def.anyModule && !def.anyModule.some((m) => state.hasModule(m))) return false
       return true
     },
     [state, PAGES],
@@ -298,7 +317,7 @@ function OrgApp(props: OrgAppProps) {
 
   const def = PAGES[current]
     const notEnabled = def.module ? !state.moduleOn(def.module) : false
-  const logo = org.branding.logo_url
+  const logo = theme === 'dark' ? org.branding.logo_dark_url || org.branding.logo_url : org.branding.logo_url
 
   return (
     <AppContext.Provider value={state}>
@@ -309,6 +328,7 @@ function OrgApp(props: OrgAppProps) {
           </button>
           <Wordmark />
           <OrgSwitcher />
+          <ThemeSwitch />
         </header>
         <div className="body">
           <nav className={`sidebar ${menuOpen ? 'open' : ''}`}>
@@ -354,6 +374,17 @@ function OrgApp(props: OrgAppProps) {
         </div>
       </div>
     </AppContext.Provider>
+  )
+}
+
+function ThemeSwitch() {
+  const { mode } = useTheme()
+  return (
+    <select className="theme-select" value={mode} aria-label="Theme" onChange={(e) => setThemeMode(e.target.value as ThemeMode)}>
+      <option value="system">◐ System</option>
+      <option value="light">☀ Light</option>
+      <option value="dark">☾ Dark</option>
+    </select>
   )
 }
 
