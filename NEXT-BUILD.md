@@ -93,6 +93,13 @@ TVs on 1.0.0 cannot parse a playlist containing an unknown item type (the whole 
 - Known obligations from NDI's licensing page: link to ndi.video where NDI is used (in the app's About/Settings and on the website), show "NDI® is a registered trademark of Vizrt NDI AB", report the commercial app to NDI, do not put "NDI" in our product name without asking, ship only the files the SDK allows, build with an SDK version under 30 days old when releasing, and handle codec licensing (H.264/H.265) ourselves.
 - Download the Android SDK from https://ndi.video/for-developers/ndi-sdk/ and keep the `arm64-v8a` and `armeabi-v7a` libraries (Fire TV sticks are ARM; skip x86 in release).
 
+### 2.0a Licence finding (2026-10-15, read from the NDI SDK v6 Android installer's licence text)
+- The SDK licence covers "Products" that run on general-purpose operating systems and computers. It **expressly excludes** products on fixed-purpose appliances and on **embedded devices using an embedded-type operating system, which it says includes Android** (and Linux, iOS and similar). For those exclusions the licence says you **must enter into a commercial licence agreement with NDI**.
+- Church TV OS runs on Android-based Fire TV and Google TV devices, so it very likely falls under that exclusion. A commercial agreement with NDI is probably required, even for development. This is a reading of the text, not legal advice; NDI decides.
+- Other terms that apply regardless: ship only files the SDK documentation says may be distributed; the bundled app must use the latest SDK version at release; end-user terms must pass NDI's restrictions through to customers (no reverse engineering, warranty and liability disclaimers, copyright notice); NDI trademark rules and notices; the SDK is confidential (do not share it or commit it to the repo; `vendor/` is git-ignored).
+- **Action:** email NDI first and describe the product (Android TV app, free download, subscription on the web). Do not run the installer or start the spike until their answer is in. The installer itself asks the user to type "y" to accept the licence, which is Keith's decision, not ours.
+- The installer is in `~/Downloads/Install_NDI_SDK_v6_Android.tar.gz`; a copy of the extracted (not run) script is in `vendor/ndi-installer/` (ignored by git).
+
 ### 2.1 Spike (1-2 days, test TV only)
 - New Android Studio native module (NDK/CMake) with a thin JNI wrapper around the NDI receiver: find sources, connect, pull video frames, release.
 - Create an `NsdManager` (`getSystemService(Context.NSD_SERVICE)`) and keep it alive for as long as any finder/receiver exists. NDI's docs require this on Android.

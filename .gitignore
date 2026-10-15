@@ -8,3 +8,6 @@ dist/
 supabase/.temp/
 supabase/.branches/
 store/build/*.apk
+
+# NDI SDK is confidential and not redistributable
+vendor/
