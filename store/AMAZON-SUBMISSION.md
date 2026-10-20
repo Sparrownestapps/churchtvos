@@ -79,3 +79,16 @@ Everything below is ready to paste. Console labels change over time; match them 
 - Have the privacy policy and terms reviewed by someone qualified.
 - Test on at least one more Fire OS device (for example a Fire TV Stick 4K Max or a Fire OS 8 device).
 - Decide whether to create a reviewer account in the dashboard (test church with one screen).
+
+
+## 8. Resubmission after the first rejection (2026-10-20)
+Amazon's reviewers signed up on the website, created a church and tried to pair a TV; pairing failed with an error. Cause: a church created in the dashboard had no plan attached, so the pairing step refused ("Your plan allows 0 TVs"). Fixed on the server on 2026-10-20 (migration `20261020000002_trial_and_default_room.sql`): every new church now starts on a free trial (Kids + Signage, 2 TVs) with a ready-made "Main Room" location, and the three review accounts were backfilled.
+
+Use these testing instructions when resubmitting (replace the older text):
+
+> The app is a display client for organizations that manage content in a web dashboard (app.churchtvos.com). Two ways to evaluate it:
+> 1. No account: on the first screen choose "Settings and demo mode" (or press Menu), then Demo mode, then Kids demo or Signage demo. Back leaves a demo.
+> 2. Full flow: open app.churchtvos.com on a computer or phone and choose "First time? Create an account". Sign up, confirm the email if asked, then create a church (any name). The church starts on a free trial with a location called "Main Room". In the dashboard go to Screens, choose Pair a TV, type the six-character code shown on the TV, pick "Main Room" and save. The TV then shows the church's content. To see something on the TV: in Kids, add a playlist with a countdown or text and schedule it for Main Room (or in Signage add a sign). 
+> Auto-launch on boot is opt-in and only offered on Amazon devices.
+
+Which file to upload: the newest build in `store/build/` (1.3.0 at the time of writing, version code 4). The pairing fix is server-side, so any version works, but newer builds also fix the church logo not showing and add the Settings button on the pairing screen.
