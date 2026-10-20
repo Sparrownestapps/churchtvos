@@ -7,6 +7,7 @@ import { EmptyState, ScopeSelect, useDefaultScope } from '../ui'
 import { MediaSelect } from '../MediaSelect'
 import { YouTubeItemEditor, newYouTubeItem } from '../YouTubeItem'
 import { StreamItemEditor, newStreamItem, validStreamUrl } from '../StreamItem'
+import { LyricsItemEditor, newLyricsItem, type SongLite } from '../LyricsItem'
 
 const KIND_LABEL: Record<PlaylistItem['type'], string> = {
   video: 'Video',
@@ -23,12 +24,14 @@ export default function PlaylistsPage() {
   const [editing, setEditing] = useState<Playlist | 'new' | null>(null)
 
   const { data, reload } = useLoad(async () => {
-    const [playlists, media, folders] = await Promise.all([
+    const [playlists, media, folders, songs] = await Promise.all([
       supabase.from('playlists').select('*').eq('organization_id', org.id).order('updated_at', { ascending: false }),
       fetchAll<Media>((a, b) => supabase.from('media').select('*').eq('organization_id', org.id).eq('module', 'kids').order('title').range(a, b)),
       fetchAll<MediaFolder>((a, b) => supabase.from('media_folders').select('*').eq('organization_id', org.id).eq('module', 'kids').order('name').range(a, b)),
+      // The song library is optional here: if it can't be read, typed lyrics still work.
+      fetchAll<SongLite>((a, b) => supabase.from('songs').select('id,title,sections,arrangement,lines_per_slide').eq('organization_id', org.id).order('title').range(a, b)).catch(() => [] as SongLite[]),
     ])
-    return { playlists: must(playlists) as Playlist[], media, folders }
+    return { playlists: must(playlists) as Playlist[], media, folders, songs }
   })
 
   if (editing) {
@@ -37,6 +40,7 @@ export default function PlaylistsPage() {
         playlist={editing === 'new' ? null : editing}
         media={data?.media ?? []}
         folders={data?.folders ?? []}
+        songs={data?.songs ?? []}
         onDone={() => (setEditing(null), reload())}
       />
     )
@@ -105,7 +109,7 @@ export default function PlaylistsPage() {
   )
 }
 
-function PlaylistEditor({ playlist, media, folders, onDone }: { playlist: Playlist | null; media: Media[]; folders: MediaFolder[]; onDone: () => void }) {
+function PlaylistEditor({ playlist, media, folders, songs, onDone }: { playlist: Playlist | null; media: Media[]; folders: MediaFolder[]; songs: SongLite[]; onDone: () => void }) {
   const { org } = useApp()
   const defaultScope = useDefaultScope()
   const channelId = org.branding.youtube_channel_id || null
@@ -123,7 +127,7 @@ function PlaylistEditor({ playlist, media, folders, onDone }: { playlist: Playli
       video: { type: 'video', title: '', url: '', media_id: '' },
       image: { type: 'image', title: '', url: '', media_id: '', seconds: null },
       countdown: { type: 'countdown', title: 'Service starts in', seconds: 300 },
-      lyrics: { type: 'lyrics', title: '', slides: [] },
+      lyrics: newLyricsItem(),
       youtube: newYouTubeItem(channelId, org.name),
       stream: newStreamItem(null),
     }
@@ -144,8 +148,10 @@ function PlaylistEditor({ playlist, media, folders, onDone }: { playlist: Playli
     if (noYouTube >= 0) return alert(`Item ${noYouTube + 1} needs a YouTube video chosen.`)
     const badStream = items.findIndex((i) => i.type === 'stream' && !validStreamUrl(i.url))
     if (badStream >= 0) return alert(`Item ${badStream + 1} needs a stream link (starting with https://).`)
+    const noSong = items.findIndex((i) => i.type === 'lyrics' && 'song_id' in i && !i.song_id)
+    if (noSong >= 0) return alert(`Item ${noSong + 1} needs a song chosen from the library (or switch it to typed lyrics).`)
     const cleaned = items.map((i) =>
-      i.type === 'lyrics' ? { ...i, slides: i.slides.map((s) => s.trim()).filter(Boolean) } : i,
+      i.type === 'lyrics' && 'slides' in i ? { ...i, slides: i.slides.map((s) => s.trim()).filter(Boolean) } : i,
     )
     setSaving(true)
     const row = { organization_id: org.id, name: name.trim(), site_id: scope, items: cleaned }
@@ -245,23 +251,7 @@ function PlaylistEditor({ playlist, media, folders, onDone }: { playlist: Playli
 
           {item.type === 'youtube' && <YouTubeItemEditor item={item} onChange={(next) => update(i, next)} />}
 
-          {item.type === 'lyrics' && (
-            <div className="stack-sm">
-              <label className="field">
-                <span>Song title</span>
-                <input value={item.title} onChange={(e) => update(i, { ...item, title: e.target.value })} />
-              </label>
-              <label className="field">
-                <span>Lyrics · leave a blank line between slides</span>
-                <textarea
-                  rows={8}
-                  value={item.slides.join('\n\n')}
-                  onChange={(e) => update(i, { ...item, slides: e.target.value.split(/\n[ \t]*\n/) })}
-                />
-              </label>
-              <span className="muted">{item.slides.filter((s) => s.trim()).length} slides</span>
-            </div>
-          )}
+          {item.type === 'lyrics' && <LyricsItemEditor item={item} songs={songs} onChange={(next) => update(i, next)} />}
         </div>
       ))}
 

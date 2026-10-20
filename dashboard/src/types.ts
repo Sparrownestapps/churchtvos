@@ -1,3 +1,5 @@
+import type { SongSection } from './songParsers'
+
 /** An application id from the `modules` table ('kids', 'signage', ...). */
 export type Module = string
 
@@ -93,10 +95,37 @@ export type PlaylistItem =
   | { type: 'video'; title: string; url: string; media_id: string }
   | { type: 'image'; title: string; url: string; media_id: string; seconds: number | null }
   | { type: 'countdown'; title: string; seconds: number }
-  | { type: 'lyrics'; title: string; slides: string[] }
+  | LyricsItem
   // video_id null + channel_id set = whatever that channel is live-streaming when the item plays
   | { type: 'youtube'; title: string; video_id: string | null; channel_id: string | null; start: number | null }
   | StreamItem
+
+/**
+ * Lyrics: typed by hand (legacy shape, `slides`) or taken from the song library (`song_id`; the server expands it into
+ * slides for the TV). `show_title` shows the song name as its own first slide that holds until Next. Legacy items have
+ * no `show_title` and behave as before.
+ */
+export type LyricsItem =
+  | { type: 'lyrics'; title: string; slides: string[]; show_title?: boolean }
+  | { type: 'lyrics'; title: string; song_id: string; show_title?: boolean }
+
+/** One row of the shared song library (`songs`). */
+export type Song = {
+  id: string
+  organization_id: string
+  title: string
+  authors: string | null
+  ccli_number: string | null
+  copyright: string | null
+  sections: SongSection[]
+  /** Ordered section ids to play (repeats allowed). null / empty = every section once, in order. */
+  arrangement: string[] | null
+  /** 0 = one slide per section. */
+  lines_per_slide: number
+  source: 'manual' | 'paste' | 'file'
+  created_at: string
+  updated_at: string
+}
 
 /** Live HLS (.m3u8) feed. Must match the TV app (needs app 1.1.0+). */
 export type StreamItem = {

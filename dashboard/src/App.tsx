@@ -21,6 +21,8 @@ import './getstarted.css'
 
 // The calendar (and FullCalendar) loads on first visit so the main bundle stays small.
 const CalendarPage = lazy(() => import('./calendar/CalendarPage'))
+// The shared song library (and its editor/importer) loads on first visit too.
+const SongsPage = lazy(() => import('./pages/SongsPage'))
 
 type PageDef = { label: string; title?: string; render: () => ReactNode; module?: Module; adminOnly?: boolean; /** Shown to anyone who has at least one of these applications. */ anyModule?: Module[] }
 
@@ -74,6 +76,17 @@ function buildNav(modules: ModuleDef[]) {
   groups.unshift({ title: 'Schedule', pages: ['calendar'] })
   pages.getstarted = { label: 'Get started', adminOnly: true, render: () => <GetStartedPage /> }
   groups.unshift({ title: 'Start', pages: ['getstarted'] })
+  // The song library belongs to the church, not to one application, so it sits outside the Kids group.
+  pages.songs = {
+    label: 'Songs',
+    anyModule: ['kids', 'slides'],
+    render: () => (
+      <Suspense fallback={<p className="muted">Loading songs…</p>}>
+        <SongsPage />
+      </Suspense>
+    ),
+  }
+  groups.push({ title: 'Library', pages: ['songs'] })
   Object.assign(pages, MANAGE_PAGES)
   groups.push({ title: 'Manage', pages: Object.keys(MANAGE_PAGES) })
   return { pages, groups }

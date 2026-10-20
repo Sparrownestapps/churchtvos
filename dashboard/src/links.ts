@@ -15,6 +15,7 @@ export const HELP_PAGES = {
   install: 'install-app.html',
   screens: 'screens.html',
   media: 'media.html',
+  songs: 'songs.html',
   kids: 'kids.html',
   signage: 'signage.html',
   calendar: 'calendar.html',
