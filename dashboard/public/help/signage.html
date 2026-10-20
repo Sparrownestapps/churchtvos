@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Signage module · Church TV OS Help</title>
+<meta name="description" content="Signs, live streams, weekly slots and mixed TVs.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="/app-icon.png">
+<link rel="stylesheet" href="/help/help.css">
+</head>
+<body>
+<header class="top"><div class="in"><a class="brand" href="/help/">Church TV OS</a><span class="muted">Help Center</span><span class="space"></span><a class="nav" href="https://app.churchtvos.com">Open the dashboard</a></div></header>
+<main>
+<p class="crumb"><a href="/help/">&larr; Help Center</a></p>
+<h1>Signage module</h1>
+<p class="updated">Last updated 2026-10-20</p>
+
+<p class="lead">The Signage module loops announcements on lobby and hallway screens. It plays by itself, on a weekly schedule, with no one needed at the TV.</p>
+
+<h2>Playlists</h2>
+<p>Open <b>Signage, Playlists</b> and press <b>New playlist</b>. Name it (for example "Lobby - Weekday loop"), then add items. They play in order and then start over.</p>
+<h3>What you can add</h3>
+<dl>
+<dt>Image</dt><dd>Pick from your Signage library and choose how many seconds it shows.</dd>
+<dt>Video</dt><dd>Plays to the end, then moves on.</dd>
+<dt>Sign</dt><dd>A text-only slide made right in the dashboard, so you do not need a design tool. Enter a <b>Title</b> and optional smaller text, pick a background colour (including your church colours), choose left or centre alignment, set how many seconds it shows, and optionally show your church logo. The text colour is chosen for you so it stays readable. A preview shows landscape and portrait.</dd>
+<dt>Live stream</dt><dd>A live video link ending in <code>.m3u8</code> (HLS). Leave the time blank to keep it up until the playlist loops past it. See below.</dd>
+</dl>
+<div class="heads-up"><p>Signs and live streams need the Church TV OS app version <b>1.1.0 or newer</b> on the TV. A TV on an older version may not play a playlist that contains them. The version each TV runs is listed on the Screens page.</p></div>
+
+<h2>Live streams</h2>
+<ul>
+<li>Paste the HLS link (<code>.m3u8</code>) and press <b>Test link</b>. A failed test is only a hint, because many servers block browser checks.</li>
+<li>Choose "If the stream is down": <b>Skip it</b> moves straight on so no room is left blank, or <b>Show waiting for feed</b> holds a card for a short while first, which suits a stream that starts a few minutes late.</li>
+<li>Sound is off unless you turn on Play sound.</li>
+</ul>
+<h3>BoxCast</h3>
+<p>In BoxCast open the broadcast, choose <b>Embed</b>, and copy the <b>Static M3U8</b> link into the stream box.</p>
+<div class="heads-up"><p>BoxCast viewers are about 30 to 40 seconds behind real life. That is fine for "watch the service" screens in the lobby, but do not use it for lyrics or anything that must match what is happening in the room.</p></div>
+
+<h2>Slots: when each playlist plays</h2>
+<p>A <b>slot</b> says which playlist plays on a screen (or a whole group) on certain days and times. Open <b>Signage, Slots &amp; schedule</b>, choose a screen or group, and add slots, or add them on the <a href="/help/calendar.html">Calendar</a>. Slots repeat weekly.</p>
+<ul>
+<li>If several slots overlap, the higher <b>priority</b> wins, then the newest.</li>
+<li>When no slot is active, the screen plays its <b>default playlist</b> (set on the Screens page).</li>
+<li>If there is no default playlist either, the screen shows a <b>black screen</b>. That is on purpose, so the TV is never showing something out of date.</li>
+</ul>
+<div class="tip"><p>Want the TV dark overnight? Do not add a slot for those hours and leave the default playlist empty. Or set the module schedule to <b>Off</b>.</p></div>
+
+<h2>Mixed TVs: Signage and Kids on the same screen</h2>
+<p>A screen only shows Signage when its <b>module schedule</b> says so (or when Signage is its default module). To run Signage on weekdays and Kids on Sunday, give the screen a module schedule: "Signage Monday to Saturday" and "Kids Sunday 8:00 to 13:00". Set this on the Screens page or the Calendar. Only owners and admins can change module schedules.</p>
+<div class="heads-up"><p>If a Signage playlist is not showing, check the module schedule first. A screen set to Kids at that time will not play Signage, however good the slot looks.</p></div>
+<figure><img src="/help/img/09-signage-demo-1.jpg" alt="A Signage welcome sign on the TV" width="960" height="540"><figcaption>A simple text sign, as it appears on the TV.</figcaption></figure>
+<!-- screenshot to add: the sign editor with the landscape and portrait preview -->
+
+<nav class="pager" aria-label="Previous and next guide"><a class="prev" href="/help/kids.html"><small>Previous</small>Kids module</a><a class="next" href="/help/calendar.html"><small>Next</small>The Calendar</a></nav>
+</main>
+<footer><p><a href="/help/">Help Center</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · Questions? <a href="mailto:keith@sparrownest.com">keith@sparrownest.com</a></p></footer>
+</body></html>

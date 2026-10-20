@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Install the app on a TV · Church TV OS Help</title>
+<meta name="description" content="Supported devices, app stores and installing it yourself.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="/app-icon.png">
+<link rel="stylesheet" href="/help/help.css">
+</head>
+<body>
+<header class="top"><div class="in"><a class="brand" href="/help/">Church TV OS</a><span class="muted">Help Center</span><span class="space"></span><a class="nav" href="https://app.churchtvos.com">Open the dashboard</a></div></header>
+<main>
+<p class="crumb"><a href="/help/">&larr; Help Center</a></p>
+<h1>Install the app on a TV</h1>
+<p class="updated">Last updated 2026-10-20</p>
+
+<p class="lead">The Church TV OS app runs on Fire TV and Google TV devices. Check your device first, then pick the install route that suits you.</p>
+
+<h2>Which devices work</h2>
+<div class="table-wrap"><table>
+<tr><th>Works</th><th>Does not work</th></tr>
+<tr><td><ul>
+<li>Fire TV Stick 4K Max</li>
+<li>Fire TV Cube</li>
+<li>Fire TVs and sticks that run <b>Fire OS</b></li>
+<li>Google TV and Android TV devices</li>
+</ul></td><td><ul>
+<li>The newest Fire TV sticks that run <b>Vega OS</b>. They cannot run Android apps, and so they cannot run Church TV OS.</li>
+</ul></td></tr>
+</table></div>
+<div class="heads-up"><p>Before you buy or install, check the device's product page. If it says <b>Vega OS</b>, choose a different device. A Fire TV Stick 4K Max, a Fire TV Cube or a Google TV streamer all work well. A wired network connection is a nice extra for TVs that run all day, but Wi-Fi is fine.</p></div>
+
+<h2>Option 1: the app store (easiest)</h2>
+<ul>
+<li><b>Amazon Appstore</b> for Fire TV: link coming soon.</li>
+<li><b>Google Play</b> for Google TV and Android TV: link coming soon.</li>
+</ul>
+<p>Once a listing is live, search for "Church TV OS" on the TV, choose <b>Get</b> or <b>Install</b>, then open it. Store installs also update automatically.</p>
+
+<h2>Option 2: install it directly (sideload) on a Fire TV</h2>
+<p>While the store listings are being approved, the app file is available on request: email <a href="mailto:keith@sparrownest.com?subject=Church%20TV%20OS%20app%20file">keith@sparrownest.com</a> and we will send you a download link. Then use the free <b>Downloader</b> app from the Amazon Appstore to install it.</p>
+<ol class="steps">
+<li>On the Fire TV, install <b>Downloader</b> (search for it).</li>
+<li>Go to <b>Settings, My Fire TV, Developer options, Install unknown apps</b> and turn on <b>Downloader</b>. If you don't see Developer options, open <b>About</b> and press OK on the device name seven times.</li>
+<li>Open Downloader and type the download link we sent you.</li>
+<li>Download the file, press <b>Install</b>, then <b>Open</b>.</li>
+<li>The app shows <b>Pair this TV</b> and a code. Carry on with <a href="/help/screens.html">Pair a TV and manage screens</a>.</li>
+</ol>
+<div class="heads-up"><p>Pick one source per TV. Amazon signs store apps with its own key, so a TV installed directly cannot update to the store version. To switch a TV to the store version, uninstall the directly installed app first, then install from the store. You will need to pair the TV again.</p></div>
+
+<h2>Option 3: install with adb (advanced)</h2>
+<p>For people comfortable with a command line. You need the APK file and the TV on the same network as your computer.</p>
+<ol class="steps">
+<li>On the TV, turn on <b>ADB debugging</b> in Developer options and note the TV's IP address (Settings, My Fire TV, About, Network).</li>
+<li>On your computer run <code>adb connect TV-IP-ADDRESS:5555</code>. Accept the prompt on the TV if one appears.</li>
+<li>Run <code>adb install -r church-tv-os.apk</code> (use the file name you were sent).</li>
+<li>Launch the app from the TV's home screen, or with <code>adb shell monkey -p com.churchtvos.tv 1</code>.</li>
+</ol>
+
+<h2>Google TV and Android TV</h2>
+<p>Use Google Play once the listing is live. Until then, ask us for the app file (see Option 2) and install it with a file-transfer app or with adb as above. On Google TV, turn on Developer options first (Settings, System, About, press the Android TV OS build seven times).</p>
+
+<h2>After installing</h2>
+<ul>
+<li>The app can <b>open by itself when the TV turns on</b>. This is a setting you can turn on or off under Menu, Settings, "Auto-launch".</li>
+<li>If your TV used the old Forward Kids TV app, remove it from that TV. Two auto-launching apps will compete for the screen.</li>
+<li>Press the Menu button on the remote to find <b>Demo mode</b>, which shows sample content without a church account. It is a good way to check the TV, the sound and the picture.</li>
+</ul>
+<figure><img src="/help/img/04-settings.jpg" alt="The app's Settings screen with Auto-launch, Demo mode and Close buttons" width="960" height="540"><figcaption>The Settings screen on the TV (press Menu).</figcaption></figure>
+
+<nav class="pager" aria-label="Previous and next guide"><a class="prev" href="/help/key-ideas.html"><small>Previous</small>Key ideas and glossary</a><a class="next" href="/help/screens.html"><small>Next</small>Pair a TV and manage screens</a></nav>
+</main>
+<footer><p><a href="/help/">Help Center</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · Questions? <a href="mailto:keith@sparrownest.com">keith@sparrownest.com</a></p></footer>
+</body></html>
