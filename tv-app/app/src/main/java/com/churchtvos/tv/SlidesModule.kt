@@ -41,6 +41,7 @@ private val whenFormatSlides = DateTimeFormatter.ofPattern("EEE MMM d · h:mm a"
 fun SlidesModule(device: DeviceState, state: TvUiState, now: Instant, cache: MediaCache) {
     // Snapshot of the deck when Play was pressed, so a sync mid-service can't change it.
     var playing by remember { mutableStateOf<Deck?>(null) }
+    var autoStartedFor by remember { mutableStateOf<String?>(null) } // see KidsModule: autoplay starts each scheduled item once
     val active = playing
     if (active != null) {
         SlidesPlayer(active, cache, onExit = { playing = null })
@@ -52,6 +53,12 @@ fun SlidesModule(device: DeviceState, state: TvUiState, now: Instant, cache: Med
     val deck = schedule?.deck
     val ready = deck != null && deck.mediaUrls.all { cache.fileFor(it).exists() } && deck.playableSlides.isNotEmpty()
     val downloading = state.downloading
+    LaunchedEffect(current?.id, ready, device.screen.autoplay) {
+        if (device.screen.autoplay && current != null && ready && autoStartedFor != current.id) {
+            autoStartedFor = current.id
+            playing = deck
+        }
+    }
     DeckHomeScreen(
         site = device.site.orEmpty(),
         location = device.location.orEmpty(),

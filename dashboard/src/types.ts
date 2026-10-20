@@ -218,6 +218,7 @@ export type Screen = {
   orientation: Orientation
   default_module: ScreenModule
   signage_default_playlist_id: string | null
+  autoplay?: boolean
   pairing_code: string | null
   model: string | null
   app_version: string | null

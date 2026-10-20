@@ -222,6 +222,8 @@ fun App(sync: TvSync, cache: MediaCache, settingsOpen: Boolean, onSettingsChange
 private fun KidsModule(device: DeviceState, state: TvUiState, now: Instant, cache: MediaCache) {
     // Snapshot of the playlist when Play was pressed, so a sync mid-service can't change it.
     var playing by remember { mutableStateOf<Playlist?>(null) }
+    // With "start playing automatically" on, each scheduled item starts by itself once (pressing Back stops it for good).
+    var autoStartedFor by remember { mutableStateOf<String?>(null) }
     val active = playing
 
     if (active != null) {
@@ -235,6 +237,12 @@ private fun KidsModule(device: DeviceState, state: TvUiState, now: Instant, cach
     val playlist = schedule?.playlist
     val ready = playlist != null && playlist.mediaUrls.all { cache.fileFor(it).exists() }
     val downloading = state.downloading
+    LaunchedEffect(current?.id, ready, device.screen.autoplay) {
+        if (device.screen.autoplay && current != null && ready && autoStartedFor != current.id) {
+            autoStartedFor = current.id
+            playing = playlist
+        }
+    }
     HomeScreen(
         site = device.site.orEmpty(),
         location = device.location.orEmpty(),

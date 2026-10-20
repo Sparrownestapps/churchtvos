@@ -194,6 +194,7 @@ function ScreenCard({
     default_module: s.default_module,
     group_id: s.group_id ?? '',
     signage_default_playlist_id: s.signage_default_playlist_id ?? '',
+    autoplay: !!s.autoplay,
   })
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }))
 
@@ -209,6 +210,7 @@ function ScreenCard({
             default_module: form.default_module,
             group_id: form.group_id || null,
             signage_default_playlist_id: form.signage_default_playlist_id || null,
+            autoplay: form.autoplay,
           })
           .eq('id', s.id),
       ),
@@ -280,6 +282,13 @@ function ScreenCard({
                   </select>
                 </label>
               </div>
+              <label className="row">
+                <input type="checkbox" checked={form.autoplay} onChange={(e) => set('autoplay', e.target.checked)} />
+                <span>
+                  Start playing automatically
+                  <span className="muted"> — Kids and Slides begin the scheduled content by themselves, for example after a power cut (Signage always plays on its own). Needs app 1.4.0 or newer.</span>
+                </span>
+              </label>
               <div className="row wrap">
                 <label className="field">
                   <span>Orientation</span>

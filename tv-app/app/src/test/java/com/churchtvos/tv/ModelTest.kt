@@ -175,4 +175,12 @@ class ModelTest {
         val b = AppJson.decodeFromString<DeviceState>("""{"paired":true,"organization":{"name":"X","status":"suspended"}}""")
         assertEquals("suspended", b.organization?.status)
     }
+
+    @Test
+    fun screenAutoplayDefaultsOffAndReadsOn() {
+        val a = AppJson.decodeFromString<DeviceState>("""{"paired":true,"screen":{"name":"X"}}""")
+        assertEquals(false, a.screen.autoplay)
+        val b = AppJson.decodeFromString<DeviceState>("""{"paired":true,"screen":{"name":"X","autoplay":true}}""")
+        assertEquals(true, b.screen.autoplay)
+    }
 }

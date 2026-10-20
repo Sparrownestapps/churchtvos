@@ -76,7 +76,7 @@ data class BrandingInfo(
 )
 
 @Serializable
-data class ScreenInfo(val name: String? = null, val orientation: String = "landscape")
+data class ScreenInfo(val name: String? = null, val orientation: String = "landscape", val autoplay: Boolean = false)
 
 /** Which module runs when. Days are 0 = Sunday; times are local to the site. */
 @Serializable
