@@ -26,7 +26,17 @@ sealed interface PlaylistItem {
 
     @Serializable
     @SerialName("lyrics")
-    data class Lyrics(override val title: String, val slides: List<String>) : PlaylistItem
+    data class Lyrics(
+        override val title: String,
+        val slides: List<String>,
+        /** Section label for each slide (Verse 1, Chorus...); optional. */
+        val labels: List<String> = emptyList(),
+        /** Show the song title as its own first slide that waits for the leader to press Next. */
+        @SerialName("show_title") val showTitle: Boolean = false,
+        val authors: String? = null,
+        val ccli: String? = null,
+        val copyright: String? = null,
+    ) : PlaylistItem
 
     /** A simple text sign: coloured background, title and optional subtext (Signage). */
     @Serializable
@@ -85,6 +95,8 @@ sealed interface Slide {
     /** A picture shipped inside the app (demo mode). */
     data class Bundled(@androidx.annotation.DrawableRes val res: Int, val seconds: Int) : Slide
     data class Lyric(val song: String, val text: String, val number: Int, val count: Int) : Slide
+    /** The song name on its own, before the words. Holds until Next is pressed. */
+    data class SongTitle(val title: String, val authors: String?, val ccli: String?, val copyright: String?) : Slide
     data class YouTube(val videoId: String?, val channelId: String?, val start: Int?) : Slide
     data class Sign(val title: String, val subtext: String, val background: String, val seconds: Int, val align: String, val logo: Boolean) : Slide
     data class Stream(val url: String, val audio: Boolean, val seconds: Int?, val fallback: String) : Slide
@@ -95,9 +107,7 @@ fun Playlist.toSlides(cache: MediaCache): List<Slide> = items.flatMap { item ->
         is PlaylistItem.Video -> listOf(Slide.Video(cache.fileFor(item.url)))
         is PlaylistItem.Image -> listOf(Slide.Image(cache.fileFor(item.url), item.seconds))
         is PlaylistItem.Countdown -> listOf(Slide.Countdown(item.title, item.seconds))
-        is PlaylistItem.Lyrics -> item.slides.mapIndexed { i, text ->
-            Slide.Lyric(item.title, text, i + 1, item.slides.size)
-        }
+        is PlaylistItem.Lyrics -> item.toLyricSlides()
         is PlaylistItem.YouTube -> listOf(Slide.YouTube(item.videoId, item.channelId, item.start))
         is PlaylistItem.Sign -> listOf(Slide.Sign(item.title, item.subtext, item.background, item.seconds, item.align, item.logo))
         is PlaylistItem.Stream -> listOf(Slide.Stream(item.url, item.audio, item.seconds, item.fallback))
@@ -106,3 +116,9 @@ fun Playlist.toSlides(cache: MediaCache): List<Slide> = items.flatMap { item ->
 }
 
 data class DownloadProgress(val done: Int, val total: Int)
+
+/** A song's slides: an optional title slide first, then one slide per lyric section. */
+fun PlaylistItem.Lyrics.toLyricSlides(): List<Slide> {
+    val words = slides.mapIndexed { i, text -> Slide.Lyric(title, text, i + 1, slides.size) }
+    return if (showTitle) listOf<Slide>(Slide.SongTitle(title, authors, ccli, copyright)) + words else words
+}

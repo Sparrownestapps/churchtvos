@@ -189,6 +189,7 @@ fun PlayerScreen(slides: List<Slide>, onExit: () -> Unit, onFinished: () -> Unit
                 )
                 is Slide.Countdown -> CountdownSlide(slide, onDone = { next() })
                 is Slide.Lyric -> LyricSlide(slide)
+                is Slide.SongTitle -> SongTitleSlide(slide)
                 is Slide.YouTube -> YouTubeSlide(slide, youtube, onEnded = { next() })
                 is Slide.Sign -> SignSlide(slide)
                 is Slide.Stream -> if (streamFailed) StreamNotice(slide)

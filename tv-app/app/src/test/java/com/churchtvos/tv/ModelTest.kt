@@ -54,4 +54,22 @@ class ModelTest {
         assertEquals("kids", state.moduleNow(sunday10))
         assertEquals("signage", state.moduleNow(monday10))
     }
+
+    @Test
+    fun lyricsWithTitleSlideComeFirstAndOldShapeStillWorks() {
+        val json = """{"id":"p","name":"S","items":[
+          {"type":"lyrics","title":"Great Are You Lord","slides":["a","b"],"labels":["Verse 1","Chorus"],"show_title":true,"authors":"Smith","ccli":"123","copyright":"(c) X"},
+          {"type":"lyrics","title":"Old","slides":["x"]}]}"""
+        val items = AppJson.decodeFromString<Playlist>(json).items
+        val withTitle = (items[0] as PlaylistItem.Lyrics).toLyricSlides()
+        assertEquals(3, withTitle.size)
+        val title = withTitle[0] as Slide.SongTitle
+        assertEquals("Great Are You Lord", title.title)
+        assertEquals("123", title.ccli)
+        assertEquals("a", (withTitle[1] as Slide.Lyric).text)
+        assertEquals(2, (withTitle[2] as Slide.Lyric).number)
+        val old = (items[1] as PlaylistItem.Lyrics).toLyricSlides()
+        assertEquals(1, old.size)
+        assertTrue(old[0] is Slide.Lyric)
+    }
 }
