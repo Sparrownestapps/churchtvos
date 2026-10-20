@@ -20,7 +20,13 @@ import androidx.core.app.ServiceCompat
  * so volunteers never have to find the app. Only for TVs that are paired to a room.
  */
 object AutoLaunch {
-    fun isEnabled(context: Context): Boolean = DeviceStore(context).let { it.isPaired && it.autoLaunch }
+    /**
+     * Fire OS lets an app reopen itself when the TV turns on. Google TV / Android TV (Android 10+) blocks apps from
+     * starting screens from the background, so auto-launch is only offered on Amazon devices.
+     */
+    val supported: Boolean get() = Build.MANUFACTURER.equals("Amazon", ignoreCase = true)
+
+    fun isEnabled(context: Context): Boolean = supported && DeviceStore(context).let { it.isPaired && it.autoLaunch }
 
     fun start(context: Context) {
         if (!isEnabled(context)) return
@@ -30,6 +36,10 @@ object AutoLaunch {
 
     /** Turns auto-launch on or off right away (starts or stops the background watcher). */
     fun setEnabled(context: Context, enabled: Boolean) {
+        if (!supported) {
+            DeviceStore(context).also { it.autoLaunch = false; it.autoLaunchAsked = true }
+            return
+        }
         DeviceStore(context).also { it.autoLaunch = enabled; it.autoLaunchAsked = true }
         if (enabled) start(context) else context.stopService(Intent(context, WakeWatcherService::class.java))
     }

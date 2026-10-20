@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react'
 import { useApp } from './context'
 import type { Module } from './types'
+import { helpUrl, type HelpTopic } from './links'
 
 /** Which site a piece of content belongs to. Only people with all-sites access can share with all sites. */
 export function ScopeSelect({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
@@ -84,4 +86,16 @@ export function ModuleOff({ module }: { module: Module }) {
 /** Shown in place of editing controls for people who can only view. */
 export function ReadOnlyNote() {
   return <p className="muted">You have view-only access here.</p>
+}
+
+/** Friendly empty state: what this is, the next step, and a link to the matching help page. */
+export function EmptyState({ children, help }: { children: ReactNode; help: HelpTopic }) {
+  return (
+    <p className="muted empty-state">
+      {children}{' '}
+      <a href={helpUrl(help)} target="_blank" rel="noreferrer">
+        Learn more
+      </a>
+    </p>
+  )
 }

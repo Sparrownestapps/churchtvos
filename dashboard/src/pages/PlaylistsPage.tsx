@@ -3,7 +3,7 @@ import { useApp } from '../context'
 import { supabase } from '../supabase'
 import type { Media, MediaFolder, Playlist, PlaylistItem } from '../types'
 import { attempt, fetchAll, moveItem, must, scopeLabel, useLoad } from '../lib'
-import { ScopeSelect, useDefaultScope } from '../ui'
+import { EmptyState, ScopeSelect, useDefaultScope } from '../ui'
 import { MediaSelect } from '../MediaSelect'
 import { YouTubeItemEditor, newYouTubeItem } from '../YouTubeItem'
 import { StreamItemEditor, newStreamItem, validStreamUrl } from '../StreamItem'
@@ -65,7 +65,11 @@ export default function PlaylistsPage() {
           </button>
         </div>
       )}
-      {playlists.length === 0 && <p className="muted">No playlists yet.</p>}
+      {playlists.length === 0 && (
+        <EmptyState help="kids">
+          A playlist is what a Kids room plays, in order: videos, slides, a countdown, lyrics. Add media first, then press New playlist.
+        </EmptyState>
+      )}
       {playlists.map((p) => {
         const canEdit = canEditContent('kids', p.site_id)
         return (

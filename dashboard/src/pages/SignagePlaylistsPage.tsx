@@ -58,7 +58,9 @@ export default function SignagePlaylistsPage() {
           </button>
         </div>
       )}
-      {playlists.length === 0 && <p className="muted">No Signage playlists yet.</p>}
+      {playlists.length === 0 && <EmptyState help="signage">
+          A Signage playlist is the loop a screen shows: images, videos, text signs and live streams. Add media first, then make your first playlist.
+        </EmptyState>}
       {playlists.map((p) => {
         const canEdit = canEditContent('signage', p.site_id)
         const seconds = p.items.reduce((t, i) => t + (i.type === 'image' ? i.seconds ?? 10 : 0), 0)

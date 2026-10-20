@@ -3,7 +3,7 @@ import { useApp } from '../context'
 import { supabase } from '../supabase'
 import type { Location, Module, Site } from '../types'
 import { attempt, must } from '../lib'
-import { ModuleChips } from '../ui'
+import { EmptyState, ModuleChips } from '../ui'
 
 const zones: string[] = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
 
@@ -210,7 +210,16 @@ export default function SitesPage() {
           </div>
         )
       })}
-      {sites.length === 0 && <p className="muted">No sites yet.</p>}
+      {sites.length === 0 && (
+        <EmptyState help="ideas">
+          A site is a campus or building. Add your first one below, then add the rooms and areas (locations) where TVs will go.
+        </EmptyState>
+      )}
+      {sites.length > 0 && locations.length === 0 && (
+        <EmptyState help="ideas">
+          Next, add a location for each room or area that has a TV, like a Nursery or Lobby. Tag it Kids or Signage so the right content can play there.
+        </EmptyState>
+      )}
       {isAdmin && (
         <div className="card row">
           <input

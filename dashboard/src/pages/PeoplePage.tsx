@@ -3,6 +3,7 @@ import { useApp } from '../context'
 import { supabase } from '../supabase'
 import type { Membership, Module, Role } from '../types'
 import { attempt, must, roleLabel, useLoad } from '../lib'
+import { EmptyState } from '../ui'
 
 const ROLES: { value: Role; help: string }[] = [
   { value: 'owner', help: 'Everything, including people' },
@@ -71,6 +72,12 @@ export default function PeoplePage() {
           address and they'll see {org.name} straight away.
         </p>
       </form>
+
+      {people && people.length <= 1 && (
+        <EmptyState help="people">
+          It's just you so far. Invite volunteers and staff above and choose which applications and sites they can use.
+        </EmptyState>
+      )}
 
       <div className="stack-sm">
         {(people ?? []).map((m) => {

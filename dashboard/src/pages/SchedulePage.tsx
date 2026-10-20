@@ -3,7 +3,7 @@ import { useApp } from '../context'
 import { supabase } from '../supabase'
 import type { Playlist, Schedule } from '../types'
 import { attempt, fmtWhen, must, nextSundayAt, locationLabel, toLocalInput, useLoad } from '../lib'
-import { ReadOnlyNote } from '../ui'
+import { EmptyState, ReadOnlyNote } from '../ui'
 
 const SeriesManager = lazy(() => import('../calendar/SeriesManager'))
 
@@ -146,7 +146,9 @@ export default function SchedulePage() {
       <div className="card">
         <h3>Current & upcoming</h3>
         {schedules.length === 0 ? (
-          <p className="muted">Nothing scheduled.</p>
+          <EmptyState help="kids">
+            Nothing scheduled yet. Choose a playlist, a start time and the Kids rooms above to put it on the TVs. For something that repeats every week, use the Calendar.
+          </EmptyState>
         ) : (
           <table>
             <thead>

@@ -26,7 +26,7 @@ import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
 
 @Composable
-private fun TvButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+internal fun TvButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         modifier = modifier,
@@ -58,6 +58,7 @@ private val body = TextStyle(fontFamily = Lato, fontSize = 18.sp, lineHeight = 2
 @Composable
 fun SettingsScreen(
     autoLaunch: Boolean,
+    autoLaunchSupported: Boolean,
     paired: Boolean,
     detail: String,
     onToggleAutoLaunch: () -> Unit,
@@ -68,7 +69,7 @@ fun SettingsScreen(
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     SettingsFrame("Settings") {
-        if (paired) {
+        if (paired && autoLaunchSupported) {
             Text(
                 if (autoLaunch) "Church TV OS opens by itself when this TV turns on." else "Church TV OS does not open by itself. You'll need to start it from the Fire TV home screen.",
                 style = body,
@@ -82,6 +83,10 @@ fun SettingsScreen(
             Spacer(Modifier.height(12.dp))
             TvButton("Demo mode", onClick = onDemo)
         } else {
+            if (paired) {
+                Text("Auto-launch isn't available on this device: its system doesn't let apps open themselves. Start Church TV OS from the home screen.", style = body)
+                Spacer(Modifier.height(16.dp))
+            }
             TvButton("Demo mode", Modifier.focusRequester(focus), onDemo)
         }
         Spacer(Modifier.height(12.dp))

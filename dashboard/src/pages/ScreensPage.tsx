@@ -3,7 +3,7 @@ import { useApp } from '../context'
 import { supabase } from '../supabase'
 import type { Orientation, Screen, ScreenGroup, ScreenModule, ScreenSchedule, SignagePlaylist } from '../types'
 import { MODULE_NAME, attempt, locationLabel, must, summarizeRules, timeAgo, useLoad } from '../lib'
-import { LocationOptions } from '../ui'
+import { EmptyState, LocationOptions } from '../ui'
 import ScheduleRules from '../ScheduleRules'
 
 const ORIENTATION: Record<Orientation, string> = {
@@ -147,7 +147,11 @@ function ScreensTab({ data, reload, isAdmin }: TabProps) {
         {data.screens.length} screen{data.screens.length === 1 ? '' : 's'}
         {data.limit !== null && ` of ${data.limit} allowed on your plan`}
       </p>
-      {data.screens.length === 0 && <p className="muted">No screens paired yet.</p>}
+      {data.screens.length === 0 && (
+        <EmptyState help="screens">
+          A screen is one TV running the Church TV OS app. Open the app on a TV, then enter the code it shows in the box above to pair it.
+        </EmptyState>
+      )}
       {data.screens.map((s) => (
         <ScreenCard
           key={s.id}
@@ -382,7 +386,11 @@ function GroupsTab({ data, reload, isAdmin }: TabProps) {
           </button>
         </div>
       )}
-      {data.groups.length === 0 && <p className="muted">No groups yet. Groups let several screens share a schedule.</p>}
+      {data.groups.length === 0 && (
+        <EmptyState help="screens">
+          No groups yet. A group lets several screens share one schedule, like all your lobby TVs. Add one above, then pick it on each screen.
+        </EmptyState>
+      )}
       {data.groups.map((g) => {
         const rules = data.schedules.filter((r) => r.group_id === g.id)
         const members = data.screens.filter((s) => s.group_id === g.id)

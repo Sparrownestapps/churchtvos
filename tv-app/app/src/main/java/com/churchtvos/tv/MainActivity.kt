@@ -28,6 +28,31 @@ import kotlinx.coroutines.delay
 class MainActivity : ComponentActivity() {
     private var settingsOpen by mutableStateOf(false)
 
+    private var centerDownAt = 0L
+    private var longPressHandled = false
+
+    // Holding OK for a second opens (and closes) Settings from anywhere: Google TV remotes have no Menu button.
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (event.repeatCount == 0) {
+                    centerDownAt = event.eventTime
+                    longPressHandled = false
+                } else if (longPressHandled) {
+                    return true
+                } else if (event.eventTime - centerDownAt >= 1000) {
+                    longPressHandled = true
+                    settingsOpen = !settingsOpen
+                    return true
+                }
+            } else if (event.action == KeyEvent.ACTION_UP && longPressHandled) {
+                longPressHandled = false
+                return true // do not also "click" whatever had focus
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     // The remote's Menu button opens (and closes) Settings from anywhere.
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_MENU) {
@@ -109,7 +134,7 @@ fun App(sync: TvSync, cache: MediaCache, settingsOpen: Boolean, onSettingsChange
     var demo by remember { mutableStateOf<String?>(null) }
     var demoMenu by remember { mutableStateOf(false) }
     var autoLaunch by remember { mutableStateOf(sync.store.autoLaunch) }
-    var asked by remember { mutableStateOf(sync.store.autoLaunchAsked) }
+    var asked by remember { mutableStateOf(sync.store.autoLaunchAsked || !AutoLaunch.supported) }
     val demoNow = demo
 
     BrandTheme(device?.brand() ?: Brand()) {
@@ -124,6 +149,7 @@ fun App(sync: TvSync, cache: MediaCache, settingsOpen: Boolean, onSettingsChange
                 demoMenu -> DemoMenu(onPick = { demo = it; demoMenu = false; onSettingsChange(false) }, onClose = { demoMenu = false })
                 settingsOpen -> SettingsScreen(
                     autoLaunch = autoLaunch,
+                    autoLaunchSupported = AutoLaunch.supported,
                     paired = device?.paired == true,
                     detail = "Version ${BuildConfig.VERSION_NAME}" + (device?.screen?.name?.let { "  ·  $it" } ?: "") + "  ·  $DASHBOARD_HOST",
                     onToggleAutoLaunch = { autoLaunch = !autoLaunch; AutoLaunch.setEnabled(context, autoLaunch); asked = true },
@@ -131,7 +157,7 @@ fun App(sync: TvSync, cache: MediaCache, settingsOpen: Boolean, onSettingsChange
                     onClose = { onSettingsChange(false) },
                 )
                 device == null -> MessageScreen("Connecting…", state.error)
-                !device.paired -> PairingScreen(device.pairingCode ?: "······", state.offline)
+                !device.paired -> PairingScreen(device.pairingCode ?: "······", state.offline, onSettings = { onSettingsChange(true) })
                 !asked -> AutoLaunchPrompt { yes ->
                     AutoLaunch.setEnabled(context, yes)
                     autoLaunch = yes

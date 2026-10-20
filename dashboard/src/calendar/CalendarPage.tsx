@@ -15,6 +15,7 @@ import SignageSlotsPage from '../pages/SignageSlotsPage'
 import { ChoiceDialog, Drawer, type DialogState } from './parts'
 import { CreatePanel, EditPanel, type CalCtx } from './CalendarPanel'
 import SeriesManager from './SeriesManager'
+import { EmptyState } from '../ui'
 import CopyWeek from './CopyWeek'
 import { DAY_NAMES, addDays, browserTz, endToRule, fromWall, hm, hourDiff, ruleEnd, safeTz, toWall, tzAbbr, wallOf, weekStartOf, ymd } from './tz'
 import '../calendar.css'
@@ -533,7 +534,7 @@ function CalendarView() {
   }
 
   if (base.error) return <p className="error">Couldn't load the calendar: {base.error}</p>
-  if (!b || !target || !ctx) return base.data === undefined ? <p className="muted">Loading…</p> : <p className="muted">Add a screen or location first (Screens, or Sites & Locations).</p>
+  if (!b || !target || !ctx) return base.data === undefined ? <p className="muted">Loading…</p> : <EmptyState help="calendar">The calendar shows what plays on a screen and when. Pair a TV under Screens (or add a location under Sites & Locations) first, then come back to drag out your schedule.</EmptyState>
 
   const go = (fn: 'prev' | 'next' | 'today') => api()?.[fn]()
   const setView = (v: string) => api()?.changeView(v)

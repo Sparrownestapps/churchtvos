@@ -15,6 +15,9 @@ import ScreensPage from './pages/ScreensPage'
 import SitesPage from './pages/SitesPage'
 import PeoplePage from './pages/PeoplePage'
 import SettingsPage from './pages/SettingsPage'
+import GetStartedPage from './pages/GetStartedPage'
+import { helpUrl } from './links'
+import './getstarted.css'
 
 // The calendar (and FullCalendar) loads on first visit so the main bundle stays small.
 const CalendarPage = lazy(() => import('./calendar/CalendarPage'))
@@ -69,6 +72,8 @@ function buildNav(modules: ModuleDef[]) {
     ),
   }
   groups.unshift({ title: 'Schedule', pages: ['calendar'] })
+  pages.getstarted = { label: 'Get started', adminOnly: true, render: () => <GetStartedPage /> }
+  groups.unshift({ title: 'Start', pages: ['getstarted'] })
   Object.assign(pages, MANAGE_PAGES)
   groups.push({ title: 'Manage', pages: Object.keys(MANAGE_PAGES) })
   return { pages, groups }
@@ -158,6 +163,7 @@ function SignedIn({ session }: { session: Session }) {
         canCancel={!!org}
         onCancel={() => setCreating(false)}
         onCreated={(id) => {
+          location.hash = 'getstarted' // a brand-new church lands on the checklist
           reload()
           switchOrg(id)
         }}
@@ -222,6 +228,13 @@ function OrgApp(props: OrgAppProps) {
 
   const [page, setPage] = useState(() => location.hash.slice(1))
   const [menuOpen, setMenuOpen] = useState(false)
+
+  // Pages can link to each other by setting location.hash (e.g. the Get started checklist).
+  useEffect(() => {
+    const onHash = () => setPage(location.hash.slice(1))
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
 
   // Apply the church's colours to the whole dashboard. In dark mode they are lightened until they read on the dark surface.
   const { resolved: theme } = useTheme()
@@ -293,7 +306,8 @@ function OrgApp(props: OrgAppProps) {
     [state, PAGES],
   )
 
-  const firstPage = Object.keys(PAGES).find(visible) ?? 'screens'
+  // Get started is reached from the nav (and right after a church is created), not as the everyday landing page.
+  const firstPage = Object.keys(PAGES).find((k) => k !== 'getstarted' && visible(k)) ?? 'screens'
   const current = page in PAGES && visible(page) ? page : firstPage
 
   useEffect(() => {
@@ -328,6 +342,9 @@ function OrgApp(props: OrgAppProps) {
           </button>
           <Wordmark />
           <OrgSwitcher />
+          <a className="help-link" href={helpUrl()} target="_blank" rel="noreferrer">
+            ? Help
+          </a>
           <ThemeSwitch />
         </header>
         <div className="body">
@@ -356,6 +373,9 @@ function OrgApp(props: OrgAppProps) {
               )
             })}
             <div className="sidebar-foot">
+              <a className="help-link" href={helpUrl()} target="_blank" rel="noreferrer">
+                ? Help Center
+              </a>
               <div className="sidebar-email">{email}</div>
               <span className="muted">{state.isPlatformAdmin ? 'Platform admin' : roleLabel(role)}</span>
               <button className="link" onClick={state.signOut}>

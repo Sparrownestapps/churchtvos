@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,21 +28,24 @@ import androidx.tv.material3.Text
 fun PairingScreen(code: String, offline: Boolean, onSettings: () -> Unit = {}) {
     BrandedScreen {
         Text("Pair this TV", style = TextStyle(fontFamily = JuliusSansOne, fontSize = 40.sp, color = BrandPrimary))
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(12.dp))
         Text(
             code.chunked(3).joinToString("  "),
-            style = TextStyle(fontFamily = Lato, fontWeight = FontWeight.Black, fontSize = 88.sp, letterSpacing = 10.sp, color = Color.White),
+            style = TextStyle(fontFamily = Lato, fontWeight = FontWeight.Black, fontSize = 72.sp, letterSpacing = 8.sp, color = Color.White),
             modifier = Modifier
                 .background(BrandPrimary, RoundedCornerShape(16.dp))
                 .padding(horizontal = 40.dp, vertical = 8.dp),
         )
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
         Text(
             "In the Church TV OS dashboard ($DASHBOARD_HOST),\ngo to Screens → Pair a TV, enter this code and choose the location.",
             style = TextStyle(fontFamily = Lato, fontSize = 18.sp, lineHeight = 28.sp, color = Greyscale, textAlign = TextAlign.Center),
         )
         Spacer(Modifier.height(16.dp))
-        Text("Menu button: settings and demo mode", style = TextStyle(fontFamily = Lato, fontSize = 13.sp, color = Greyscale))
+        // Google TV remotes have no Menu button, so Settings and demo mode are also reachable from here (or hold OK anywhere).
+        val focus = remember { FocusRequester() }
+        LaunchedEffect(Unit) { focus.requestFocus() }
+        TvButton("Settings and demo mode", Modifier.focusRequester(focus), onSettings)
         if (offline) {
             Spacer(Modifier.height(16.dp))
             Text("⚠ Can't reach the internet. Check this TV's Wi-Fi.", style = TextStyle(fontFamily = Lato, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = BrandAccent))

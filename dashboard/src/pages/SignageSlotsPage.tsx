@@ -4,7 +4,7 @@ import { supabase } from '../supabase'
 import type { Screen, ScreenGroup, SignagePlaylist, SignageSlot } from '../types'
 import { daysLabel, must, timeLabel, useLoad } from '../lib'
 import ScheduleRules from '../ScheduleRules'
-import { ReadOnlyNote } from '../ui'
+import { EmptyState, ReadOnlyNote } from '../ui'
 
 export default function SignageSlotsPage() {
   const { org, canEditContent } = useApp()
@@ -78,7 +78,9 @@ export default function SignageSlotsPage() {
       <div className="card">
         <h3>All slots</h3>
         {data.slots.length === 0 ? (
-          <p className="muted">Nothing set up yet.</p>
+          <EmptyState help="signage">
+            Nothing set up yet. A slot picks the Signage playlist for a screen on certain days and times. Choose a screen or group above to add one.
+          </EmptyState>
         ) : (
           data.slots.map((s) => {
             const label = s.screen_id

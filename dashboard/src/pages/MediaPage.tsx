@@ -4,7 +4,7 @@ import { useApp } from '../context'
 import { SUPABASE_KEY, SUPABASE_URL, supabase } from '../supabase'
 import type { Media, MediaFolder, Module } from '../types'
 import { attempt, fetchAll, fmtBytes, folderPath, must, randomName, scopeLabel, useLoad } from '../lib'
-import { ReadOnlyNote, ScopeSelect, useDefaultScope } from '../ui'
+import { EmptyState, ReadOnlyNote, ScopeSelect, useDefaultScope } from '../ui'
 
 type Upload = { id: string; name: string; percent: number; error?: string }
 type View = 'grid' | 'list'
@@ -600,9 +600,13 @@ export default function MediaPage({ module }: { module: Module }) {
         {q && <p className="muted">Searching the whole {moduleName(module)} library.</p>}
 
         {empty ? (
-          <p className="muted">
-            {!data ? 'Loading…' : q ? 'Nothing matches your search.' : here ? 'This folder is empty.' : 'No media yet. Upload your first video or slide above.'}
-          </p>
+          !data || q || here ? (
+            <p className="muted">{!data ? 'Loading…' : q ? 'Nothing matches your search.' : 'This folder is empty.'}</p>
+          ) : (
+            <EmptyState help="media">
+              No media yet. Upload your first video or image above. Each application has its own library, and you can sort files into folders.
+            </EmptyState>
+          )
         ) : view === 'grid' ? (
           <div className="media-grid">
             {subfolders.map((f) => (
