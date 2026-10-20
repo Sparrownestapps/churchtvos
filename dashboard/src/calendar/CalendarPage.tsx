@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useMemo, useRef, useState } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import dayGridPlugin from '@fullcalendar/daygrid'
@@ -7,11 +7,13 @@ import type { DateSelectArg, DatesSetArg, EventClickArg, EventContentArg, EventD
 import type { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
 import { useApp } from '../context'
 import { supabase } from '../supabase'
-import { MODULE_NAME, locationLabel, must, useLoad } from '../lib'
-import type { Block, KidsSeries, NamedRow, PanelState, ResolvedTarget, SeriesOccurrence } from '../calendarTypes'
+import { locationLabel, must, useLoad } from '../lib'
+import type { Block, Domain, KidsSeries, NamedRow, PanelState, ResolvedTarget, SeriesOccurrence } from '../calendarTypes'
+import { DOMAINS, locationRuns, normOcc, normSchedule, normSeries } from './domain'
 import type { Schedule, Screen, ScreenGroup, ScreenSchedule, SignageSlot } from '../types'
 import SchedulePage from '../pages/SchedulePage'
 import SignageSlotsPage from '../pages/SignageSlotsPage'
+const SlidesSchedulePage = lazy(() => import('../slides/SlidesSchedulePage'))
 import { ChoiceDialog, Drawer, type DialogState } from './parts'
 import { CreatePanel, EditPanel, type CalCtx } from './CalendarPanel'
 import SeriesManager from './SeriesManager'
@@ -21,6 +23,9 @@ import { DAY_NAMES, addDays, browserTz, endToRule, fromWall, hm, hourDiff, ruleE
 import '../calendar.css'
 
 const screenName = (s: Screen) => s.name || `Screen ${s.id.slice(0, 6)}`
+/** Colour class for a module's tinted band: the modules with their own colour, else a neutral one. */
+const BAND_COLOURS = ['kids', 'signage', 'slides', 'off']
+const bandName = (m: string) => (BAND_COLOURS.includes(m) ? m : 'other')
 const TARGET_KEY = 'churchtvos.cal.target'
 const readTarget = () => {
   try {
@@ -31,9 +36,15 @@ const readTarget = () => {
 }
 
 export default function CalendarPage() {
-  const { hasModule } = useApp()
+  const { hasModule, modules } = useApp()
+  const slidesOn = hasModule('slides') && modules.some((m) => m.id === 'slides')
+  const kinds = [
+    ...(hasModule('kids') ? ([['kids', 'Kids schedule']] as const) : []),
+    ...(slidesOn ? ([['slides', 'Slides schedule']] as const) : []),
+    ...(hasModule('signage') ? ([['signage', 'Signage slots']] as const) : []),
+  ]
   const [mode, setMode] = useState<'calendar' | 'list'>('calendar')
-  const [listKind, setListKind] = useState<'kids' | 'signage'>(hasModule('kids') ? 'kids' : 'signage')
+  const [listKind, setListKind] = useState<'kids' | 'signage' | 'slides'>(kinds[0]?.[0] ?? 'signage')
   return (
     <div className="stack cal-page">
       <div className="segmented cal-mode">
@@ -48,17 +59,24 @@ export default function CalendarPage() {
         <CalendarView />
       ) : (
         <div className="stack">
-          {hasModule('kids') && hasModule('signage') && (
+          {kinds.length > 1 && (
             <div className="segmented">
-              <button className={listKind === 'kids' ? 'on' : ''} onClick={() => setListKind('kids')}>
-                Kids schedule
-              </button>
-              <button className={listKind === 'signage' ? 'on' : ''} onClick={() => setListKind('signage')}>
-                Signage slots
-              </button>
+              {kinds.map(([id, label]) => (
+                <button key={id} className={listKind === id ? 'on' : ''} onClick={() => setListKind(id)}>
+                  {label}
+                </button>
+              ))}
             </div>
           )}
-          {listKind === 'kids' && hasModule('kids') ? <SchedulePage /> : <SignageSlotsPage />}
+          {listKind === 'kids' && hasModule('kids') ? (
+            <SchedulePage />
+          ) : listKind === 'slides' && slidesOn ? (
+            <Suspense fallback={<p className="muted">Loading…</p>}>
+              <SlidesSchedulePage />
+            </Suspense>
+          ) : (
+            <SignageSlotsPage />
+          )}
         </div>
       )}
     </div>
@@ -94,7 +112,7 @@ function overlapHints(items: Hint[]) {
 // ───────────────────────── the calendar ─────────────────────────
 
 function CalendarView() {
-  const { org, hasModule, isAdmin, canEditContent, locations, sites, mySites } = useApp()
+  const { org, hasModule, isAdmin, canEditContent, locations, sites, mySites, modules, moduleName } = useApp()
   const calRef = useRef<FullCalendar>(null)
   const [targetKey, setTargetKey] = useState(readTarget)
   const [range, setRange] = useState<{ start: Date; end: Date; title: string; view: string } | null>(null)
@@ -106,10 +124,13 @@ function CalendarView() {
 
   const kidsOn = hasModule('kids')
   const signageOn = hasModule('signage')
+  // Slides only appears once the registry lists it (modules.available) and the member has it.
+  const slidesOn = hasModule('slides') && modules.some((m) => m.id === 'slides')
+  const datedOn = kidsOn || slidesOn
 
   const base = useLoad(async () => {
     const none = Promise.resolve({ data: [], error: null })
-    const [screens, groups, kp, sp, slots, rules, series] = await Promise.all([
+    const [screens, groups, kp, sp, slots, rules, series, decks, dseries] = await Promise.all([
       supabase.from('screens').select('*').eq('organization_id', org.id).order('name'),
       supabase.from('screen_groups').select('*').eq('organization_id', org.id).order('name'),
       kidsOn ? supabase.from('playlists').select('id, name, site_id').eq('organization_id', org.id).order('name') : none,
@@ -117,6 +138,8 @@ function CalendarView() {
       signageOn ? supabase.from('signage_slots').select('*').eq('organization_id', org.id) : none,
       supabase.from('screen_schedules').select('*').eq('organization_id', org.id),
       kidsOn ? supabase.from('kids_series').select('*').eq('organization_id', org.id) : none,
+      slidesOn ? supabase.from('decks').select('id, name, site_id').eq('organization_id', org.id).order('name') : none,
+      slidesOn ? supabase.from('deck_series').select('*').eq('organization_id', org.id) : none,
     ])
     return {
       screens: must(screens) as Screen[],
@@ -125,7 +148,11 @@ function CalendarView() {
       signagePlaylists: must(sp) as NamedRow[],
       slots: must(slots) as SignageSlot[],
       rules: must(rules) as ScreenSchedule[],
-      series: must(series) as KidsSeries[],
+      decks: must(decks) as NamedRow[],
+      series: {
+        kids: (must(series) as unknown[]).map((r) => normSeries('kids', r)),
+        slides: (must(dseries) as unknown[]).map((r) => normSeries('slides', r)),
+      } as Record<Domain, KidsSeries[]>,
     }
   })
   const b = base.data
@@ -177,25 +204,35 @@ function CalendarView() {
   const rangeStart = range?.start.getTime()
   const rangeEnd = range?.end.getTime()
 
-  // Things that depend on the visible dates: Kids one-offs, and repeating-schedule occurrences from the server.
+  // Things that depend on the visible dates: Kids and Slides one-offs, and repeating-schedule occurrences from the server.
   const dated = useLoad(
     async () => {
-      if (!range || !kidsOn) return { schedules: [] as Schedule[], occ: [] as SeriesOccurrence[] }
+      const empty = { schedules: { kids: [], slides: [] } as Record<Domain, Schedule[]>, occ: { kids: [], slides: [] } as Record<Domain, SeriesOccurrence[]> }
+      if (!range || !datedOn) return empty
       const from = fromWall(addDays(range.start, -1), tz)
       const to = fromWall(addDays(range.end, 1), tz)
       const openCutoff = new Date(from.getTime() - 14 * 86_400_000).toISOString()
-      const [schedules, occ] = await Promise.all([
-        supabase
-          .from('schedules')
-          .select('*')
-          .eq('organization_id', org.id)
-          .lt('starts_at', to.toISOString())
-          .or(`ends_at.gt.${from.toISOString()},and(ends_at.is.null,starts_at.gt.${openCutoff})`),
-        supabase.rpc('kids_series_occurrences', { p_org: org.id, p_from: from.toISOString(), p_to: to.toISOString(), p_location: null }),
-      ])
-      return { schedules: must(schedules) as Schedule[], occ: (must(occ) ?? []) as SeriesOccurrence[] }
+      const out = empty
+      await Promise.all(
+        (['kids', 'slides'] as Domain[])
+          .filter((d) => (d === 'kids' ? kidsOn : slidesOn))
+          .map(async (d) => {
+            const [schedules, occ] = await Promise.all([
+              supabase
+                .from(DOMAINS[d].schedTable)
+                .select('*')
+                .eq('organization_id', org.id)
+                .lt('starts_at', to.toISOString())
+                .or(`ends_at.gt.${from.toISOString()},and(ends_at.is.null,starts_at.gt.${openCutoff})`),
+              supabase.rpc(DOMAINS[d].rpc, { p_org: org.id, p_from: from.toISOString(), p_to: to.toISOString(), p_location: null }),
+            ])
+            out.schedules[d] = (must(schedules) as unknown[]).map((r) => normSchedule(d, r))
+            out.occ[d] = ((must(occ) ?? []) as unknown[]).map((r) => normOcc(d, r))
+          }),
+      )
+      return out
     },
-    [rangeStart, rangeEnd, tz, kidsOn],
+    [rangeStart, rangeEnd, tz, kidsOn, slidesOn],
   )
 
   const reloadAll = useCallback(() => {
@@ -204,15 +241,16 @@ function CalendarView() {
   }, [base, dated])
 
   const playlistName = useCallback(
-    (kind: 'kids' | 'signage', id: string) => (kind === 'kids' ? b?.kidsPlaylists : b?.signagePlaylists)?.find((p) => p.id === id)?.name ?? 'Unknown playlist',
+    (kind: 'kids' | 'signage' | 'slides', id: string) =>
+      (kind === 'kids' ? b?.kidsPlaylists : kind === 'slides' ? b?.decks : b?.signagePlaylists)?.find((p) => p.id === id)?.name ?? (kind === 'slides' ? 'Unknown deck' : 'Unknown playlist'),
     [b],
   )
 
   // ───── permissions ─────
   const siteOfLoc = (locId: string) => locations.find((l) => l.id === locId)?.site_id ?? null
-  const canKidsAt = (locId: string) => canEditContent('kids', siteOfLoc(locId))
+  const canAt = (d: Domain, locId: string) => canEditContent(d, siteOfLoc(locId))
   const canSignage = canEditContent('signage', null)
-  const canCreate = canSignage || isAdmin || locations.some((l) => l.modules.includes('kids') && canEditContent('kids', l.site_id))
+  const canCreate = canSignage || isAdmin || (['kids', 'slides'] as Domain[]).some((d) => locations.some((l) => locationRuns(d, l) && canEditContent(d, l.site_id)))
 
   // ───── events ─────
   const built = useMemo(() => {
@@ -266,7 +304,7 @@ function CalendarView() {
             kind: 'module',
             row: r,
             date,
-            label: r.module === 'off' ? 'Screen off' : `Switch to ${MODULE_NAME[r.module]}`,
+            label: r.module === 'off' ? 'Screen off' : `Switch to ${moduleName(r.module)}`,
             sub: ruleSub(r),
             editable: isAdmin,
             lockReason: 'Only owners and admins can change which module a screen runs.',
@@ -275,60 +313,66 @@ function CalendarView() {
       }
     }
 
-    // Kids one-offs (an open-ended one lasts until the next one in that room, else an hour on the grid)
-    const all = (dated.data?.schedules ?? []).slice().sort((x, y) => Date.parse(x.starts_at) - Date.parse(y.starts_at))
-    for (const s of all) {
-      if (!target.locationIds.includes(s.location_id)) continue
-      const next = all.find((o) => o.location_id === s.location_id && Date.parse(o.starts_at) > Date.parse(s.starts_at))
-      const openEnded = !s.ends_at
-      const endMs = s.ends_at ? Date.parse(s.ends_at) : next ? Date.parse(next.starts_at) : Date.parse(s.starts_at) + 3_600_000
-      const editable = canKidsAt(s.location_id)
-      blocks.push({
-        id: `one:${s.id}`,
-        start: toWall(Date.parse(s.starts_at), tz),
-        end: toWall(endMs, tz),
-        group: `kids:${s.location_id}`,
-        prio: 1,
-        created: Date.parse(s.starts_at),
-        block: {
-          kind: 'oneoff',
-          row: s,
-          openEnded,
-          label: playlistName('kids', s.playlist_id),
-          sub: multiLoc ? locName(s.location_id) : undefined,
-          editable,
-          lockReason: 'Kids schedules need editor access to this site.',
-        },
-      })
+    // One-offs for Kids playlists and Slides decks (an open-ended one lasts until the next one in that room, else an hour on the grid)
+    for (const d of ['kids', 'slides'] as Domain[]) {
+      const dn = DOMAINS[d]
+      const pre = d === 'kids' ? '' : 'd'
+      const all = (dated.data?.schedules[d] ?? []).slice().sort((x, y) => Date.parse(x.starts_at) - Date.parse(y.starts_at))
+      for (const s of all) {
+        if (!target.locationIds.includes(s.location_id)) continue
+        const next = all.find((o) => o.location_id === s.location_id && Date.parse(o.starts_at) > Date.parse(s.starts_at))
+        const openEnded = !s.ends_at
+        const endMs = s.ends_at ? Date.parse(s.ends_at) : next ? Date.parse(next.starts_at) : Date.parse(s.starts_at) + 3_600_000
+        const editable = canAt(d, s.location_id)
+        blocks.push({
+          id: `${pre}one:${s.id}`,
+          start: toWall(Date.parse(s.starts_at), tz),
+          end: toWall(endMs, tz),
+          group: `${d}:${s.location_id}`,
+          prio: 1,
+          created: Date.parse(s.starts_at),
+          block: {
+            kind: 'oneoff',
+            domain: d,
+            row: s,
+            openEnded,
+            label: playlistName(d, s.playlist_id),
+            sub: multiLoc ? locName(s.location_id) : undefined,
+            editable,
+            lockReason: `${dn.label} schedules need editor access to this site.`,
+          },
+        })
+      }
+
+      // Repeating (server-expanded occurrences)
+      for (const o of dated.data?.occ[d] ?? []) {
+        if (!target.locationIds.includes(o.location_id)) continue
+        const series = b.series[d].find((x) => x.id === o.series_id)
+        if (!series) continue
+        const sameTz = siteTz(o.location_id) === tz
+        const editable = canAt(d, o.location_id) && sameTz
+        blocks.push({
+          id: `${pre}ser:${o.series_id}:${o.on_date}`,
+          start: toWall(Date.parse(o.starts_at), tz),
+          end: toWall(Date.parse(o.ends_at), tz),
+          group: `${d}:${o.location_id}`,
+          prio: 0,
+          created: Date.parse(series.created_at),
+          block: {
+            kind: 'series',
+            domain: d,
+            occ: o,
+            series,
+            label: o.is_override ? `${playlistName(d, o.playlist_id)} (this date)` : `Week ${o.occurrence_no}: ${playlistName(d, o.playlist_id)}`,
+            sub: series.name || (multiLoc ? locName(o.location_id) : undefined),
+            editable,
+            lockReason: sameTz ? `${dn.label} schedules need editor access to this site.` : "This repeating schedule is in a different time zone than the one shown, so it can't be edited here.",
+          },
+        })
+      }
     }
 
-    // Kids repeating (server-expanded occurrences)
-    for (const o of dated.data?.occ ?? []) {
-      if (!target.locationIds.includes(o.location_id)) continue
-      const series = b.series.find((x) => x.id === o.series_id)
-      if (!series) continue
-      const sameTz = siteTz(o.location_id) === tz
-      const editable = canKidsAt(o.location_id) && sameTz
-      blocks.push({
-        id: `ser:${o.series_id}:${o.on_date}`,
-        start: toWall(Date.parse(o.starts_at), tz),
-        end: toWall(Date.parse(o.ends_at), tz),
-        group: `kids:${o.location_id}`,
-        prio: 0,
-        created: Date.parse(series.created_at),
-        block: {
-          kind: 'series',
-          occ: o,
-          series,
-          label: o.is_override ? `${playlistName('kids', o.playlist_id)} (this date)` : `Week ${o.occurrence_no}: ${playlistName('kids', o.playlist_id)}`,
-          sub: series.name || (multiLoc ? locName(o.location_id) : undefined),
-          editable,
-          lockReason: sameTz ? 'Kids schedules need editor access to this site.' : "This repeating schedule is in a different time zone than the one shown, so it can't be edited here.",
-        },
-      })
-    }
-
-    const hints = overlapHints(blocks.map((x) => ({ id: x.id, group: x.group, s: x.start.getTime(), e: x.end.getTime(), prio: x.prio, created: x.created, label: x.block.label, kids: x.group.startsWith('kids:') })))
+    const hints = overlapHints(blocks.map((x) => ({ id: x.id, group: x.group, s: x.start.getTime(), e: x.end.getTime(), prio: x.prio, created: x.created, label: x.block.label, kids: x.group.startsWith('kids:') || x.group.startsWith('slides:') })))
     for (const x of blocks) {
       x.block.warn = hints.get(x.id)
       const resize = x.block.kind === 'oneoff' ? !x.block.openEnded : true
@@ -337,7 +381,7 @@ function CalendarView() {
         title: x.block.label,
         start: x.start,
         end: x.end,
-        classNames: ['cal-ev', `cal-ev-${x.block.kind}`, ...(x.block.kind === 'module' ? [`cal-ev-mod-${x.block.row.module === 'kids' || x.block.row.module === 'signage' || x.block.row.module === 'off' ? x.block.row.module : 'other'}`] : []), ...(x.block.editable ? [] : ['cal-locked'])],
+        classNames: ['cal-ev', `cal-ev-${x.block.kind}`, ...(x.block.kind === 'oneoff' || x.block.kind === 'series' ? [`cal-ev-d-${x.block.domain}`] : []), ...(x.block.kind === 'module' ? [`cal-ev-mod-${bandName(x.block.row.module)}`] : []), ...(x.block.editable ? [] : ['cal-locked'])],
         startEditable: x.block.editable,
         durationEditable: x.block.editable && resize,
         extendedProps: { block: x.block },
@@ -362,7 +406,7 @@ function CalendarView() {
             start: new Date(wallOf(date).getTime() + run.from * 60_000),
             end: new Date(wallOf(date).getTime() + run.to * 60_000),
             display: 'background',
-            classNames: ['cal-band', `cal-band-${run.module === 'kids' || run.module === 'signage' || run.module === 'off' ? run.module : 'other'}`],
+            classNames: ['cal-band', `cal-band-${bandName(run.module)}`],
           })
           run = null
         }
@@ -383,7 +427,7 @@ function CalendarView() {
     }
     return { events, bandsOn }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [b, target, range, dated.data, tz, canSignage, isAdmin, locations, playlistName, siteTz])
+  }, [b, target, range, dated.data, tz, canSignage, isAdmin, locations, playlistName, siteTz, moduleName])
 
   // ───── actions ─────
   const api = () => calRef.current?.getApi()
@@ -398,7 +442,7 @@ function CalendarView() {
 
   const ctx: CalCtx | null =
     b && target
-      ? { tz, target, screens: b.screens, groups: b.groups, kidsPlaylists: b.kidsPlaylists, signagePlaylists: b.signagePlaylists, slots: b.slots, rules: b.rules, reload: reloadAll, openPanel }
+      ? { tz, target, screens: b.screens, groups: b.groups, kidsPlaylists: b.kidsPlaylists, decks: b.decks, signagePlaylists: b.signagePlaylists, slots: b.slots, rules: b.rules, reload: reloadAll, openPanel }
       : null
 
   const openCreateAt = (s: Date, e: Date | null) => {
@@ -441,7 +485,7 @@ function CalendarView() {
 
     if (block.kind === 'oneoff') {
       const patch = { starts_at: fromWall(newStart, tz).toISOString(), ends_at: block.openEnded ? null : fromWall(newEnd, tz).toISOString() }
-      await write(supabase.from('schedules').update(patch).eq('id', block.row.id), revert)
+      await write(supabase.from(DOMAINS[block.domain].schedTable).update(patch).eq('id', block.row.id), revert)
       return
     }
 
@@ -465,7 +509,7 @@ function CalendarView() {
       ask({
         title: 'Change the whole repeating schedule?',
         message: `Times for a repeating schedule can only be changed for every date at once. It will run ${diff ? `${diff > 0 ? '+' : ''}${diff} day${Math.abs(diff) === 1 ? '' : 's'} from now on, ` : ''}at ${hm(newStart)}-${hm(newEnd)}. Skipped or changed dates keep their original dates. To change just one date, click it instead.`,
-        choices: [{ label: 'Change the whole series', run: async () => void (await write(supabase.from('kids_series').update(patch).eq('id', s.id), revert)) }],
+        choices: [{ label: 'Change the whole series', run: async () => void (await write(supabase.from(DOMAINS[block.domain].seriesTable).update(patch).eq('id', s.id), revert)) }],
       })
       return
     }
@@ -565,7 +609,7 @@ function CalendarView() {
               </optgroup>
             )}
             {options.locations.length > 0 && (
-              <optgroup label="Locations (Kids)">
+              <optgroup label="Locations">
                 {options.locations.map((o) => (
                   <option key={o.key} value={o.key}>
                     {o.label}
@@ -584,12 +628,12 @@ function CalendarView() {
               + Add
             </button>
           )}
-          {kidsOn && (
+          {datedOn && (
             <button className="btn" onClick={() => openPanel({ mode: 'series' })}>
               Repeating schedules
             </button>
           )}
-          {kidsOn && canCreate && (
+          {datedOn && canCreate && (
             <button className="btn" onClick={() => setCopyOpen(true)}>
               Copy week
             </button>
@@ -626,10 +670,20 @@ function CalendarView() {
       <div className="cal-meta">
         <span className={`cal-tz ${diffH || target.mixedTz ? 'differs' : ''}`} title={tz}>
           🕒 {tzNote}
-          {target.mixedTz ? '. This group spans several time zones; Kids times are shown in the first' : ''}
+          {target.mixedTz ? `. This group spans several time zones; ${slidesOn && !kidsOn ? 'Slides' : 'Kids and Slides'} times are shown in the first` : ''}
         </span>
         <span className="cal-legend">
-          <i className="lg cal-lg-oneoff" />Kids one-time <i className="lg cal-lg-series" />Kids repeating <i className="lg cal-lg-slot" />Signage <i className="lg cal-lg-module" />Module switch
+          {kidsOn && (
+            <>
+              <i className="lg cal-lg-oneoff" />Kids one-time <i className="lg cal-lg-series" />Kids repeating{' '}
+            </>
+          )}
+          {slidesOn && (
+            <>
+              <i className="lg cal-lg-deck" />Slides one-time <i className="lg cal-lg-deckser" />Slides repeating{' '}
+            </>
+          )}
+          <i className="lg cal-lg-slot" />Signage <i className="lg cal-lg-module" />Module switch
           {built.bandsOn && <span className="muted"> · tinted background = module running</span>}
         </span>
       </div>
@@ -688,7 +742,28 @@ function CalendarView() {
           {panel.mode === 'create' && <CreatePanel key={panelKey} ctx={ctx} state={panel} onClose={closePanel} />}
           {panel.mode === 'edit' && <EditPanel key={panelKey} ctx={ctx} block={panel.block} onClose={closePanel} />}
           {panel.mode === 'series' && (
-            <SeriesManager key={panelKey} locationIds={panel.focusId || target.locationIds.length === 0 ? undefined : target.locationIds} focusId={panel.focusId} onChanged={reloadAll} />
+            <>
+              {kidsOn && (!panel.domain || panel.domain === 'kids') && (
+                <SeriesManager
+                  key={`${panelKey}k`}
+                  domain="kids"
+                  heading={slidesOn && !panel.domain ? 'Kids playlists' : undefined}
+                  locationIds={panel.focusId || target.locationIds.length === 0 ? undefined : target.locationIds}
+                  focusId={panel.focusId}
+                  onChanged={reloadAll}
+                />
+              )}
+              {slidesOn && (!panel.domain || panel.domain === 'slides') && (
+                <SeriesManager
+                  key={`${panelKey}s`}
+                  domain="slides"
+                  heading={kidsOn && !panel.domain ? 'Slides decks' : undefined}
+                  locationIds={panel.focusId || target.locationIds.length === 0 ? undefined : target.locationIds}
+                  focusId={panel.focusId}
+                  onChanged={reloadAll}
+                />
+              )}
+            </>
           )}
         </Drawer>
       )}

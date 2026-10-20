@@ -1,0 +1,77 @@
+/* Platform admin console and trial banner. New colours are light/dark pairs; everything else uses the app variables. */
+:root {
+  --adm-ok-bg: #e3f4ec;
+  --adm-warn-bg: #fff1d6;
+  --adm-bad-bg: #fde7e5;
+  --adm-new-bg: #e4ecfb;
+  --adm-new-fg: #1d4fa8;
+  --adm-off-bg: #eceef1;
+}
+:root[data-theme="dark"] {
+  --adm-ok-bg: #173226;
+  --adm-warn-bg: #3a2f12;
+  --adm-bad-bg: #3d1f1d;
+  --adm-new-bg: #1c2a47;
+  --adm-new-fg: #9ec0ff;
+  --adm-off-bg: #2a2f37;
+}
+
+.adm-grow { flex: 1 1 220px; }
+.adm-title { margin: 0 0 4px; color: var(--primary); }
+.adm-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.adm-stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 2px; text-align: left; font: inherit; color: inherit; }
+button.adm-stat { cursor: pointer; }
+button.adm-stat:hover { border-color: var(--primary); }
+.adm-stat-value { font-size: 24px; font-weight: 800; color: var(--primary); }
+.adm-stat-label { font-size: 12px; color: var(--muted); }
+.adm-stat.warn { background: var(--adm-warn-bg); }
+.adm-stat.bad { background: var(--adm-bad-bg); }
+.adm-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.adm-count { margin-left: 6px; opacity: 0.7; font-weight: 400; }
+
+.adm-badge, .adm-chip { display: inline-block; border-radius: 999px; padding: 2px 9px; font-size: 12px; font-weight: 700; white-space: nowrap; background: var(--adm-off-bg); color: var(--grey); }
+.adm-badge.ok, .adm-chip.ok { background: var(--adm-ok-bg); color: var(--ok); }
+.adm-badge.warn, .adm-chip.warn { background: var(--adm-warn-bg); color: var(--warn); }
+.adm-badge.bad, .adm-chip.bad { background: var(--adm-bad-bg); color: var(--danger); }
+.adm-badge.new { background: var(--adm-new-bg); color: var(--adm-new-fg); }
+.adm-chipset { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+
+/* Church list: a table on wide screens, cards on phones */
+.adm-table { display: grid; gap: 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.adm-head, .adm-row { display: grid; grid-template-columns: 1.4fr 1.3fr 1fr 2.2fr 0.9fr 0.7fr 1fr 0.8fr; gap: 12px; padding: 10px 14px; align-items: start; text-align: left; }
+.adm-head { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); }
+.adm-row { background: none; border: 0; border-bottom: 1px solid var(--line); font: inherit; color: inherit; cursor: pointer; width: 100%; }
+.adm-row:last-child { border-bottom: 0; }
+.adm-row:hover { background: var(--tint-primary); }
+.adm-cell { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+.adm-name b { color: var(--primary); }
+
+@media (max-width: 760px) {
+  .adm-head { display: none; }
+  .adm-table { background: none; border: 0; gap: 10px; }
+  .adm-row { grid-template-columns: 1fr; gap: 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+  .adm-cell[data-label]::before { content: attr(data-label); font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--muted); }
+  .adm-cell.adm-name::before { display: none; }
+}
+
+/* Church detail */
+.adm-presets { background: var(--tint-primary); border-radius: 8px; padding: 12px; }
+.adm-ent { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 10px; }
+.adm-num { width: 80px; }
+.adm-plan { width: 130px; }
+.adm-usage { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.adm-usage > div { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.adm-usage > div.bad { background: var(--adm-bad-bg); }
+.adm-danger { border-color: var(--danger); }
+.adm-danger code { background: var(--surface); padding: 1px 5px; border-radius: 4px; }
+textarea { font: inherit; width: 100%; box-sizing: border-box; }
+
+.adm-audit { display: grid; }
+.adm-audit-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.adm-audit-main { display: grid; gap: 2px; }
+
+/* Banner for church admins */
+.adm-banner { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 14px; border: 1px solid var(--line); }
+.adm-banner.warn { background: var(--adm-warn-bg); color: var(--warn); }
+.adm-banner.bad { background: var(--adm-bad-bg); color: var(--danger); }
+.adm-banner a { color: inherit; font-weight: 700; }

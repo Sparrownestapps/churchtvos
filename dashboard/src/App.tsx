@@ -17,14 +17,25 @@ import PeoplePage from './pages/PeoplePage'
 import SettingsPage from './pages/SettingsPage'
 import GetStartedPage from './pages/GetStartedPage'
 import { helpUrl } from './links'
+import TrialBanner from './admin/TrialBanner'
+import { canLeave } from './slides/unsaved'
 import './getstarted.css'
 
 // The calendar (and FullCalendar) loads on first visit so the main bundle stays small.
 const CalendarPage = lazy(() => import('./calendar/CalendarPage'))
 // The shared song library (and its editor/importer) loads on first visit too.
 const SongsPage = lazy(() => import('./pages/SongsPage'))
+// The Slides module (decks, themes, schedule) is lazy too, so the main bundle does not grow.
+const DecksPage = lazy(() => import('./slides/DecksPage'))
+const ThemesPage = lazy(() => import('./slides/ThemesPage'))
+const SlidesSchedulePage = lazy(() => import('./slides/SlidesSchedulePage'))
+// The platform Admin console (all churches) is lazy too and only reachable by the platform owner.
+const AdminChurchesPage = lazy(() => import('./admin/ChurchesPage'))
+const AdminActivityPage = lazy(() => import('./admin/ActivityPage'))
+const adminPage = (page: ReactNode) => <Suspense fallback={<p className="muted">Loading…</p>}>{page}</Suspense>
+const slidesPage = (page: ReactNode) => <Suspense fallback={<p className="muted">Loading…</p>}>{page}</Suspense>
 
-type PageDef = { label: string; title?: string; render: () => ReactNode; module?: Module; adminOnly?: boolean; /** Shown to anyone who has at least one of these applications. */ anyModule?: Module[] }
+type PageDef = { label: string; title?: string; render: () => ReactNode; module?: Module; adminOnly?: boolean; /** Only the platform owner; hidden from everyone else. */ platformOnly?: boolean; /** Shown to anyone who has at least one of these applications. */ anyModule?: Module[] }
 
 /**
  * Pages each application contributes to its nav group. Adding an application = one row in the `modules`
@@ -38,6 +49,12 @@ const MODULE_PAGES: Record<string, { slug: string; label: string; render: () => 
   signage: [
     { slug: 'playlists', label: 'Playlists', render: () => <SignagePlaylistsPage /> },
     { slug: 'slots', label: 'Slots & schedule', render: () => <SignageSlotsPage /> },
+  ],
+  // Only shown once the registry row (modules.id = 'slides') is available; FALLBACK_MODULES deliberately leaves it out.
+  slides: [
+    { slug: 'decks', label: 'Decks', render: () => slidesPage(<DecksPage />) },
+    { slug: 'themes', label: 'Themes', render: () => slidesPage(<ThemesPage />) },
+    { slug: 'schedule', label: 'Schedule', render: () => slidesPage(<SlidesSchedulePage />) },
   ],
 }
 
@@ -66,7 +83,7 @@ function buildNav(modules: ModuleDef[]) {
   }
   pages.calendar = {
     label: 'Calendar',
-    anyModule: ['kids', 'signage'],
+    anyModule: ['kids', 'signage', 'slides'],
     render: () => (
       <Suspense fallback={<p className="muted">Loading the calendar…</p>}>
         <CalendarPage />
@@ -89,6 +106,9 @@ function buildNav(modules: ModuleDef[]) {
   groups.push({ title: 'Library', pages: ['songs'] })
   Object.assign(pages, MANAGE_PAGES)
   groups.push({ title: 'Manage', pages: Object.keys(MANAGE_PAGES) })
+  pages['admin-churches'] = { label: 'Churches', title: 'Admin: churches', platformOnly: true, render: () => adminPage(<AdminChurchesPage />) }
+  pages['admin-activity'] = { label: 'Activity', title: 'Admin: activity', platformOnly: true, render: () => adminPage(<AdminActivityPage />) }
+  groups.push({ title: 'Admin', pages: ['admin-churches', 'admin-activity'] })
   return { pages, groups }
 }
 
@@ -276,7 +296,7 @@ function OrgApp(props: OrgAppProps) {
   const state = useMemo<AppState | null>(() => {
     if (!data) return null
     const hasModule = (m: Module) => isAdmin || !!membership?.modules.includes(m)
-    const moduleOn = (m: Module) => hasModule(m) && entitled(data.entitlements.find((e) => e.module === m))
+    const moduleOn = (m: Module) => hasModule(m) && entitled(data.entitlements.find((e) => e.module === m), org.status)
     const mySites = allSites ? data.sites : data.sites.filter((s) => membership?.site_ids?.includes(s.id))
     return {
       userId: uid,
@@ -311,6 +331,7 @@ function OrgApp(props: OrgAppProps) {
     (key: string) => {
       const def = PAGES[key]
       if (!state) return false
+      if (def.platformOnly && !state.isPlatformAdmin) return false
       if (def.adminOnly && !state.isAdmin) return false
       if (def.module && !state.hasModule(def.module)) return false
       if (def.anyModule && !def.anyModule.some((m) => state.hasModule(m))) return false
@@ -377,7 +398,7 @@ function OrgApp(props: OrgAppProps) {
                     <button
                       key={key}
                       className={`nav-item ${current === key ? 'active' : ''}`}
-                      onClick={() => setPage(key)}
+                      onClick={() => canLeave() && setPage(key)}
                     >
                       {PAGES[key].label}
                     </button>
@@ -398,6 +419,7 @@ function OrgApp(props: OrgAppProps) {
           </nav>
           {menuOpen && <div className="scrim" onClick={() => setMenuOpen(false)} />}
           <main className="content">
+            <TrialBanner />
             <div className="topbar">
               <h1>{def.title ?? def.label}</h1>
               {logo && <img className="org-logo" src={logo} alt={org.name} />}

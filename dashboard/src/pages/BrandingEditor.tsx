@@ -8,12 +8,10 @@ const DEFAULT_PRIMARY = '#1f3a5f'
 const DEFAULT_ACCENT = '#e8833a'
 const DEFAULT_SPLASH_SECONDS = 5
 
-type Scope = 'org' | 'kids' | 'signage'
-const SCOPES: { id: Scope; label: string }[] = [
-  { id: 'org', label: 'Church (default)' },
-  { id: 'kids', label: 'Kids' },
-  { id: 'signage', label: 'Signage' },
-]
+type ModuleScope = 'kids' | 'signage' | 'slides'
+type Scope = 'org' | ModuleScope
+/** Modules that can have their own look (shown when the registry lists them). */
+const LOOK_MODULES: string[] = ['kids', 'signage', 'slides']
 
 function lookOf(b: Branding, scope: Scope): Look {
   return scope === 'org' ? b : (b.modules?.[scope] ?? {})
@@ -43,7 +41,11 @@ function logoFor(bg: string, light?: string, dark?: string) {
 }
 
 export default function BrandingEditor({ value, onChange, name }: { value: Branding; onChange: (b: Branding) => void; name: string }) {
-  const { org } = useApp()
+  const { org, modules, moduleName } = useApp()
+  const SCOPES: { id: Scope; label: string }[] = [
+    { id: 'org', label: 'Church (default)' },
+    ...modules.filter((m) => LOOK_MODULES.includes(m.id)).map((m) => ({ id: m.id as ModuleScope, label: m.name })),
+  ]
   const [scope, setScope] = useState<Scope>('org')
   const [uploading, setUploading] = useState(false)
   const own = lookOf(value, scope)
@@ -124,7 +126,7 @@ export default function BrandingEditor({ value, onChange, name }: { value: Brand
                   : patch({ primary_color: undefined, accent_color: undefined })
               }
             />
-            <span>Use different colours for {scope === 'kids' ? 'Kids' : 'Signage'}</span>
+            <span>Use different colours for {moduleName(scope)}</span>
           </label>
         )}
         {(!isModule || customColours) && (

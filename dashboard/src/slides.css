@@ -1,0 +1,121 @@
+/*
+ * Slides module (decks, themes, schedule). New colour variables come as a light/dark pair, prefixed --sl-.
+ * The slide frames (.sl-frame) deliberately ignore the dashboard theme: they depict the TV, so their colours are set inline
+ * from the deck's own background and text colours. Everything around them uses the dashboard variables from styles.css.
+ */
+:root {
+  --sl-strip-bg: #eceef1;
+  --sl-frame-edge: rgba(0, 0, 0, 0.2);
+  --sl-badge-bg: rgba(0, 0, 0, 0.62);
+  --sl-warn-bg: #fff4d6;
+}
+:root[data-theme="dark"] {
+  --sl-strip-bg: #12161b;
+  --sl-frame-edge: rgba(255, 255, 255, 0.22);
+  --sl-badge-bg: rgba(0, 0, 0, 0.72);
+  --sl-warn-bg: #3a2e12;
+}
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* ───── The frame: 16:9 or 9:16, all text sizes are percent of its height (cqh) ───── */
+.sl-frame { position: relative; container-type: size; overflow: hidden; width: 100%; aspect-ratio: 16 / 9; border-radius: 6px; background: #000; border: 1px solid var(--sl-frame-edge); color: #fff; }
+.sl-frame.port { aspect-ratio: 9 / 16; }
+.sl-bg, .sl-dim, .sl-media { position: absolute; inset: 0; }
+.sl-bg img, .sl-bg video, .sl-media img, .sl-media video { width: 100%; height: 100%; display: block; }
+.sl-vbadge { position: absolute; right: 3%; bottom: 4%; font-size: 3.4cqh; color: #fff; background: var(--sl-badge-bg); padding: 0.5cqh 1.6cqh; border-radius: 1cqh; }
+.sl-empty { position: absolute; inset: 0; display: grid; place-items: center; font-size: 5cqh; opacity: 0.8; }
+.sl-box { position: absolute; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+.sl-text { width: 100%; }
+.sl-block { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.2; }
+.sl-logo { position: absolute; max-height: 9%; max-width: 20%; object-fit: contain; }
+.sl-logo.bottom-left { left: 3%; bottom: 4%; }
+.sl-logo.bottom-right { right: 3%; bottom: 4%; }
+.sl-logo.top-left { left: 3%; top: 4%; }
+.sl-logo.top-right { right: 3%; top: 4%; }
+.sl-stream { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.4cqh; text-align: center; padding: 6cqh; }
+.sl-live { background: #d32f2f; color: #fff; padding: 0.8cqh 2.4cqh; border-radius: 1.2cqh; font-size: 3.4cqh; font-weight: 800; letter-spacing: 0.1em; }
+.sl-stream-title { font-size: 8cqh; font-weight: 800; }
+.sl-stream-note { font-size: 3cqh; opacity: 0.7; }
+
+/* ───── Lists and toolbars ───── */
+.sl-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.sl-search { flex: 1; min-width: 180px; }
+.sl-sort { display: flex; gap: 6px; align-items: center; }
+.sl-deckrow { flex-wrap: wrap; gap: 12px; }
+.sl-deckmain { min-width: 0; flex: 1; gap: 14px; flex-wrap: wrap; }
+.sl-deckthumb { width: 128px; flex: none; border: 0; padding: 0; background: none; cursor: pointer; border-radius: 6px; display: block; }
+.sl-deckthumb.static { cursor: default; }
+.sl-presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; align-items: stretch; }
+.sl-preset { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 12px; display: grid; gap: 4px; cursor: pointer; color: var(--primary); align-content: start; }
+.sl-preset:hover { border-color: var(--primary); }
+.sl-preset b { color: var(--primary); }
+
+/* ───── Deck editor ───── */
+.sl-header { position: relative; }
+.sl-addwrap { position: relative; }
+.sl-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 25; background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px var(--shadow); min-width: 270px; display: grid; padding: 6px; }
+.sl-menu-item { text-align: left; background: none; border: 0; padding: 10px 12px; border-radius: 8px; cursor: pointer; display: grid; gap: 2px; color: var(--primary); }
+.sl-menu-item:hover, .sl-menu-item:focus-visible { background: var(--tint-primary); }
+.sl-strip { display: flex; gap: 10px; overflow-x: auto; padding: 10px; background: var(--sl-strip-bg); border-radius: 10px; }
+.sl-strip:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sl-thumb { position: relative; flex: 0 0 172px; display: grid; gap: 4px; padding: 6px; border: 2px solid transparent; border-radius: 10px; cursor: pointer; align-content: start; user-select: none; }
+.sl-thumb:hover { background: var(--tint-primary); }
+.sl-thumb.on { border-color: var(--primary); background: var(--tint-primary); }
+.sl-thumb.over { box-shadow: inset 5px 0 0 var(--accent); }
+.sl-thumb.dragging { opacity: 0.4; }
+.sl-thumb .sl-frame { pointer-events: none; }
+.sl-num { position: absolute; z-index: 2; top: 10px; left: 10px; min-width: 22px; text-align: center; padding: 1px 6px; border-radius: 999px; background: var(--sl-badge-bg); color: #fff; font-size: 11px; font-weight: 800; }
+.sl-thumb-label { font-size: 12px; font-weight: 700; color: var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sl-tools { align-items: center; }
+.sl-work { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px); gap: 16px; align-items: start; }
+.sl-preview-card { position: sticky; top: calc(var(--appbar) + env(safe-area-inset-top) + 12px); }
+.sl-previews { display: flex; gap: 12px; align-items: flex-end; }
+.sl-fig { margin: 0; display: grid; gap: 4px; }
+.sl-fig.land { flex: 1 1 62%; min-width: 0; }
+.sl-fig.port { flex: 0 1 26%; min-width: 70px; }
+.sl-fig figcaption { text-align: center; }
+.sl-fieldset { min-width: 0; }
+.sl-fieldset:not(.card) { border: 0; padding: 0; margin: 0; }
+.sl-fieldset.card { margin: 0; }
+.sl-fieldset:disabled { opacity: 1; }
+.sl-details { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; background: var(--surface); }
+.sl-details > summary { cursor: pointer; font-weight: 700; color: var(--primary); min-height: 28px; }
+.sl-details-body { padding-top: 10px; display: grid; gap: 10px; }
+
+/* ───── Pickers ───── */
+.sl-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.sl-seg button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 14px; font-weight: 700; color: var(--primary); cursor: pointer; }
+.sl-seg button.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.sl-seg button:disabled { opacity: 0.5; cursor: default; }
+.field > .sl-nocaps { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 13px; color: var(--muted); }
+.sl-chosen { width: 150px; flex: none; }
+.sl-chosen img, .sl-chosen .poster { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; display: block; }
+.sl-none { aspect-ratio: 16 / 9; background: var(--sl-strip-bg); display: grid; place-items: center; color: var(--muted); border-radius: 6px; border: 1px dashed var(--line); font-size: 13px; width: 100%; }
+.sl-picker { width: min(780px, 100%); max-height: 88vh; display: flex; flex-direction: column; }
+.sl-picker-body { overflow-y: auto; min-height: 180px; display: grid; gap: 10px; align-content: start; }
+.sl-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.sl-pick-tile { display: grid; gap: 4px; text-align: left; padding: 6px; border: 2px solid transparent; border-radius: 8px; background: var(--surface); cursor: pointer; color: inherit; align-content: start; }
+.sl-pick-tile:hover { border-color: var(--line); }
+.sl-pick-tile.on { border-color: var(--primary); }
+.sl-pick-tile img, .sl-pick-tile .poster { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 5px; background: var(--media-bg); display: block; }
+.sl-pick-tile b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--primary); font-size: 13px; }
+.sl-pick-tile.folder { place-items: center; text-align: center; padding: 18px 6px; background: var(--tint-primary); }
+.sl-warn-text { color: var(--warn); font-size: 12px; font-weight: 700; }
+
+/* ───── Phones ───── */
+@media (max-width: 1000px) {
+  .sl-work { grid-template-columns: minmax(0, 1fr); }
+  .sl-preview-card { position: static; }
+}
+@media (max-width: 760px) {
+  .sl-thumb { flex-basis: 150px; }
+  .sl-seg button { padding: 11px 14px; min-height: 44px; }
+  .sl-menu { left: 0; right: auto; }
+  .sl-menu-item { min-height: 48px; }
+  .sl-deckthumb { width: 100px; }
+  .sl-picker { max-height: 92vh; }
+  .sl-pick-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  .swatch { width: 40px; height: 40px; }
+  .sl-sort { width: 100%; }
+}

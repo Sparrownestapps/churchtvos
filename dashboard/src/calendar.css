@@ -163,3 +163,40 @@
   .cal-nav { justify-content: center; }
   .cal-title { order: -1; flex: 1 1 100%; text-align: center; }
 }
+
+/* Slides on the calendar: an amber pair for dated decks and a rose pair for repeating decks (light and dark below). */
+:root {
+  --cal-deck-bg: #fbe8d2;
+  --cal-deck-bd: #c26a14;
+  --cal-deck-fg: #6e3705;
+  --cal-deckser-bg: #f7dde6;
+  --cal-deckser-bd: #b23a68;
+  --cal-deckser-fg: #6b1b3d;
+  --cal-band-slides: rgba(194, 106, 20, 0.09);
+}
+:root[data-theme='dark'] {
+  --cal-deck-bg: #3d2a16;
+  --cal-deck-bd: #e8995a;
+  --cal-deck-fg: #f7dcc3;
+  --cal-deckser-bg: #402230;
+  --cal-deckser-bd: #e57c9f;
+  --cal-deckser-fg: #f7d3df;
+  --cal-band-slides: rgba(232, 153, 90, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='dark']) {
+    --cal-deck-bg: #3d2a16;
+    --cal-deck-bd: #e8995a;
+    --cal-deck-fg: #f7dcc3;
+    --cal-deckser-bg: #402230;
+    --cal-deckser-bd: #e57c9f;
+    --cal-deckser-fg: #f7d3df;
+    --cal-band-slides: rgba(232, 153, 90, 0.12);
+  }
+}
+.cal-ev-oneoff.cal-ev-d-slides { --ev-bg: var(--cal-deck-bg); --ev-bd: var(--cal-deck-bd); --ev-fg: var(--cal-deck-fg); }
+.cal-ev-series.cal-ev-d-slides { --ev-bg: var(--cal-deckser-bg); --ev-bd: var(--cal-deckser-bd); --ev-fg: var(--cal-deckser-fg); }
+.cal-lg-deck { background: var(--cal-deck-bg); border-color: var(--cal-deck-bd); }
+.cal-lg-deckser { background: var(--cal-deckser-bg); border-color: var(--cal-deckser-bd); }
+.cal-band-slides { background: var(--cal-band-slides); }
+.cal-series-heading { margin: 8px 0 0; color: var(--primary); }

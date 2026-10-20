@@ -47,6 +47,7 @@ fun DeviceState.brand(module: String? = null): Brand {
     val own = when (module) {
         Module.KIDS -> org?.modules?.kids
         Module.SIGNAGE -> org?.modules?.signage
+        Module.SLIDES -> org?.modules?.slides
         else -> null
     }
     val splash = SplashInfo(

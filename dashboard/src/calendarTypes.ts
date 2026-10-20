@@ -1,6 +1,9 @@
 import type { Schedule, ScreenSchedule, SignageSlot } from './types'
 
-/** A repeating Kids schedule (public.kids_series). */
+/** Which family of dated schedules a block belongs to: Kids playlists or Slides decks (see calendar/domain.ts). */
+export type Domain = 'kids' | 'slides'
+
+/** A repeating Kids schedule (public.kids_series). Slides series (deck_series) are normalised into this shape: deck ids appear as playlist ids. */
 export type KidsSeries = {
   id: string
   organization_id: string
@@ -42,18 +45,18 @@ export type NamedRow = { id: string; name: string; site_id?: string | null }
 type BlockBase = { editable: boolean; lockReason?: string; warn?: string; label: string; sub?: string }
 /** What a calendar event stands for (kept in event.extendedProps.block). */
 export type Block =
-  | (BlockBase & { kind: 'oneoff'; row: Schedule; openEnded: boolean })
-  | (BlockBase & { kind: 'series'; occ: SeriesOccurrence; series: KidsSeries })
+  | (BlockBase & { kind: 'oneoff'; domain: Domain; row: Schedule; openEnded: boolean })
+  | (BlockBase & { kind: 'series'; domain: Domain; occ: SeriesOccurrence; series: KidsSeries })
   | (BlockBase & { kind: 'slot'; row: SignageSlot; date: string })
   | (BlockBase & { kind: 'module'; row: ScreenSchedule; date: string })
 
 export type PanelState =
   | { mode: 'create'; date: string; start: string; end: string; touch?: boolean; prefill?: Prefill }
   | { mode: 'edit'; block: Block }
-  | { mode: 'series'; focusId?: string }
+  | { mode: 'series'; focusId?: string; domain?: Domain }
 
 export type Prefill = {
-  type?: 'kids' | 'signage' | 'module'
+  type?: 'kids' | 'slides' | 'signage' | 'module'
   playlistId?: string
   module?: string
   keys?: string[]
@@ -70,7 +73,7 @@ export type ResolvedTarget = {
   /** Rows (slots / module rules) matching these screen ids or group ids are shown. */
   screenIds: string[]
   groupIds: string[]
-  /** Kids schedules for these locations are shown. */
+  /** Kids and Slides schedules for these locations are shown. */
   locationIds: string[]
   /** Several time zones among the target's locations. */
   mixedTz: boolean

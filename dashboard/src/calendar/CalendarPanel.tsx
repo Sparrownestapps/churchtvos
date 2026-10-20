@@ -3,7 +3,8 @@ import { useApp } from '../context'
 import { supabase } from '../supabase'
 import { DayPicker } from '../ScheduleRules'
 import { MODULE_NAME, attempt, daysLabel, must } from '../lib'
-import type { Block, NamedRow, PanelState, Prefill, ResolvedTarget } from '../calendarTypes'
+import type { Block, Domain, NamedRow, PanelState, Prefill, ResolvedTarget } from '../calendarTypes'
+import { DOMAINS, exceptionRow, locationRuns } from './domain'
 import type { Screen, ScreenGroup, ScreenSchedule, ScreenModule, SignageSlot } from '../types'
 import { RotationEditor } from './parts'
 import { DAY_NAMES, addDays, fmtClock, fmtDay, fromWall, hm, safeTz, toWall, wallOf, weekStartOf, ymd } from './tz'
@@ -15,6 +16,7 @@ export type CalCtx = {
   screens: Screen[]
   groups: ScreenGroup[]
   kidsPlaylists: NamedRow[]
+  decks: NamedRow[]
   signagePlaylists: NamedRow[]
   slots: SignageSlot[]
   rules: ScreenSchedule[]
@@ -34,33 +36,38 @@ function overlaps(a: { days: number[]; start_time: string; end_time: string }, b
 // ───────────────────────── Create ─────────────────────────
 
 export function CreatePanel({ ctx, state, onClose }: { ctx: CalCtx; state: Extract<PanelState, { mode: 'create' }>; onClose: () => void }) {
-  const { org, isAdmin, canEditContent, locations, sites, modules } = useApp()
-  const { target, screens, groups, kidsPlaylists, signagePlaylists } = ctx
+  const { org, isAdmin, canEditContent, locations, sites, modules, moduleName, hasModule } = useApp()
+  const { target, screens, groups, kidsPlaylists, decks, signagePlaylists } = ctx
   const pf: Prefill = state.prefill ?? {}
 
   const siteTz = (locId: string) => safeTz(sites.find((s) => s.id === locations.find((l) => l.id === locId)?.site_id)?.timezone)
+  const slidesListed = hasModule('slides') && modules.some((m) => m.id === 'slides')
   const kidsLocs = locations.filter((l) => l.modules.includes('kids') && canEditContent('kids', l.site_id))
-  const available = [
+  const slidesLocs = slidesListed ? locations.filter((l) => locationRuns('slides', l) && canEditContent('slides', l.site_id)) : []
+  type Type = 'kids' | 'slides' | 'signage' | 'module'
+  const available: Type[] = [
     ...(canEditContent('signage', null) ? (['signage'] as const) : []),
     ...(kidsLocs.length ? (['kids'] as const) : []),
+    ...(slidesLocs.length ? (['slides'] as const) : []),
     ...(isAdmin ? (['module'] as const) : []),
   ]
-  const firstType = target.kind === 'location' && available.includes('kids') ? 'kids' : available[0]
+  const firstType: Type | undefined = target.kind === 'location' && (available.includes('kids') || available.includes('slides')) ? (available.includes('kids') ? 'kids' : 'slides') : available[0]
+  const dated = (t: Type): t is Domain => t === 'kids' || t === 'slides'
 
   const defaultKeys = (t: string): string[] => {
-    if (t === 'kids') return [target.kind === 'screen' ? `screen:${target.id}` : target.kind === 'group' ? `group:${target.id}` : `loc:${target.id}`]
+    if (t === 'kids' || t === 'slides') return [target.kind === 'screen' ? `screen:${target.id}` : target.kind === 'group' ? `group:${target.id}` : `loc:${target.id}`]
     if (target.kind === 'location') return screens.filter((s) => s.location_id === target.id).map((s) => `screen:${s.id}`)
     return [`${target.kind}:${target.id}`]
   }
 
-  const [type, setTypeState] = useState<'kids' | 'signage' | 'module'>(pf.type ?? firstType ?? 'kids')
+  const [type, setTypeState] = useState<Type>(pf.type ?? firstType ?? 'kids')
   const [keys, setKeys] = useState<string[]>(pf.keys ?? defaultKeys(pf.type ?? firstType ?? 'kids'))
   const [playlistId, setPlaylistId] = useState(pf.playlistId ?? '')
   const [moduleId, setModuleId] = useState<ScreenModule>((pf.module as ScreenModule) ?? 'kids')
   const [date, setDate] = useState(state.date)
   const [start, setStart] = useState(state.start)
   const [end, setEnd] = useState(state.end)
-  const [repeat, setRepeat] = useState<'once' | 'weekly'>(type === 'kids' ? 'once' : 'weekly')
+  const [repeat, setRepeat] = useState<'once' | 'weekly'>(dated(type) ? 'once' : 'weekly')
   const [days, setDays] = useState<number[]>(pf.days ?? [dowOf(state.date)])
   const [endDate, setEndDate] = useState('')
   const [extra, setExtra] = useState<string[]>([])
@@ -73,17 +80,17 @@ export function CreatePanel({ ctx, state, onClose }: { ctx: CalCtx; state: Extra
     return <p className="muted">You have view-only access, so you can't add anything to the calendar.</p>
   }
 
-  function setType(t: 'kids' | 'signage' | 'module') {
+  function setType(t: Type) {
     setTypeState(t)
     setKeys(defaultKeys(t))
     setPlaylistId('')
-    if (t !== 'kids') setRepeat('weekly')
-    else setRepeat('once')
+    setExtra([])
+    setRepeat(dated(t) ? 'once' : 'weekly')
   }
 
   const toggleKey = (k: string) => setKeys((ks) => (ks.includes(k) ? ks.filter((x) => x !== k) : [...ks, k]))
 
-  // Kids playlists play per location, so every chosen screen / group resolves to its location(s), de-duplicated.
+  // Kids playlists and Slides decks play per location, so every chosen screen / group resolves to its location(s), de-duplicated.
   const locIds = new Set<string>()
   for (const k of keys) {
     const [kind, id] = k.split(':')
@@ -94,18 +101,22 @@ export function CreatePanel({ ctx, state, onClose }: { ctx: CalCtx; state: Extra
     }
     if (kind === 'group') for (const s of screens) if (s.group_id === id && s.location_id) locIds.add(s.location_id)
   }
-  const playlist = kidsPlaylists.find((p) => p.id === playlistId)
+  const dom: Domain | null = dated(type) ? type : null
+  const dn = DOMAINS[dom ?? 'kids']
+  const playlist = (dom === 'slides' ? decks : kidsPlaylists).find((p) => p.id === playlistId)
   const okLocs: string[] = []
   const skipped: string[] = []
   for (const id of locIds) {
     const l = locations.find((x) => x.id === id)
     if (!l) continue
-    const why = !l.modules.includes('kids')
-      ? 'not a Kids room'
-      : !canEditContent('kids', l.site_id)
-        ? "you can't edit Kids here"
+    const why = !locationRuns(dom ?? 'kids', l)
+      ? dom === 'slides'
+        ? 'not tagged for Slides or Kids'
+        : 'not a Kids room'
+      : !canEditContent(dom ?? 'kids', l.site_id)
+        ? `you can't edit ${dn.label} here`
         : playlist?.site_id && playlist.site_id !== l.site_id
-          ? 'the playlist is for another site'
+          ? `the ${dn.item} is for another site`
           : ''
     if (why) skipped.push(`${l.name} (${why})`)
     else okLocs.push(id)
@@ -123,15 +134,15 @@ export function CreatePanel({ ctx, state, onClose }: { ctx: CalCtx; state: Extra
   async function submit() {
     if (!date) return alert('Choose a date.')
     if (end <= start) return alert('The end time must be after the start time.')
-    if (type !== 'module' && !playlistId) return alert('Choose a playlist.')
+    if (type !== 'module' && !playlistId) return alert(`Choose a ${dn.item}.`)
     const weeklyDays = days
     if (weeklyDays.length === 0) return alert('Choose at least one day.')
     if (endDate && endDate < date) return alert('The end date must not be before the start date.')
 
     setBusy(true)
     const ok = await attempt(async () => {
-      if (type === 'kids') {
-        if (okLocs.length === 0) throw new Error('Choose at least one Kids location you can edit.')
+      if (dom) {
+        if (okLocs.length === 0) throw new Error(`Choose at least one ${dom === 'slides' ? 'Slides' : 'Kids'} location you can edit.`)
         if (repeat === 'once') {
           const monday = weekStartOf(wallOf(date))
           const dates = weeklyDays.map((d) => ymd(addDays(monday, (d + 6) % 7)))
@@ -139,15 +150,15 @@ export function CreatePanel({ ctx, state, onClose }: { ctx: CalCtx; state: Extra
             dates.map((dt) => ({
               organization_id: org.id,
               location_id,
-              playlist_id: playlistId,
+              [dn.schedCol]: playlistId,
               starts_at: fromWall(wallOf(dt, start), siteTz(location_id)).toISOString(),
               ends_at: fromWall(wallOf(dt, end), siteTz(location_id)).toISOString(),
             })),
           )
-          must(await supabase.from('schedules').insert(rows))
+          must(await supabase.from(dn.schedTable).insert(rows))
         } else {
           const rotation = [playlistId, ...extra]
-          if (rotation.some((p) => !p)) throw new Error('Choose a playlist for every week of the rotation.')
+          if (rotation.some((p) => !p)) throw new Error(`Choose a ${dn.item} for every week of the rotation.`)
           const rows = okLocs.map((location_id) => ({
             organization_id: org.id,
             location_id,
@@ -157,10 +168,10 @@ export function CreatePanel({ ctx, state, onClose }: { ctx: CalCtx; state: Extra
             end_time: end,
             start_date: date,
             end_date: endDate || null,
-            playlist_ids: rotation,
+            [dn.seriesCol]: rotation,
             on_end: onEnd,
           }))
-          must(await supabase.from('kids_series').insert(rows))
+          must(await supabase.from(dn.seriesTable).insert(rows))
         }
         return
       }
@@ -198,14 +209,14 @@ export function CreatePanel({ ctx, state, onClose }: { ctx: CalCtx; state: Extra
   }
 
   const screensByLoc = (locId: string | null) => screens.filter((s) => s.location_id === locId)
-  const playlistsForType = type === 'kids' ? kidsPlaylists : signagePlaylists
+  const playlistsForType = type === 'kids' ? kidsPlaylists : type === 'slides' ? decks : signagePlaylists
 
   return (
     <div className="stack-sm">
       <div className="segmented cal-type">
         {available.map((t) => (
           <button key={t} className={type === t ? 'on' : ''} onClick={() => setType(t)}>
-            {t === 'kids' ? 'Kids playlist' : t === 'signage' ? 'Signage playlist' : 'Switch module'}
+            {t === 'kids' ? 'Kids playlist' : t === 'slides' ? 'Slides deck' : t === 'signage' ? 'Signage playlist' : 'Switch module'}
           </button>
         ))}
       </div>
@@ -216,7 +227,7 @@ export function CreatePanel({ ctx, state, onClose }: { ctx: CalCtx; state: Extra
           <select value={moduleId} onChange={(e) => setModuleId(e.target.value)}>
             {modules.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.name}
+                {moduleName(m.id)}
               </option>
             ))}
             <option value="off">Off (black screen)</option>
@@ -224,7 +235,7 @@ export function CreatePanel({ ctx, state, onClose }: { ctx: CalCtx; state: Extra
         </label>
       ) : (
         <label className="field">
-          <span>{type === 'kids' && repeat === 'weekly' ? 'Week 1 playlist' : 'Playlist'}</span>
+          <span>{dom && repeat === 'weekly' ? `Week 1 ${dn.item}` : dom === 'slides' ? 'Deck' : 'Playlist'}</span>
           <select value={playlistId} onChange={(e) => setPlaylistId(e.target.value)}>
             <option value="">Choose…</option>
             {playlistsForType.map((p) => (
@@ -252,7 +263,7 @@ export function CreatePanel({ ctx, state, onClose }: { ctx: CalCtx; state: Extra
       </div>
 
       <div className="field">
-        <span>{type === 'kids' ? 'Where (Kids playlists play per location)' : 'Which screens'}</span>
+        <span>{dom ? `Where (${dn.label} ${dn.item}s play per location)` : 'Which screens'}</span>
         <div className="cal-targets">
           {groups.length > 0 && (
             <div className="room-group">
@@ -265,9 +276,9 @@ export function CreatePanel({ ctx, state, onClose }: { ctx: CalCtx; state: Extra
               ))}
             </div>
           )}
-          {(type === 'kids' ? kidsLocs : locations.filter((l) => screensByLoc(l.id).length > 0)).map((l) => (
+          {(type === 'kids' ? kidsLocs : type === 'slides' ? slidesLocs : locations.filter((l) => screensByLoc(l.id).length > 0)).map((l) => (
             <div key={l.id} className="room-group">
-              {type === 'kids' ? (
+              {dom ? (
                 <label className="check">
                   <input type="checkbox" checked={keys.includes(`loc:${l.id}`)} onChange={() => toggleKey(`loc:${l.id}`)} />
                   <b>{l.name}</b>
@@ -285,7 +296,7 @@ export function CreatePanel({ ctx, state, onClose }: { ctx: CalCtx; state: Extra
             </div>
           ))}
         </div>
-        {type === 'kids' ? (
+        {dom ? (
           <p className="muted">
             Plays in: {okLocs.length ? okLocs.map(locName).join(', ') : 'nowhere yet'}.
             {skipped.length > 0 && <span className="notice warn"> Skipped: {skipped.join('; ')}.</span>}
@@ -299,7 +310,7 @@ export function CreatePanel({ ctx, state, onClose }: { ctx: CalCtx; state: Extra
 
       <div className="field">
         <span>Repeat</span>
-        {type === 'kids' ? (
+        {dom ? (
           <div className="segmented">
             <button className={repeat === 'once' ? 'on' : ''} onClick={() => setRepeat('once')}>
               This week only
@@ -320,12 +331,12 @@ export function CreatePanel({ ctx, state, onClose }: { ctx: CalCtx; state: Extra
       </div>
       {repeat === 'weekly' && (
         <label className="field">
-          <span>Ends on (optional){type !== 'kids' ? ' — not available for this type' : ''}</span>
-          <input type="date" value={endDate} disabled={type !== 'kids'} onChange={(e) => setEndDate(e.target.value)} />
+          <span>Ends on (optional){!dom ? ' — not available for this type' : ''}</span>
+          <input type="date" value={endDate} disabled={!dom} onChange={(e) => setEndDate(e.target.value)} />
         </label>
       )}
 
-      {type === 'kids' && repeat === 'weekly' && (
+      {dom && repeat === 'weekly' && (
         <>
           <label className="field">
             <span>Name (optional)</span>
@@ -338,21 +349,22 @@ export function CreatePanel({ ctx, state, onClose }: { ctx: CalCtx; state: Extra
               setPlaylistId(v[0] ?? '')
               setExtra(v.slice(1))
             }}
-            playlists={kidsPlaylists}
+            playlists={dom === 'slides' ? decks : kidsPlaylists}
+            itemName={dn.item}
             onEnd={onEnd}
             onEndChange={setOnEnd}
           />
         </>
       )}
 
-      {type !== 'kids' && (
+      {!dom && (
         <label className="check">
           <input type="checkbox" checked={higher} onChange={(e) => setHigher(e.target.checked)} />
           Add as higher priority than anything it overlaps
         </label>
       )}
       <p className="muted">
-        {type === 'kids'
+        {dom
           ? "Times are in each location's site time zone. A one-time block replaces any repeating one it overlaps."
           : "Times are in the screen's site time zone. When blocks overlap, the highest priority wins, then the newest."}
       </p>
@@ -388,6 +400,8 @@ function OneOffEdit({ ctx, block, done }: { ctx: CalCtx; block: Extract<Block, {
   const tz = safeTz(sites.find((s) => s.id === loc?.site_id)?.timezone)
   const s0 = toWall(Date.parse(row.starts_at), tz)
   const e0 = row.ends_at ? toWall(Date.parse(row.ends_at), tz) : null
+  const dn = DOMAINS[block.domain]
+  const itemList = block.domain === 'slides' ? ctx.decks : ctx.kidsPlaylists
   const [playlistId, setPlaylistId] = useState(row.playlist_id)
   const [date, setDate] = useState(ymd(s0))
   const [start, setStart] = useState(hm(s0))
@@ -397,26 +411,26 @@ function OneOffEdit({ ctx, block, done }: { ctx: CalCtx; block: Extract<Block, {
   async function save() {
     if (end && (end <= start)) return alert('The end time must be after the start time.')
     const patch = {
-      playlist_id: playlistId,
+      [dn.schedCol]: playlistId,
       starts_at: fromWall(wallOf(date, start), tz).toISOString(),
       ends_at: end ? fromWall(wallOf(date, end), tz).toISOString() : null,
     }
-    if (await attempt(async () => must(await supabase.from('schedules').update(patch).eq('id', row.id)))) done()
+    if (await attempt(async () => must(await supabase.from(dn.schedTable).update(patch).eq('id', row.id)))) done()
   }
   async function del() {
     if (!confirm('Remove this from the schedule?')) return
-    if (await attempt(async () => must(await supabase.from('schedules').delete().eq('id', row.id)))) done()
+    if (await attempt(async () => must(await supabase.from(dn.schedTable).delete().eq('id', row.id)))) done()
   }
 
   return (
     <>
       <p className="muted">
-        Kids one-time schedule · {loc?.name ?? 'Unknown location'}
+        {dn.label} one-time schedule · {loc?.name ?? 'Unknown location'}
       </p>
       <label className="field">
-        <span>Playlist</span>
+        <span>{block.domain === 'slides' ? 'Deck' : 'Playlist'}</span>
         <select value={playlistId} disabled={ro} onChange={(e) => setPlaylistId(e.target.value)}>
-          {ctx.kidsPlaylists.map((p) => (
+          {itemList.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>
@@ -437,7 +451,7 @@ function OneOffEdit({ ctx, block, done }: { ctx: CalCtx; block: Extract<Block, {
           <input type="time" step={900} value={end} disabled={ro} onChange={(e) => setEnd(e.target.value)} />
         </label>
       </div>
-      {!end && <p className="muted">No end time: it plays until the next scheduled playlist starts.</p>}
+      {!end && <p className="muted">No end time: it plays until the next scheduled {dn.item} starts.</p>}
       {!ro && (
         <div className="row wrap-sm">
           <button className="btn primary" onClick={save}>
@@ -445,7 +459,7 @@ function OneOffEdit({ ctx, block, done }: { ctx: CalCtx; block: Extract<Block, {
           </button>
           <button
             className="btn"
-            onClick={() => ctx.openPanel({ mode: 'create', date, start, end: end || hm(new Date(wallOf(date, start).getTime() + 3_600_000)), prefill: { type: 'kids', playlistId, keys: [`loc:${row.location_id}`] } })}
+            onClick={() => ctx.openPanel({ mode: 'create', date, start, end: end || hm(new Date(wallOf(date, start).getTime() + 3_600_000)), prefill: { type: block.domain, playlistId, keys: [`loc:${row.location_id}`] } })}
           >
             Duplicate…
           </button>
@@ -462,22 +476,20 @@ function SeriesOccEdit({ ctx, block, done }: { ctx: CalCtx; block: Extract<Block
   const { occ, series } = block
   const [playlistId, setPlaylistId] = useState(occ.playlist_id)
   const ro = !block.editable
-  const nameOf = (id: string) => ctx.kidsPlaylists.find((p) => p.id === id)?.name ?? '—'
+  const dn = DOMAINS[block.domain]
+  const itemList = block.domain === 'slides' ? ctx.decks : ctx.kidsPlaylists
+  const nameOf = (id: string) => itemList.find((p) => p.id === id)?.name ?? '—'
 
   const upsert = (action: 'skip' | 'playlist') =>
     attempt(async () =>
-      must(
-        await supabase
-          .from('kids_series_exceptions')
-          .upsert({ series_id: series.id, on_date: occ.on_date, action, playlist_id: action === 'playlist' ? playlistId : null }, { onConflict: 'series_id,on_date' }),
-      ),
+      must(await supabase.from(dn.excTable).upsert(exceptionRow(block.domain, series.id, occ.on_date, action, playlistId), { onConflict: 'series_id,on_date' })),
     )
   async function clear() {
-    if (await attempt(async () => must(await supabase.from('kids_series_exceptions').delete().eq('series_id', series.id).eq('on_date', occ.on_date)))) done()
+    if (await attempt(async () => must(await supabase.from(dn.excTable).delete().eq('series_id', series.id).eq('on_date', occ.on_date)))) done()
   }
   async function deleteSeries() {
     if (!confirm('Delete the whole repeating schedule, including every other date? This cannot be undone.')) return
-    if (await attempt(async () => must(await supabase.from('kids_series').delete().eq('id', series.id)))) done()
+    if (await attempt(async () => must(await supabase.from(dn.seriesTable).delete().eq('id', series.id)))) done()
   }
 
   return (
@@ -498,9 +510,9 @@ function SeriesOccEdit({ ctx, block, done }: { ctx: CalCtx; block: Extract<Block
         <div className="stack-sm cal-section">
           <div className="row wrap">
             <label className="field grow">
-              <span>Play a different playlist</span>
+              <span>Play a different {dn.item}</span>
               <select value={playlistId} onChange={(e) => setPlaylistId(e.target.value)}>
-                {ctx.kidsPlaylists.map((p) => (
+                {itemList.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
                   </option>
@@ -525,7 +537,7 @@ function SeriesOccEdit({ ctx, block, done }: { ctx: CalCtx; block: Extract<Block
               </button>
             )}
           </div>
-          <p className="muted">Skipping makes the rotation wait: the skipped week's playlist moves to the next date. A changed date still uses up its week.</p>
+          <p className="muted">Skipping makes the rotation wait: the skipped week's {dn.item} moves to the next date. A changed date still uses up its week.</p>
         </div>
       )}
       <span className="field-label">The whole series</span>

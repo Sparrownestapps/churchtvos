@@ -3,7 +3,8 @@ import { useApp } from '../context'
 import { supabase } from '../supabase'
 import { DayPicker } from '../ScheduleRules'
 import { attempt, daysLabel, locationLabel, must, shortTime, useLoad } from '../lib'
-import type { KidsSeries, NamedRow, SeriesException } from '../calendarTypes'
+import type { Domain, KidsSeries, NamedRow, SeriesException } from '../calendarTypes'
+import { DOMAINS, exceptionRow, normException, normSeries } from './domain'
 import { RotationEditor } from './parts'
 import { fmtDay } from './tz'
 import '../calendar.css'
@@ -31,14 +32,21 @@ const toDraft = (s: KidsSeries): Draft => ({
 })
 
 /**
- * Lists the church's repeating Kids schedules (kids_series) with a rotation editor and the skipped / changed
+ * Lists the church's repeating Kids or Slides schedules (kids_series / deck_series) with a rotation editor and the skipped / changed
  * dates (kids_series_exceptions). Used by the Calendar's "Repeating schedules" panel and the Kids Schedule page.
  */
 export default function SeriesManager({
+  domain = 'kids',
+  heading,
   locationIds,
   focusId,
   onChanged,
 }: {
+  /** Kids playlists (default) or Slides decks. */
+  domain?: Domain
+  /** Shown above the list when both kinds are listed together. */
+  heading?: string
+
   /** Only these locations (omit for all the user can see). */
   locationIds?: string[]
   focusId?: string
@@ -47,18 +55,19 @@ export default function SeriesManager({
   const { org, locations, sites, canEditContent } = useApp()
   const [editing, setEditing] = useState<string | null>(focusId ?? null)
   const [draft, setDraft] = useState<Draft | null>(null)
+  const dn = DOMAINS[domain]
 
   const { data, reload } = useLoad(async () => {
     const [series, playlists] = await Promise.all([
-      supabase.from('kids_series').select('*').eq('organization_id', org.id).order('start_date'),
-      supabase.from('playlists').select('id, name, site_id').eq('organization_id', org.id).order('name'),
+      supabase.from(dn.seriesTable).select('*').eq('organization_id', org.id).order('start_date'),
+      supabase.from(domain === 'slides' ? 'decks' : 'playlists').select('id, name, site_id').eq('organization_id', org.id).order('name'),
     ])
-    const list = must(series) as KidsSeries[]
+    const list = (must(series) as unknown[]).map((r) => normSeries(domain, r))
     const ex = list.length
-      ? must(await supabase.from('kids_series_exceptions').select('*').in('series_id', list.map((s) => s.id)).order('on_date'))
+      ? must(await supabase.from(dn.excTable).select('*').in('series_id', list.map((s) => s.id)).order('on_date'))
       : []
-    return { series: list, playlists: must(playlists) as NamedRow[], exceptions: ex as SeriesException[] }
-  })
+    return { series: list, playlists: must(playlists) as NamedRow[], exceptions: (ex as unknown[]).map((r) => normException(domain, r)) }
+  }, [domain])
 
   const changed = () => {
     reload()
@@ -83,7 +92,7 @@ export default function SeriesManager({
     if (!draft) return
     if (draft.days.length === 0) return alert('Choose at least one day.')
     if (draft.end <= draft.start) return alert('The end time must be after the start time.')
-    if (draft.playlists.some((p) => !p)) return alert('Choose a playlist for every week.')
+    if (draft.playlists.some((p) => !p)) return alert(`Choose a ${dn.item} for every week.`)
     if (draft.endDate && draft.endDate < draft.startDate) return alert('The end date must not be before the start date.')
     const row = {
       name: draft.name.trim() || null,
@@ -92,10 +101,10 @@ export default function SeriesManager({
       end_time: draft.end,
       start_date: draft.startDate,
       end_date: draft.endDate || null,
-      playlist_ids: draft.playlists,
+      [dn.seriesCol]: draft.playlists,
       on_end: draft.onEnd,
     }
-    if (await attempt(async () => must(await supabase.from('kids_series').update(row).eq('id', s.id)))) {
+    if (await attempt(async () => must(await supabase.from(dn.seriesTable).update(row).eq('id', s.id)))) {
       setEditing(null)
       setDraft(null)
       changed()
@@ -104,7 +113,7 @@ export default function SeriesManager({
 
   async function remove(s: KidsSeries) {
     if (!confirm('Delete this repeating schedule and all its dates? Nothing will play from it any more.')) return
-    if (await attempt(async () => must(await supabase.from('kids_series').delete().eq('id', s.id)))) {
+    if (await attempt(async () => must(await supabase.from(dn.seriesTable).delete().eq('id', s.id)))) {
       setEditing(null)
       setDraft(null)
       changed()
@@ -113,9 +122,14 @@ export default function SeriesManager({
 
   return (
     <div className="stack-sm">
-      {list.length === 0 && <p className="muted">No repeating schedules yet. Drag on the calendar and choose "Every week" to make one.</p>}
+      {heading && <h4 className="cal-series-heading">{heading}</h4>}
+      {list.length === 0 && (
+        <p className="muted">
+          No repeating {heading ? `${dn.label} ` : ''}schedules yet. Drag on the calendar and choose "Every week" to make one.
+        </p>
+      )}
       {list.map((s) => {
-        const canEdit = canEditContent('kids', siteOf(s.location_id))
+        const canEdit = canEditContent(domain, siteOf(s.location_id))
         const open = editing === s.id
         const ex = data.exceptions.filter((e) => e.series_id === s.id)
         return (
@@ -142,7 +156,7 @@ export default function SeriesManager({
                   </button>
                 </span>
               ) : (
-                <span className="muted" title="You can't edit Kids content for this site">
+                <span className="muted" title={`You can't edit ${dn.label} content for this site`}>
                   🔒
                 </span>
               )}
@@ -182,6 +196,7 @@ export default function SeriesManager({
                   value={draft.playlists}
                   onChange={(playlists) => setDraft({ ...draft, playlists })}
                   playlists={data.playlists}
+                  itemName={dn.item}
                   onEnd={draft.onEnd}
                   onEndChange={(onEnd) => setDraft({ ...draft, onEnd })}
                 />
@@ -201,7 +216,7 @@ export default function SeriesManager({
             )}
 
             {(ex.length > 0 || (open && canEdit)) && (
-              <Exceptions series={s} exceptions={ex} playlists={data.playlists} canEdit={canEdit} nameOf={nameOf} onChanged={changed} showAdd={open} />
+              <Exceptions domain={domain} series={s} exceptions={ex} playlists={data.playlists} canEdit={canEdit} nameOf={nameOf} onChanged={changed} showAdd={open} />
             )}
           </div>
         )
@@ -211,6 +226,7 @@ export default function SeriesManager({
 }
 
 function Exceptions({
+  domain,
   series,
   exceptions,
   playlists,
@@ -219,6 +235,7 @@ function Exceptions({
   onChanged,
   showAdd,
 }: {
+  domain: Domain
   series: KidsSeries
   exceptions: SeriesException[]
   playlists: NamedRow[]
@@ -230,18 +247,19 @@ function Exceptions({
   const [date, setDate] = useState('')
   const [action, setAction] = useState<'skip' | 'playlist'>('skip')
   const [playlist, setPlaylist] = useState('')
+  const dn = DOMAINS[domain]
 
   async function add() {
     if (!date) return alert('Choose a date.')
-    if (action === 'playlist' && !playlist) return alert('Choose a playlist.')
-    const row = { series_id: series.id, on_date: date, action, playlist_id: action === 'playlist' ? playlist : null }
-    if (await attempt(async () => must(await supabase.from('kids_series_exceptions').upsert(row, { onConflict: 'series_id,on_date' })))) {
+    if (action === 'playlist' && !playlist) return alert(`Choose a ${dn.item}.`)
+    const row = exceptionRow(domain, series.id, date, action, playlist)
+    if (await attempt(async () => must(await supabase.from(dn.excTable).upsert(row, { onConflict: 'series_id,on_date' })))) {
       setDate('')
       onChanged()
     }
   }
   async function remove(e: SeriesException) {
-    if (await attempt(async () => must(await supabase.from('kids_series_exceptions').delete().eq('series_id', e.series_id).eq('on_date', e.on_date)))) onChanged()
+    if (await attempt(async () => must(await supabase.from(dn.excTable).delete().eq('series_id', e.series_id).eq('on_date', e.on_date)))) onChanged()
   }
 
   return (
@@ -269,12 +287,12 @@ function Exceptions({
             <span>On that date</span>
             <select value={action} onChange={(e) => setAction(e.target.value as 'skip' | 'playlist')}>
               <option value="skip">Skip (nothing plays)</option>
-              <option value="playlist">Play a different playlist</option>
+              <option value="playlist">Play a different {dn.item}</option>
             </select>
           </label>
           {action === 'playlist' && (
             <label className="field grow">
-              <span>Playlist</span>
+              <span>{domain === 'slides' ? 'Deck' : 'Playlist'}</span>
               <select value={playlist} onChange={(e) => setPlaylist(e.target.value)}>
                 <option value="">Choose…</option>
                 {playlists.map((p) => (

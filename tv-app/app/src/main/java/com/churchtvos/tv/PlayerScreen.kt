@@ -211,21 +211,14 @@ private fun StreamNotice(slide: Slide.Stream) {
 
 @Composable
 private fun CountdownSlide(slide: Slide.Countdown, onDone: () -> Unit) {
-    var remaining by remember { mutableIntStateOf(slide.seconds) }
-    LaunchedEffect(Unit) {
-        while (remaining > 0) {
-            delay(1_000)
-            remaining--
-        }
-        onDone()
-    }
-    Box(Modifier.fillMaxSize().background(BrandPrimary).padding(horizontal = 48.dp, vertical = 27.dp)) {
-        Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(slide.title.uppercase(), style = TextStyle(fontFamily = Lato, fontWeight = FontWeight.Bold, fontSize = 22.sp, letterSpacing = 4.sp, color = BrandAccent))
-            Text(
-                "%d:%02d".format(remaining / 60, remaining % 60),
-                style = TextStyle(fontFamily = JuliusSansOne, fontSize = 160.sp, color = Color.White),
-            )
+    CountdownRunner(slide.spec, slide.audioFile, paused = false, onFinished = onDone) { time ->
+        Box(Modifier.fillMaxSize().background(BrandPrimary).padding(horizontal = 48.dp, vertical = 27.dp)) {
+            Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (slide.title.isNotBlank()) {
+                    Text(slide.title.uppercase(), style = TextStyle(fontFamily = Lato, fontWeight = FontWeight.Bold, fontSize = 22.sp, letterSpacing = 4.sp, color = BrandAccent))
+                }
+                Text(time, style = TextStyle(fontFamily = JuliusSansOne, fontSize = 160.sp, color = Color.White))
+            }
         }
     }
 }
@@ -247,7 +240,7 @@ private fun LyricSlide(slide: Slide.Lyric) {
 }
 
 @Composable
-private fun KeepScreenOn() {
+internal fun KeepScreenOn() {
     val view = LocalView.current
     DisposableEffect(view) {
         view.keepScreenOn = true

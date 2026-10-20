@@ -22,7 +22,15 @@ sealed interface PlaylistItem {
 
     @Serializable
     @SerialName("countdown")
-    data class Countdown(override val title: String, val seconds: Int) : PlaylistItem
+    data class Countdown(
+        override val title: String,
+        val seconds: Int = 60,
+        val mode: String = "duration",
+        val until: String? = null,
+        val audio: CountdownAudio? = null,
+        @SerialName("at_zero") val atZero: String = "next",
+        @SerialName("if_passed") val ifPassed: String = "zero",
+    ) : PlaylistItem
 
     @Serializable
     @SerialName("lyrics")
@@ -83,6 +91,7 @@ val Playlist.mediaUrls: List<String>
         when (it) {
             is PlaylistItem.Video -> it.url
             is PlaylistItem.Image -> it.url
+            is PlaylistItem.Countdown -> it.audio?.url
             else -> null
         }
     }
@@ -91,7 +100,7 @@ val Playlist.mediaUrls: List<String>
 sealed interface Slide {
     data class Video(val file: File) : Slide
     data class Image(val file: File, val seconds: Int?) : Slide
-    data class Countdown(val title: String, val seconds: Int) : Slide
+    data class Countdown(val title: String, val spec: CountdownSpec, val audioFile: File?) : Slide
     /** A picture shipped inside the app (demo mode). */
     data class Bundled(@androidx.annotation.DrawableRes val res: Int, val seconds: Int) : Slide
     data class Lyric(val song: String, val text: String, val number: Int, val count: Int) : Slide
@@ -102,11 +111,13 @@ sealed interface Slide {
     data class Stream(val url: String, val audio: Boolean, val seconds: Int?, val fallback: String) : Slide
 }
 
+fun PlaylistItem.Countdown.spec() = CountdownSpec(mode, seconds, until, audio, atZero, ifPassed)
+
 fun Playlist.toSlides(cache: MediaCache): List<Slide> = items.flatMap { item ->
     when (item) {
         is PlaylistItem.Video -> listOf(Slide.Video(cache.fileFor(item.url)))
         is PlaylistItem.Image -> listOf(Slide.Image(cache.fileFor(item.url), item.seconds))
-        is PlaylistItem.Countdown -> listOf(Slide.Countdown(item.title, item.seconds))
+        is PlaylistItem.Countdown -> listOf(Slide.Countdown(item.title, item.spec(), item.audio?.let { a -> cache.fileFor(a.url).takeIf { it.exists() } }))
         is PlaylistItem.Lyrics -> item.toLyricSlides()
         is PlaylistItem.YouTube -> listOf(Slide.YouTube(item.videoId, item.channelId, item.start))
         is PlaylistItem.Sign -> listOf(Slide.Sign(item.title, item.subtext, item.background, item.seconds, item.align, item.logo))

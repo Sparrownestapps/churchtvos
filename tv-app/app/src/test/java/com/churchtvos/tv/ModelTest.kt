@@ -72,4 +72,107 @@ class ModelTest {
         assertEquals(1, old.size)
         assertTrue(old[0] is Slide.Lyric)
     }
+
+    private val deckJson = """
+        {"id":"d","name":"Sunday","loop":true,
+         "theme":{"font":"julius","title_scale":1.2,"text_color":"#FFFFFF","position":"lower","background":{"type":"video","url":"https://x/bg.mp4","dim":0.4}},
+         "background":{"type":"gradient","color":"#112233","color2":"#000000","angle":90},
+         "slides":[
+          {"id":"a","kind":"text","title":"Welcome","body":"Hello","layout":"lower_third","background":{"type":"image","url":"https://x/a.jpg","fit":"cover","dim":0.3}},
+          {"kind":"song_title","title":"Song","authors":"Auth","ccli":"123"},
+          {"kind":"lyric","song":"Song","text":"line","label":"Verse 1","number":1,"count":2},
+          {"id":"m","kind":"media","url":"https://x/p.png","media_kind":"image","seconds":8},
+          {"id":"c","kind":"countdown","seconds":90},
+          {"id":"s","kind":"stream","url":"https://x/live.m3u8"},
+          {"id":"b","kind":"blank"},
+          {"id":"z","kind":"hologram","whatever":1},
+          {"id":"y","kind":"text","title":"Odd bg","background":{"type":"plasma"}}
+         ]}
+    """.trimIndent()
+
+    @Test
+    fun deckDecodesAllKindsAndSkipsUnknown() {
+        val deck = AppJson.decodeFromString<Deck>(deckJson)
+        assertEquals(9, deck.slides.size)
+        assertTrue(deck.slides[7] is DeckSlide.Unknown)
+        assertEquals(8, deck.playableSlides.size)
+        assertTrue(deck.loop)
+        assertEquals("julius", deck.theme.font)
+        assertEquals(1.2f, deck.theme.titleScale)
+        assertTrue(deck.theme.background is SlideBackground.Video)
+        assertTrue(deck.background is SlideBackground.Gradient)
+        val text = deck.slides[0] as DeckSlide.Text
+        assertEquals("lower_third", text.layout)
+        assertEquals(0.3f, (text.background as SlideBackground.Image).dim)
+        assertTrue((deck.slides[8] as DeckSlide.Text).background is SlideBackground.Unknown)
+        assertEquals(8, (deck.slides[3] as DeckSlide.Media).seconds)
+        assertEquals(1, (deck.slides[2] as DeckSlide.Lyric).number)
+    }
+
+    @Test
+    fun deckMediaUrlsCoverBackgroundsAndMedia() {
+        val deck = AppJson.decodeFromString<Deck>(deckJson)
+        assertEquals(setOf("https://x/bg.mp4", "https://x/a.jpg", "https://x/p.png"), deck.mediaUrls.toSet())
+    }
+
+    @Test
+    fun deviceStateCarriesSlidesSchedules() {
+        val state = AppJson.decodeFromString<DeviceState>(
+            """{"paired":true,"enabled_modules":["slides"],"slides":{"schedules":[
+                {"id":"x","starts_at":"2026-10-18T13:00:00+00:00","ends_at":"2026-10-18T14:00:00+00:00","deck":{"id":"d","name":"S","slides":[]}}]}}""",
+        )
+        val inside = java.time.Instant.parse("2026-10-18T13:30:00Z")
+        assertEquals("S", state.currentDeck(inside)?.deck?.name)
+        assertEquals(null, state.currentDeck(java.time.Instant.parse("2026-10-18T15:00:00Z")))
+    }
+
+    @Test
+    fun countdownTimeFormatAndFade() {
+        assertEquals("5:00", formatCountdown(300_000))
+        assertEquals("0:07", formatCountdown(6_100))
+        assertEquals("0:00", formatCountdown(0))
+        assertEquals("1:05:00", formatCountdown(3_900_000))
+        assertEquals(1f, fadeFactor(10_000, 3f))
+        assertEquals(0.5f, fadeFactor(1_500, 3f))
+        assertEquals(0f, fadeFactor(0, 3f))
+        assertEquals(1f, fadeFactor(500, 0f))
+    }
+
+    @Test
+    fun untilMillisUsesTheSiteTimeZone() {
+        val zone = java.time.ZoneId.of("America/Toronto")
+        val now = java.time.Instant.parse("2026-10-18T12:00:00Z").toEpochMilli() // 08:00 EDT
+        val nine = untilMillis("09:00", now, zone)!!
+        assertEquals(java.time.Instant.parse("2026-10-18T13:00:00Z").toEpochMilli(), nine)
+        assertEquals(null, untilMillis("later", now, zone))
+        assertEquals(null, untilMillis(null, now, zone))
+    }
+
+    @Test
+    fun countdownDecodesNewFieldsAndOldItemsKeepOldBehaviour() {
+        val items = AppJson.decodeFromString<Playlist>(
+            """{"id":"p","name":"C","items":[
+              {"type":"countdown","title":"Old","seconds":300},
+              {"type":"countdown","title":"New","mode":"until","until":"09:00","at_zero":"hold","if_passed":"zero",
+               "audio":{"url":"https://x/a.mp3","volume":0.5,"loop":false,"fade_seconds":5,"align_end":true}}]}""",
+        ).items
+        val old = (items[0] as PlaylistItem.Countdown).spec()
+        assertEquals("next", old.atZero)
+        assertEquals("duration", old.mode)
+        assertEquals(300, old.seconds)
+        val new = (items[1] as PlaylistItem.Countdown).spec()
+        assertEquals("until", new.mode)
+        assertEquals("hold", new.atZero)
+        assertEquals(true, new.audio?.alignEnd)
+        assertEquals(5f, new.audio?.fadeSeconds)
+        assertEquals(listOf("https://x/a.mp3"), AppJson.decodeFromString<Playlist>("""{"id":"p","name":"C","items":[{"type":"countdown","title":"N","audio":{"url":"https://x/a.mp3"}}]}""").mediaUrls)
+    }
+
+    @Test
+    fun organizationStatusDefaultsToActiveAndReadsSuspended() {
+        val a = AppJson.decodeFromString<DeviceState>("""{"paired":true,"organization":{"name":"X"}}""")
+        assertEquals("active", a.organization?.status)
+        val b = AppJson.decodeFromString<DeviceState>("""{"paired":true,"organization":{"name":"X","status":"suspended"}}""")
+        assertEquals("suspended", b.organization?.status)
+    }
 }

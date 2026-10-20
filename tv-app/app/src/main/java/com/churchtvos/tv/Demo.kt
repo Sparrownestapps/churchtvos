@@ -12,7 +12,7 @@ object Demo {
             Slide.Bundled(R.drawable.demo_info, 6),
         )
         else -> listOf(
-            Slide.Countdown("Service starts in", 10),
+            Slide.Countdown("Service starts in", CountdownSpec(seconds = 10), null),
             Slide.Lyric("Sample song", "Verse 1\nSample lyrics appear\nlarge and centred", 1, 2),
             Slide.Lyric("Sample song", "Chorus\nOne slide per section,\nadvance with Right", 2, 2),
             Slide.Bundled(R.drawable.demo_welcome, 6),

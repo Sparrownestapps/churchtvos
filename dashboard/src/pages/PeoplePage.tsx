@@ -11,16 +11,13 @@ const ROLES: { value: Role; help: string }[] = [
   { value: 'editor', help: 'Edit content in their modules' },
   { value: 'operator', help: 'View only (for now)' },
 ]
-const MODULES: { value: Module; label: string }[] = [
-  { value: 'kids', label: 'Kids' },
-  { value: 'signage', label: 'Signage' },
-]
-
 type Draft = { email: string; role: Role; modules: Module[]; site_ids: string[] | null }
-const blank: Draft = { email: '', role: 'editor', modules: ['kids', 'signage'], site_ids: null }
+/** A new person starts with every available module (from the registry). */
+const blankFor = (modules: Module[]): Draft => ({ email: '', role: 'editor', modules, site_ids: null })
 
 export default function PeoplePage() {
-  const { org, userId, sites } = useApp()
+  const { org, userId, sites, modules, moduleName } = useApp()
+  const blank = blankFor(modules.map((m) => m.id))
   const [draft, setDraft] = useState<Draft>(blank)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [edit, setEdit] = useState<Draft>(blank)
@@ -91,7 +88,7 @@ export default function PeoplePage() {
                     {m.email} {mine && <span className="muted">(you)</span>}
                   </h3>
                   <span className="muted">
-                    {roleLabel(m.role)} · {m.role === 'owner' || m.role === 'admin' ? 'All modules' : m.modules.map((x) => MODULES.find((o) => o.value === x)?.label).join(', ') || 'No modules'} ·{' '}
+                    {roleLabel(m.role)} · {m.role === 'owner' || m.role === 'admin' ? 'All modules' : m.modules.filter((x) => modules.some((o) => o.id === x)).map((x) => moduleName(x)).join(', ') || 'No modules'} ·{' '}
                     {m.role === 'owner' || m.role === 'admin' ? 'All sites' : scope} · {m.user_id ? 'Active' : 'Invited, not signed up yet'}
                   </span>
                 </div>
@@ -128,6 +125,7 @@ export default function PeoplePage() {
 }
 
 function AccessFields({ value, onChange, sites }: { value: Draft; onChange: (d: Draft) => void; sites: { id: string; name: string }[] }) {
+  const { modules } = useApp()
   const everything = value.role === 'owner' || value.role === 'admin'
   const toggleModule = (m: Module) =>
     onChange({ ...value, modules: value.modules.includes(m) ? value.modules.filter((x) => x !== m) : [...value.modules, m] })
@@ -153,10 +151,10 @@ function AccessFields({ value, onChange, sites }: { value: Draft; onChange: (d: 
           <div className="field">
             <span>Modules</span>
             <div className="row wrap-sm">
-              {MODULES.map((m) => (
-                <label key={m.value} className="check">
-                  <input type="checkbox" checked={value.modules.includes(m.value)} onChange={() => toggleModule(m.value)} />
-                  {m.label}
+              {modules.map((m) => (
+                <label key={m.id} className="check">
+                  <input type="checkbox" checked={value.modules.includes(m.id)} onChange={() => toggleModule(m.id)} />
+                  {m.name}
                 </label>
               ))}
             </div>

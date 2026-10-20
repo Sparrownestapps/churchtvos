@@ -18,6 +18,7 @@ export const HELP_PAGES = {
   songs: 'songs.html',
   kids: 'kids.html',
   signage: 'signage.html',
+  slides: 'slides.html',
   calendar: 'calendar.html',
   branding: 'branding.html',
   people: 'people.html',

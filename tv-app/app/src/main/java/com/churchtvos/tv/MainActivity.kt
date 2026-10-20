@@ -64,6 +64,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // A display must never fall asleep or start the screensaver while this app is in front (home screens included).
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         AutoLaunch.start(applicationContext)
         val cache = MediaCache(applicationContext)
         val sync = TvSync(applicationContext, cache)
@@ -77,8 +79,23 @@ class MainActivity : ComponentActivity() {
         } else null
         val debugHome = if (BuildConfig.DEBUG) intent.getStringExtra("debug_home") != null else false
         val debugOrientation = if (BuildConfig.DEBUG) intent.getStringExtra("debug_orientation") else null
+        // Debug builds only: --es debug_deck_b64 '<base64 of a Deck json>' (downloads the deck's media first)
+        val debugDeck = if (BuildConfig.DEBUG) intent.getStringExtra("debug_deck_b64")?.let {
+            AppJson.decodeFromString<Deck>(String(android.util.Base64.decode(it, android.util.Base64.DEFAULT)))
+        } else null
         setContent {
-            if (debugSign != null || debugHome) {
+            if (debugDeck != null) {
+                BrandTheme(Brand()) {
+                    Oriented(debugOrientation ?: "landscape") {
+                        var ready by remember { mutableStateOf(false) }
+                        LaunchedEffect(Unit) {
+                            debugDeck.mediaUrls.forEach { runCatching { cache.download(it) } }
+                            ready = true
+                        }
+                        if (ready) SlidesPlayer(debugDeck, cache, onExit = { finish() }) else Box(Modifier.fillMaxSize().background(Color.Black))
+                    }
+                }
+            } else if (debugSign != null || debugHome) {
                 val branding = if (BuildConfig.DEBUG) intent.getStringExtra("debug_brand") else null
                 BrandTheme(Brand(primary = parseHexColor(branding) ?: Brand().primary, logoUrl = intent.getStringExtra("debug_logo"))) {
                     Oriented(debugOrientation ?: "landscape") {
@@ -104,7 +121,7 @@ class MainActivity : ComponentActivity() {
                 }
                 // Countdown either side to check switching into and out of YouTube.
                 PlayerScreen(
-                    listOf(Slide.Countdown("Before", 4), slide, Slide.Countdown("After", 30)),
+                    listOf(Slide.Countdown("Before", CountdownSpec(seconds = 4), null), slide, Slide.Countdown("After", CountdownSpec(seconds = 30), null)),
                     onExit = { finish() },
                 )
             } else {
@@ -137,6 +154,8 @@ fun App(sync: TvSync, cache: MediaCache, settingsOpen: Boolean, onSettingsChange
     var asked by remember { mutableStateOf(sync.store.autoLaunchAsked || !AutoLaunch.supported) }
     val demoNow = demo
 
+    val zone = remember(device?.timezone) { runCatching { java.time.ZoneId.of(device?.timezone) }.getOrDefault(java.time.ZoneId.systemDefault()) }
+    androidx.compose.runtime.CompositionLocalProvider(LocalTimeZone provides zone) {
     BrandTheme(device?.brand() ?: Brand()) {
         Oriented(device?.screen?.orientation ?: "landscape") {
             when {
@@ -163,6 +182,10 @@ fun App(sync: TvSync, cache: MediaCache, settingsOpen: Boolean, onSettingsChange
                     autoLaunch = yes
                     asked = true
                 }
+                device.organization?.status == "suspended" -> MessageScreen(
+                    "This account is paused",
+                    "Please ask your church's administrator to contact Church TV OS support.",
+                )
                 else -> {
                     val module = device.moduleNow(now.toEpochMilli())
                     // Each module can have its own look, and its own splash when the TV starts or switches into it.
@@ -183,12 +206,14 @@ fun App(sync: TvSync, cache: MediaCache, settingsOpen: Boolean, onSettingsChange
                                 "That module isn't switched on for ${device.organization?.name ?: "this church"}. Ask your church's admin.",
                             )
                             module == Module.SIGNAGE -> SignageModule(device, now, cache)
+                            module == Module.SLIDES -> SlidesModule(device, state, now, cache)
                             else -> KidsModule(device, state, now, cache)
                         }
                     }
                 }
             }
         }
+    }
     }
 }
 

@@ -369,3 +369,9 @@ tr.faded td { opacity: 0.45; }
 .sign-mock .sign-title { font-weight: 800; line-height: 1.1; overflow-wrap: anywhere; }
 .sign-mock .sign-sub { line-height: 1.25; opacity: 0.85; overflow-wrap: anywhere; }
 .sign-mock .sign-logo { max-width: 40%; max-height: 16%; object-fit: contain; position: absolute; left: 9%; top: 7%; }
+
+/* Audio rows in the media library */
+.audio-thumb { display: grid; place-items: center; align-content: center; gap: 4px; background: var(--sl-strip-bg); }
+.audio-thumb .audio-icon { font-size: 28px; line-height: 1; }
+.audio-thumb audio { width: 92%; height: 30px; }
+.media-row .audio-thumb audio { display: none; }

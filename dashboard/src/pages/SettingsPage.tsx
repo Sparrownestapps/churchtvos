@@ -67,8 +67,8 @@ export default function SettingsPage() {
 }
 
 function Plan() {
-  const { entitlements } = useApp()
-  const modules: Module[] = ['kids', 'signage']
+  const { entitlements, modules: registry, moduleName, org } = useApp()
+  const modules: Module[] = registry.map((m) => m.id)
   return (
     <div className="card stack-sm">
       <h3>Your plan</h3>
@@ -76,10 +76,10 @@ function Plan() {
         const e = entitlements.find((x) => x.module === m)
         return (
           <div key={m} className="list-row">
-            <b>{m === 'kids' ? 'Kids' : 'Signage'}</b> ·{' '}
+            <b>{moduleName(m)}</b> ·{' '}
             {e ? (
               <>
-                <span className={entitled(e) ? 'notice' : 'error'}>{entitled(e) ? 'Enabled' : 'Not enabled'}</span>
+                <span className={entitled(e, org.status) ? 'notice' : 'error'}>{entitled(e, org.status) ? 'Enabled' : 'Not enabled'}</span>
                 <span className="muted">
                   {' '}
                   · {e.status} · {e.plan} · up to {e.tv_limit} TV{e.tv_limit === 1 ? '' : 's'}
@@ -97,11 +97,14 @@ function Plan() {
 
 /** Platform admins (and only they, by row-level security) can switch modules on for a church. */
 function PlatformEntitlements() {
-  const { org, entitlements, reloadOrg } = useApp()
+  const { org, entitlements, reloadOrg, modules } = useApp()
   return (
     <div className="card stack-sm">
       <h3>Platform admin: modules for {org.name}</h3>
-      {(['kids', 'signage'] as Module[]).map((m) => (
+      <p className="muted">
+        <a href="#admin-churches">Manage all churches in the Admin console</a>
+      </p>
+      {modules.map((def) => def.id).map((m) => (
         <EntitlementRow key={m} module={m} current={entitlements.find((e) => e.module === m)} onSaved={reloadOrg} orgId={org.id} />
       ))}
     </div>
@@ -109,6 +112,7 @@ function PlatformEntitlements() {
 }
 
 function EntitlementRow({ module, current, orgId, onSaved }: { module: Module; current?: Entitlement; orgId: string; onSaved: () => void }) {
+  const { moduleName } = useApp()
   const [status, setStatus] = useState<Entitlement['status']>(current?.status ?? 'active')
   const [limit, setLimit] = useState(current?.tv_limit ?? 5)
   const [plan, setPlan] = useState(current?.plan ?? 'standard')
@@ -128,7 +132,7 @@ function EntitlementRow({ module, current, orgId, onSaved }: { module: Module; c
 
   return (
     <div className="row wrap list-row">
-      <b style={{ width: 70 }}>{module === 'kids' ? 'Kids' : 'Signage'}</b>
+      <b style={{ width: 70 }}>{moduleName(module)}</b>
       <label className="field">
         <span>Status</span>
         <select value={status} onChange={(e) => setStatus(e.target.value as Entitlement['status'])}>

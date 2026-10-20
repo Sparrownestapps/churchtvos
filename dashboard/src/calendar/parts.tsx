@@ -61,11 +61,12 @@ export function ChoiceDialog({ dialog, close }: { dialog: DialogState; close: ()
   )
 }
 
-/** Ordered list of Kids playlists: "Week 1, Week 2, ..." plus what happens at the end. */
+/** Ordered list of Kids playlists (or Slides decks): "Week 1, Week 2, ..." plus what happens at the end. */
 export function RotationEditor({
   value,
   onChange,
   playlists,
+  itemName = 'playlist',
   onEnd,
   onEndChange,
   readOnly,
@@ -73,6 +74,8 @@ export function RotationEditor({
   value: string[]
   onChange: (v: string[]) => void
   playlists: NamedRow[]
+  /** 'playlist' for Kids, 'deck' for Slides. */
+  itemName?: string
   onEnd: 'stop' | 'loop'
   onEndChange: (v: 'stop' | 'loop') => void
   readOnly?: boolean
@@ -128,7 +131,7 @@ export function RotationEditor({
           )}
         </label>
       )}
-      {value.length === 1 && <p className="muted">One playlist: it plays every week. Add more weeks for a curriculum rotation.</p>}
+      {value.length === 1 && <p className="muted">One {itemName}: it plays every week. Add more weeks for a curriculum rotation.</p>}
     </div>
   )
 }

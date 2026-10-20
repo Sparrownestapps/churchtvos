@@ -1,4 +1,5 @@
 import type { SongSection } from './songParsers'
+import type { CountdownAudio } from './slidesTypes'
 
 /** An application id from the `modules` table ('kids', 'signage', ...). */
 export type Module = string
@@ -26,7 +27,7 @@ export type Look = {
 }
 
 export type Branding = Look & {
-  modules?: { kids?: Look; signage?: Look }
+  modules?: { kids?: Look; signage?: Look; slides?: Look }
   /** YouTube channel (UC…) used by the Kids YouTube picker and "Live now" items. */
   youtube_channel_id?: string
 }
@@ -37,6 +38,8 @@ export type Organization = {
   slug: string
   branding: Branding
   created_at: string
+  /** 'suspended' = paused by the platform owner: nothing is live. */
+  status?: 'active' | 'suspended'
 }
 
 export type Membership = {
@@ -72,7 +75,7 @@ export type Media = {
   module: Module
   folder_id: string | null
   title: string
-  kind: 'video' | 'image'
+  kind: 'video' | 'image' | 'audio'
   storage_path: string
   url: string
   size_bytes: number | null
@@ -94,7 +97,7 @@ export type MediaFolder = {
 export type PlaylistItem =
   | { type: 'video'; title: string; url: string; media_id: string }
   | { type: 'image'; title: string; url: string; media_id: string; seconds: number | null }
-  | { type: 'countdown'; title: string; seconds: number }
+  | CountdownItem
   | LyricsItem
   // video_id null + channel_id set = whatever that channel is live-streaming when the item plays
   | { type: 'youtube'; title: string; video_id: string | null; channel_id: string | null; start: number | null }
@@ -125,6 +128,22 @@ export type Song = {
   source: 'manual' | 'paste' | 'file'
   created_at: string
   updated_at: string
+}
+
+/**
+ * Countdown. Old items have only title + seconds. Newer fields (need app 1.4.0+): mode 'until' counts to a clock time ('HH:MM',
+ * site time zone) and may omit seconds; audio plays during it; at_zero and if_passed say what happens at the end.
+ * Same fields as the Slides countdown (slidesTypes.ts).
+ */
+export type CountdownItem = {
+  type: 'countdown'
+  title: string
+  seconds?: number
+  mode?: 'duration' | 'until'
+  until?: string
+  audio?: CountdownAudio | null
+  at_zero?: 'next' | 'hold'
+  if_passed?: 'skip' | 'zero'
 }
 
 /** Live HLS (.m3u8) feed. Must match the TV app (needs app 1.1.0+). */

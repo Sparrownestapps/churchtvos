@@ -8,6 +8,7 @@ import java.time.ZonedDateTime
 object Module {
     const val KIDS = "kids"
     const val SIGNAGE = "signage"
+    const val SLIDES = "slides"
     const val OFF = "off"
 }
 

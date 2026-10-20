@@ -56,7 +56,22 @@ function VideoPoster({ url }: { url: string }) {
   )
 }
 
+const AUDIO_EXT = /\.(mp3|m4a|aac|wav|ogg)$/i
+const AUDIO_TYPES: Record<string, string> = { mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav', ogg: 'audio/ogg' }
+const KIND_LABEL: Record<Media['kind'], string> = { video: 'Video', image: 'Slide', audio: 'Audio' }
+
+/** Music icon with a small play/pause preview. */
+function AudioThumb({ m }: { m: Media }) {
+  return (
+    <div className="poster audio-thumb">
+      <span aria-hidden="true" className="audio-icon">🎵</span>
+      <audio controls preload="none" src={m.url} aria-label={`Preview ${m.title}`} onClick={(e) => e.stopPropagation()} />
+    </div>
+  )
+}
+
 function Thumb({ m }: { m: Media }) {
+  if (m.kind === 'audio') return <AudioThumb m={m} />
   return m.kind === 'image' ? <img src={m.url} alt="" loading="lazy" draggable={false} /> : <VideoPoster url={m.url} />
 }
 
@@ -209,8 +224,11 @@ export default function MediaPage({ module }: { module: Module }) {
   async function upload(file: File) {
     const id = crypto.randomUUID()
     setUploads((list) => [...list, { id, name: file.name, percent: 0 }])
-    const kind = file.type.startsWith('video/') ? 'video' : file.type.startsWith('image/') ? 'image' : null
-    if (!kind) return patch(id, { error: 'Only videos and images can be uploaded' })
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+    const isAudio = file.type.startsWith('audio/') || AUDIO_EXT.test(file.name)
+    const kind: Media['kind'] | null = isAudio ? 'audio' : file.type.startsWith('video/') ? 'video' : file.type.startsWith('image/') ? 'image' : null
+    if (!kind) return patch(id, { error: 'Only videos, images and audio (MP3, M4A, AAC, WAV, OGG) can be uploaded' })
+    const contentType = file.type || AUDIO_TYPES[ext] || 'application/octet-stream'
     // A folder limited to one site passes that limit to what is inside it.
     const siteId = current ? current.site_id : scope
     if (!canEdit(siteId)) return patch(id, { error: "You can't upload here" })
@@ -229,7 +247,7 @@ export default function MediaPage({ module }: { module: Module }) {
           uploadDataDuringCreation: true,
           removeFingerprintOnSuccess: true,
           chunkSize: 6 * 1024 * 1024, // Supabase requires exactly 6 MB chunks
-          metadata: { bucketName: 'media', objectName, contentType: file.type, cacheControl: '3600' },
+          metadata: { bucketName: 'media', objectName, contentType, cacheControl: '3600' },
           onProgress: (sent, total) => patch(id, { percent: Math.round((sent / total) * 100) }),
           onError: reject,
           onSuccess: () => resolve(),
@@ -478,12 +496,12 @@ export default function MediaPage({ module }: { module: Module }) {
             <input
               type="file"
               multiple
-              accept="video/*,image/*"
+              accept="video/*,image/*,audio/*,.mp3,.m4a,.aac,.wav,.ogg"
               hidden
               onChange={(e) => (Array.from(e.target.files ?? []).forEach(upload), (e.target.value = ''))}
             />
-            <b>Drop videos or images here</b>
-            <span className="muted">or click to choose files · MP4 video and JPG/PNG slides work best (1920×1080)</span>
+            <b>Drop videos, images or audio here</b>
+            <span className="muted">or click to choose files · MP4 video and JPG/PNG slides work best (1920×1080) · audio: MP3 or M4A, keep files under about 20 MB</span>
           </label>
           {uploads.map((u) => (
             <div key={u.id} className="upload">
@@ -639,7 +657,7 @@ export default function MediaPage({ module }: { module: Module }) {
                 <div className="media-info">
                   <b title={m.title}>{m.title}</b>
                   <span className="muted">
-                    {m.kind === 'video' ? 'Video' : 'Slide'} · {fmtBytes(m.size_bytes)} · {scopeLabel(m.site_id, sites)}
+                    {KIND_LABEL[m.kind]} · {fmtBytes(m.size_bytes)} · {scopeLabel(m.site_id, sites)}
                   </span>
                   {q && m.folder_id && <span className="muted">in {folderPath(m.folder_id, byId)}</span>}
                   {usageLabel(m)}
@@ -681,7 +699,7 @@ export default function MediaPage({ module }: { module: Module }) {
                 <div className="media-row-main">
                   <b title={m.title}>{m.title}</b>
                   <span className="muted">
-                    {m.kind === 'video' ? 'Video' : 'Slide'} · {fmtBytes(m.size_bytes)} · {scopeLabel(m.site_id, sites)}
+                    {KIND_LABEL[m.kind]} · {fmtBytes(m.size_bytes)} · {scopeLabel(m.site_id, sites)}
                     {q && m.folder_id ? ` · in ${folderPath(m.folder_id, byId)}` : ''}
                   </span>
                   {usageLabel(m)}

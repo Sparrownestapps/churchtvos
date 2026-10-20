@@ -103,7 +103,7 @@ export default function SongsPage() {
       )}
       {data && songs.length === 0 && (
         <EmptyState help="songs">
-          Your song library is shared by every Kids playlist (and, later, Slides). Add a song by typing it, pasting lyrics, or importing lyric files you have downloaded, then pick it in a playlist's lyrics item.
+          Your song library is shared by Kids playlists and Slides decks. Add a song by typing it, pasting lyrics, or importing lyric files you have downloaded, then pick it in a playlist's lyrics item or add it to a deck.
         </EmptyState>
       )}
       {songs.length > 0 && shown.length === 0 && <p className="muted">No songs match "{search}".</p>}

@@ -5,6 +5,8 @@ import type { Media, MediaFolder, Playlist, PlaylistItem } from '../types'
 import { attempt, fetchAll, moveItem, must, scopeLabel, useLoad } from '../lib'
 import { EmptyState, ScopeSelect, useDefaultScope } from '../ui'
 import { MediaSelect } from '../MediaSelect'
+import CountdownFields from '../CountdownFields'
+import { countdownProblem } from '../slides/render'
 import { YouTubeItemEditor, newYouTubeItem } from '../YouTubeItem'
 import { StreamItemEditor, newStreamItem, validStreamUrl } from '../StreamItem'
 import { LyricsItemEditor, newLyricsItem, type SongLite } from '../LyricsItem'
@@ -126,7 +128,7 @@ function PlaylistEditor({ playlist, media, folders, songs, onDone }: { playlist:
     const blank: Record<PlaylistItem['type'], PlaylistItem> = {
       video: { type: 'video', title: '', url: '', media_id: '' },
       image: { type: 'image', title: '', url: '', media_id: '', seconds: null },
-      countdown: { type: 'countdown', title: 'Service starts in', seconds: 300 },
+      countdown: { type: 'countdown', title: 'Service starts in', mode: 'duration', seconds: 300, at_zero: 'hold', if_passed: 'zero' },
       lyrics: newLyricsItem(),
       youtube: newYouTubeItem(channelId, org.name),
       stream: newStreamItem(null),
@@ -148,6 +150,8 @@ function PlaylistEditor({ playlist, media, folders, songs, onDone }: { playlist:
     if (noYouTube >= 0) return alert(`Item ${noYouTube + 1} needs a YouTube video chosen.`)
     const badStream = items.findIndex((i) => i.type === 'stream' && !validStreamUrl(i.url))
     if (badStream >= 0) return alert(`Item ${badStream + 1} needs a stream link (starting with https://).`)
+    const badCountdown = items.findIndex((i) => i.type === 'countdown' && countdownProblem(i))
+    if (badCountdown >= 0) return alert(`Item ${badCountdown + 1}: ${countdownProblem(items[badCountdown] as Extract<PlaylistItem, { type: 'countdown' }>)}`)
     const noSong = items.findIndex((i) => i.type === 'lyrics' && 'song_id' in i && !i.song_id)
     if (noSong >= 0) return alert(`Item ${noSong + 1} needs a song chosen from the library (or switch it to typed lyrics).`)
     const cleaned = items.map((i) =>
@@ -220,31 +224,7 @@ function PlaylistEditor({ playlist, media, folders, songs, onDone }: { playlist:
           )}
 
           {item.type === 'countdown' && (
-            <div className="row wrap">
-              <label className="field grow">
-                <span>Heading</span>
-                <input value={item.title} onChange={(e) => update(i, { ...item, title: e.target.value })} />
-              </label>
-              <label className="field">
-                <span>Minutes</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={Math.floor(item.seconds / 60)}
-                  onChange={(e) => update(i, { ...item, seconds: Number(e.target.value) * 60 + (item.seconds % 60) })}
-                />
-              </label>
-              <label className="field">
-                <span>Seconds</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={59}
-                  value={item.seconds % 60}
-                  onChange={(e) => update(i, { ...item, seconds: Math.floor(item.seconds / 60) * 60 + Number(e.target.value) })}
-                />
-              </label>
-            </div>
+            <CountdownFields value={item} onPatch={(p) => update(i, { ...item, ...p, title: p.title ?? item.title })} media={media} folders={folders} />
           )}
 
           {item.type === 'stream' && <StreamItemEditor item={item} onChange={(next) => update(i, next)} />}

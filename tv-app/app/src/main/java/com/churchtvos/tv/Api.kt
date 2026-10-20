@@ -23,6 +23,8 @@ val AppJson = Json {
     // A playlist item type newer than this app decodes as PlaylistItem.Unknown (and is skipped) instead of failing everything.
     serializersModule = SerializersModule {
         polymorphicDefaultDeserializer(PlaylistItem::class) { PlaylistItem.Unknown.serializer() }
+        polymorphicDefaultDeserializer(DeckSlide::class) { DeckSlide.Unknown.serializer() }
+        polymorphicDefaultDeserializer(SlideBackground::class) { SlideBackground.Unknown.serializer() }
     }
 }
 
@@ -41,10 +43,11 @@ data class DeviceState(
     @SerialName("module_rules") val moduleRules: List<ModuleRule> = emptyList(),
     val kids: KidsState = KidsState(),
     val signage: SignageState = SignageState(),
+    val slides: SlidesState = SlidesState(),
 )
 
 @Serializable
-data class OrganizationInfo(val name: String, val branding: BrandingInfo = BrandingInfo())
+data class OrganizationInfo(val name: String, val branding: BrandingInfo = BrandingInfo(), val status: String = "active")
 
 /** One look: the church default (top level) or an override for a module. Unset fields inherit. */
 @Serializable
@@ -60,7 +63,7 @@ data class LookInfo(
 )
 
 @Serializable
-data class ModuleLooks(val kids: LookInfo? = null, val signage: LookInfo? = null)
+data class ModuleLooks(val kids: LookInfo? = null, val signage: LookInfo? = null, val slides: LookInfo? = null)
 
 @Serializable
 data class BrandingInfo(

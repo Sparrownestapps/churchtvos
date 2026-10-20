@@ -217,7 +217,7 @@ export default function SitesPage() {
       )}
       {sites.length > 0 && locations.length === 0 && (
         <EmptyState help="ideas">
-          Next, add a location for each room or area that has a TV, like a Nursery or Lobby. Tag it Kids or Signage so the right content can play there.
+          Next, add a location for each room or area that has a TV, like a Nursery or Lobby. Tag it {modules.map((m) => m.name).join(', ').replace(/, ([^,]*)$/, ' or $1')} so the right content can play there.
         </EmptyState>
       )}
       {isAdmin && (

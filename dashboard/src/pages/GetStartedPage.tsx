@@ -45,18 +45,27 @@ export default function GetStartedPage() {
   const [hidden, setHidden] = useState(() => readFlag(key('gsHidden', org.id)))
   const [installed, setInstalled] = useState(() => readFlag(key('gsInstalled', org.id)))
 
-  const on = modules.filter((m) => (m.id === 'kids' || m.id === 'signage') && moduleOn(m.id))
+  const on = modules.filter((m) => (m.id === 'kids' || m.id === 'signage' || m.id === 'slides') && moduleOn(m.id))
   const kids = on.some((m) => m.id === 'kids')
   const signage = on.some((m) => m.id === 'signage')
+  const slides = on.some((m) => m.id === 'slides')
 
   const { data } = useLoad(async () => {
-    const [screens, media, kidsPlaylists, signagePlaylists, schedules, series, slots, rules, memberships] = await Promise.all(
-      ['screens', 'media', 'playlists', 'signage_playlists', 'schedules', 'kids_series', 'signage_slots', 'screen_schedules', 'memberships'].map((t) =>
+    const none = Promise.resolve(0)
+    const [screens, media, kidsPlaylists, signagePlaylists, schedules, series, slots, rules, memberships, decks, deckSchedules, deckSeries] = await Promise.all([
+      ...['screens', 'media', 'playlists', 'signage_playlists', 'schedules', 'kids_series', 'signage_slots', 'screen_schedules', 'memberships'].map((t) =>
         count(t, org.id),
       ),
-    )
-    return { screens, media, playlists: kidsPlaylists + signagePlaylists, schedule: schedules + series + slots + rules, people: memberships }
-  }, [org.id])
+      ...['decks', 'deck_schedules', 'deck_series'].map((t) => (slides ? count(t, org.id) : none)),
+    ])
+    return {
+      screens,
+      media,
+      playlists: kidsPlaylists + signagePlaylists + decks,
+      schedule: schedules + series + slots + rules + deckSchedules + deckSeries,
+      people: memberships,
+    }
+  }, [org.id, slides])
 
   const b = org.branding
   const branded =
@@ -65,8 +74,10 @@ export default function GetStartedPage() {
     isHex(b.accent_color) ||
     Object.values(b.modules ?? {}).some((l) => !!l && (l.logo_url || isHex(l.primary_color) || isHex(l.accent_color)))
 
-  const mediaPage = `${kids ? 'kids' : 'signage'}-media`
-  const playlistPage = `${kids ? 'kids' : 'signage'}-playlists`
+  const firstModule = kids ? 'kids' : signage ? 'signage' : slides ? 'slides' : 'kids'
+  const mediaPage = `${firstModule}-media`
+  const playlistPage = firstModule === 'slides' ? 'slides-decks' : `${firstModule}-playlists`
+  const content = (kids ? 1 : 0) + (signage ? 1 : 0) + (slides ? 1 : 0) > 1
   const names = on.map((m) => moduleName(m.id)).join(' and ')
 
   const steps: Step[] = [
@@ -89,7 +100,7 @@ export default function GetStartedPage() {
           <p>
             A <b>site</b> is a campus or building. A <b>location</b> is a room or area in it, like the Nursery or the Lobby.
             Tag each location with what it will show ({names || 'Kids or Signage'}): Kids rooms play curriculum, Signage
-            locations play announcements.
+            locations play announcements{slides ? ', and Slides locations show presentations and song lyrics' : ''}.
           </p>
         </>
       ),
@@ -152,15 +163,17 @@ export default function GetStartedPage() {
     },
     {
       id: 'playlist',
-      title: 'Build a playlist',
+      title: content ? 'Build your first content' : slides ? 'Build a deck' : 'Build a playlist',
       done: (data?.playlists ?? 0) > 0,
-      help: kids ? 'kids' : 'signage',
-      go: { label: 'Open Playlists', page: playlistPage },
+      help: kids ? 'kids' : signage ? 'signage' : 'slides',
+      go: { label: slides && !kids && !signage ? 'Open Decks' : 'Open Playlists', page: playlistPage },
       body: (
         <p>
-          A playlist is the list of things a TV plays, in order.
+          {slides && !kids && !signage ? 'A deck is a set of slides: text, images, videos, songs, countdowns and live streams.' : 'A playlist is the list of things a TV plays, in order.'}
+          {slides && (kids || signage) && ' A Slides deck is a set of slides (text, images, songs, countdowns), run from the TV remote.'}
           {signage && ' Signage playlists can include text signs and live streams, which need app version 1.1.0 or newer.'}
           {kids && ' Kids playlists can include videos, slides, countdowns, lyrics, YouTube and live streams.'}
+          {slides && ' Slides decks need TV app version 1.4.0 or newer.'}
         </p>
       ),
     },
@@ -170,7 +183,12 @@ export default function GetStartedPage() {
       done: (data?.schedule ?? 0) > 0,
       help: 'calendar',
       go: { label: 'Open Calendar', page: 'calendar' },
-      body: <p>Drag across the calendar to say what plays, where and when. Repeat it weekly so you only do it once.</p>,
+      body: (
+        <p>
+          Drag across the calendar to say what plays, where and when. Repeat it weekly so you only do it once.
+          {slides && ' You can schedule Slides decks the same way, including a rotation of decks week by week.'}
+        </p>
+      ),
     },
     {
       id: 'people',

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Slides module · Church TV OS Help</title>
+<meta name="description" content="Decks, themes, backgrounds, song slides, countdowns and live streams, run from the TV remote.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="/app-icon.png">
+<link rel="stylesheet" href="/help/help.css">
+</head>
+<body>
+<header class="top"><div class="in"><a class="brand" href="/help/">Church TV OS</a><span class="muted">Help Center</span><span class="space"></span><a class="nav" href="https://app.churchtvos.com">Open the dashboard</a></div></header>
+<main>
+<p class="crumb"><a href="/help/">&larr; Help Center</a></p>
+<h1>Slides module</h1>
+<p class="updated">Last updated 2026-10-21</p>
+
+<p class="lead">The Slides module puts presentations on your TVs: announcements, sermon points, song lyrics, countdowns and live video. You build a <b>deck</b> in the dashboard, schedule it, and someone in the room steps through it with the TV remote.</p>
+
+<div class="heads-up"><p>Slides is a separate module, switched on per church, like Kids and Signage. If you do not see <b>Slides</b> in the menu, it is not on for your church yet. See <a href="/help/billing.html">Billing and plans</a>.</p></div>
+
+<h2>What it is for</h2>
+<ul>
+<li><b>Presentations and announcements</b> on a room's TV: a welcome slide, the week's events, a sermon outline.</li>
+<li><b>Song lyrics</b> from your shared <a href="/help/songs.html">song library</a>, split into slides for you.</li>
+<li><b>A countdown</b> before the service, or <b>a live stream</b> in the middle of a deck.</li>
+</ul>
+<p>It differs from the other modules. <a href="/help/kids.html">Kids</a> plays a curriculum playlist, and <a href="/help/signage.html">Signage</a> loops by itself. Slides is <b>operated by a person</b> with the remote: slides wait for Next unless you give them a time.</p>
+
+<h2>Decks and slides</h2>
+<p>Open <b>Slides, Decks</b> and press <b>New deck</b>. A deck has a name, a theme, and an ordered list of slides. Press <b>+ Add slide</b>, reorder slides, and use the preview to see how each looks in landscape and portrait.</p>
+<dl>
+<dt>Text</dt><dd>A title and body text. Choose a layout (title and body, title only, body only, or lower third), left or centre alignment, and optionally a text colour.</dd>
+<dt>Image or video</dt><dd>Pick a file from your Slides media library. Choose whether it fits inside the screen or fills it (and crops). An image can advance after a number of seconds; a video moves on when it ends, and you can turn its sound off.</dd>
+<dt>Song</dt><dd>Pick a song from the library. It becomes one slide per verse or chorus, following the song's play order, with the section name shown if the theme asks for it. Tick <b>Show song title first</b> to open with a title slide (with authors, copyright and CCLI number) that holds until Next.</dd>
+<dt>Countdown</dt><dd>A timer that counts down from the number of seconds you choose, with an optional title such as "Service starts in".</dd>
+<dt>Live stream</dt><dd>A live video link ending in <code>.m3u8</code> (HLS), with a title, <b>Play sound</b> on or off, and what to do if the stream is down (skip it or hold). The same notes apply as for <a href="/help/signage.html">Signage live streams</a>.</dd>
+<dt>Blank</dt><dd>A plain colour screen, black unless you choose another colour. Useful between sections.</dd>
+</dl>
+<p>Each slide can also have private <b>notes</b> for you. They are never shown on the TV.</p>
+<p>Slides with no time set wait for the remote. Set seconds on a slide if you want it to move on by itself. Tick <b>Loop at the end</b> for the deck if it should start over after the last slide; otherwise the TV returns to its home screen at the end.</p>
+
+<h2>Themes</h2>
+<p>A <b>theme</b> is a reusable look: fonts, text size, text colour, alignment, where the text sits (top, centre or lower), shadow and outline, the margin around text, an optional church logo in a corner, whether song section labels show, and a default background. Open <b>Slides, Themes</b> to make them.</p>
+<p>Choose a theme for each deck. Change the theme and every slide in every deck that uses it updates. A slide can override its own background; a deck can set a background for all its slides.</p>
+<p>A slide's background is chosen in this order: the slide's own, then the deck's, then the theme's, then your church's primary colour.</p>
+
+<h2>Backgrounds</h2>
+<ul>
+<li><b>Colour</b>: one solid colour.</li>
+<li><b>Gradient</b>: two colours and an angle.</li>
+<li><b>Image</b>: from your Slides media library. Choose <b>Fill the screen</b> (crops the edges) or show the whole picture on a fill colour you choose.</li>
+<li><b>Looping video</b>: plays silently, behind the text. Consecutive slides that share the same video keep it playing without a restart.</li>
+</ul>
+<p>Every background has a <b>dim</b> setting (a black layer, up to 80%) so lyrics stay readable on a busy picture.</p>
+<div class="tip"><p><b>Video tips.</b> Use 1080p MP4 (H.264), loops of 10 to 60 seconds, and keep files modest. A Fire TV stick has little storage and a long, heavy video can stutter or fill it. If a video is missing on the TV, the slide shows its fallback colour instead.</p></div>
+
+<h2>Songs</h2>
+<p>Songs live in the church-wide <b>Songs</b> library, shared with Kids. Add a song to a deck as a <b>Song</b> slide rather than typing the words again. Edit the song in the library and every deck that uses it updates. The song's <b>lines per slide</b> and play order decide how the lyrics are split. A song that a deck uses cannot be deleted until you remove it from the deck. See <a href="/help/songs.html">Songs</a>.</p>
+
+<h2>Scheduling a deck</h2>
+<p>Slides is scheduled per <b>location</b>, like Kids. A TV shows the deck for its location. Use the <a href="/help/calendar.html">Calendar</a> (choose <b>Slides deck</b> when adding) or <b>Slides, Schedule</b> (also reachable from the Calendar's List view).</p>
+<ul>
+<li><b>This week only</b> puts a deck at a date and time (a dated schedule).</li>
+<li><b>Every week</b> repeats on the days you choose, with an optional end date. Add more weeks to make a <b>rotation of decks</b>: Week 1, Week 2, Week 3. At the end it can stop or start over.</li>
+<li>For one date of a repeating schedule you can <b>skip</b> it (the rotation waits) or play a <b>different deck</b> (it still uses up its week).</li>
+<li>A dated schedule replaces any repeating one it overlaps.</li>
+<li><b>Copy week</b> on the Calendar copies a week's dated deck schedules forward.</li>
+</ul>
+<div class="heads-up"><p>If a location is not yet tagged for Slides, a room tagged Kids can also be used for decks. For a screen that runs several modules, set its module schedule so it shows <b>Slides</b> when you want it. See <a href="/help/screens.html">Pair a TV and manage screens</a>.</p></div>
+
+<h2>Running a deck from the TV remote</h2>
+<p>The TV's Slides home screen shows <b>Now showing</b> and <b>Up next</b> (the scheduled decks) and a <b>Play</b> button, with a note if the deck is still downloading. Press OK on Play to begin. While presenting:</p>
+<div class="table-wrap"><table>
+<tr><th>Button</th><th>What it does</th></tr>
+<tr><td><b>Right</b></td><td>Next slide</td></tr>
+<tr><td><b>Left</b></td><td>Previous slide</td></tr>
+<tr><td><b>OK</b></td><td>Open the slide list, to jump to any slide (songs show their section names)</td></tr>
+<tr><td><b>Play/Pause</b></td><td>Black screen on or off</td></tr>
+<tr><td><b>Back</b></td><td>Stop and return to the home screen</td></tr>
+</table></div>
+<p>Slides with seconds set advance on their own, and videos move on when they end.</p>
+
+<h2>Portrait screens</h2>
+<p>Decks work on portrait TVs too. Text is sized to the screen and a landscape background is cropped to fill it, so check the portrait preview in the editor and use a portrait picture or video for a better result. See <a href="/help/portrait.html">Portrait screens</a>.</p>
+
+<h2>What you need</h2>
+<ul>
+<li>The Slides module switched on for your church.</li>
+<li>Church TV OS app version <b>1.4.0 or newer</b> on each TV. An older TV shows that the module is not switched on, because it does not know about Slides yet. The version is listed on the Screens page.</li>
+<li>Editor access (or above) to the Slides module for the site, to build and schedule decks.</li>
+</ul>
+
+<h2>If something is wrong</h2>
+<ul>
+<li><b>The TV says the module isn't switched on.</b> Update the app to 1.4.0 or newer, and check Slides is enabled under Settings, Your plan.</li>
+<li><b>Black screen.</b> Check the screen's module schedule and default module (it must run Slides), then check a deck is scheduled for its location right now. A TV only shows Slides when its module says so.</li>
+<li><b>The deck does not appear on the home screen.</b> Check the schedule on the Calendar for that location and time zone, and that the TV is online.</li>
+<li><b>A video background is missing or stutters.</b> Use a smaller 1080p MP4 and wait for the download to finish.</li>
+<li><b>Lyrics are too long for a slide.</b> Lower the song's lines per slide, or the theme's text size.</li>
+<li><b>A song or media file will not delete.</b> It is used by a deck. Remove it from the deck first.</li>
+</ul>
+<p>More in <a href="/help/troubleshooting.html">Troubleshooting and FAQ</a>.</p>
+
+<nav class="pager" aria-label="Previous and next guide"><a class="prev" href="/help/signage.html"><small>Previous</small>Signage module</a><a class="next" href="/help/calendar.html"><small>Next</small>The Calendar</a></nav>
+</main>
+<footer><p><a href="/help/">Help Center</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · Questions? <a href="mailto:keith@sparrownest.com">keith@sparrownest.com</a></p></footer>
+</body></html>

@@ -61,7 +61,8 @@ class TvSync(private val appContext: Context, private val cache: MediaCache) {
     private suspend fun downloadMedia(device: DeviceState) {
         val kidsUrls = device.kids.schedules.sortedBy { it.start }.flatMap { it.playlist.mediaUrls }
         val signagePlaylists = device.signage.slots.map { it.playlist } + listOfNotNull(device.signage.defaultPlaylist)
-        val urls = (kidsUrls + signagePlaylists.flatMap { it.mediaUrls }).distinct()
+        val slidesUrls = device.slides.schedules.sortedBy { it.start }.flatMap { it.deck.mediaUrls }
+        val urls = (kidsUrls + signagePlaylists.flatMap { it.mediaUrls } + slidesUrls).distinct()
         val missing = urls.filterNot { cache.fileFor(it).exists() }
         var failed = 0
         missing.forEachIndexed { i, url ->

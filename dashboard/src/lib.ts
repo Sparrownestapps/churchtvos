@@ -89,9 +89,11 @@ export function scopeLabel(siteId: string | null, sites: Site[]) {
 }
 
 /** Is a module switched on right now? Same rule as the server's module_enabled(). */
-export function entitled(e: Entitlement | undefined) {
+export function entitled(e: Entitlement | undefined, orgStatus?: 'active' | 'suspended') {
   if (!e) return false
-  if (e.status === 'active' || e.status === 'trialing') return true
+  if (orgStatus === 'suspended') return false
+  if (e.status === 'active') return true
+  if (e.status === 'trialing') return !e.current_period_end || new Date(e.current_period_end).getTime() > Date.now()
   return e.status === 'past_due' && !!e.grace_ends_at && new Date(e.grace_ends_at).getTime() > Date.now()
 }
 
@@ -135,7 +137,7 @@ export const FALLBACK_MODULES: ModuleDef[] = [
   { id: 'signage', name: 'Signage', sort: 2, available: true },
 ]
 
-export const MODULE_NAME: Record<ScreenModule, string> = new Proxy({ kids: 'Kids', signage: 'Signage', off: 'Off (black screen)' } as Record<string, string>, {
+export const MODULE_NAME: Record<ScreenModule, string> = new Proxy({ kids: 'Kids', signage: 'Signage', slides: 'Slides', off: 'Off (black screen)' } as Record<string, string>, {
   get: (t, k: string) => t[k] ?? (typeof k === 'string' ? k.charAt(0).toUpperCase() + k.slice(1) : ''),
 })
 
