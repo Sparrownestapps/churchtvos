@@ -277,7 +277,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.churchtvos.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = com.churchtvos.remote;
 				PRODUCT_MODULE_NAME = ChurchTVMac;
 				PRODUCT_NAME = "Church TV OS";
 				SDKROOT = macosx;
@@ -366,7 +366,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.churchtvos.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = com.churchtvos.remote;
 				PRODUCT_MODULE_NAME = ChurchTVMac;
 				PRODUCT_NAME = "Church TV OS";
 				SDKROOT = macosx;

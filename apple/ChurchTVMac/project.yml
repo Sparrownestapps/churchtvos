@@ -56,7 +56,7 @@ targets:
         com.apple.security.files.downloads.read-write: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.churchtvos.mac
+        PRODUCT_BUNDLE_IDENTIFIER: com.churchtvos.remote
         PRODUCT_NAME: Church TV OS
         PRODUCT_MODULE_NAME: ChurchTVMac
         ENABLE_HARDENED_RUNTIME: YES
