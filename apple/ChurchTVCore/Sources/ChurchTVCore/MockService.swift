@@ -6,6 +6,10 @@ public actor MockService: ChurchService {
     public nonisolated var isDemo: Bool { true }
 
     public static let churchId = UUID(uuidString: "D0D0D0D0-0000-4000-8000-000000000001")!
+    /// Demo church has the experimental NDI flag on with the `-ndi` launch argument (or the `demoNdi` default); off otherwise, like a real church.
+    public static var demoNdiEnabled: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ndi") || UserDefaults.standard.bool(forKey: "demoNdi")
+    }
     public static let demoUser = SessionUser(id: UUID(uuidString: "D0D0D0D0-0000-4000-8000-0000000000AA")!, email: "demo@churchtvos.com")
 
     // MARK: Sample content
@@ -87,7 +91,7 @@ public actor MockService: ChurchService {
     public func signOut() async {}
 
     public func loadChurches() async throws -> [ChurchAccess] {
-        [ChurchAccess(organization: Organization(id: Self.churchId, name: "Grace Community Church (Demo)", slug: "grace-demo"),
+        [ChurchAccess(organization: Organization(id: Self.churchId, name: "Grace Community Church (Demo)", slug: "grace-demo", ndiEnabled: Self.demoNdiEnabled),
                       role: .admin, modules: AppModule.allCases)]
     }
 

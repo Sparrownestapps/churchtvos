@@ -165,7 +165,22 @@ struct MockContentStore {
             slide(25, .blank(BlankSlideContent(color: "#101820"))),
         ], loops: true, createdAt: ago(190), updatedAt: ago(50))
 
-        return MockContentStore(kids: [brave, garden], signage: [lobby, board], decks: [sunday, christmas], themes: [classic, warm],
+        // Only with the `-ndiseed` launch argument (screenshots): one Kids playlist and one deck that already hold NDI entries.
+        var kidsLists = [brave, garden], decks = [sunday, christmas]
+        if ProcessInfo.processInfo.arguments.contains("-ndiseed") {
+            kidsLists.append(Playlist(id: uuid(7, 9), organizationId: org, siteId: nil, name: "Live camera test (NDI)", items: [
+                PlaylistItem(.countdown(CountdownItem(countdown: CountdownSettings(title: "Starting soon", seconds: 60)))),
+                PlaylistItem(.ndi(NdiItem(ndi: NdiSettings(title: "Main camera", source: "STUDIO-PC (Camera 1)", address: "192.168.1.50:5961", fit: .fit,
+                                                           fallback: .message, fallbackText: "Camera is offline, back soon", maxWaitSeconds: 15)))),
+                PlaylistItem(.ndi(NdiItem(ndi: NdiSettings(title: "Stage wide", source: "PTZ-CAM (Stage)", audio: true, fit: .fill, seconds: 120)))),
+            ], createdAt: ago(20), updatedAt: ago(2)))
+            decks.append(SlideDeck(id: uuid(8, 9), organizationId: org, siteId: nil, name: "NDI camera test", themeId: classic.id, slides: [
+                slide(91, .text(TextSlideContent(title: "Welcome", body: "Camera next", layout: .titleBody))),
+                slide(92, .ndi(NdiSettings(title: "Main camera", source: "STUDIO-PC (Camera 1)", address: "192.168.1.50:5961", fallback: .message, fallbackText: "Camera is offline, back soon"))),
+            ], loops: false, createdAt: ago(20), updatedAt: ago(2)))
+        }
+
+        return MockContentStore(kids: kidsLists, signage: [lobby, board], decks: decks, themes: [classic, warm],
                                 songs: songs, media: media, folders: folders, sites: [site1, site2], locations: locations)
     }
 }

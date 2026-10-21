@@ -58,20 +58,20 @@ struct SlidePreview: View {
     }
 
     private var isBlankOrStream: Bool {
-        switch frame { case .blank, .stream: return true; default: return false }
+        switch frame { case .blank, .stream, .ndi: return true; default: return false }
     }
 
     private var effectiveBackground: SlideBackground {
         switch frame {
         case .blank(let color): return .solid(color)
-        case .stream: return .solid("#000000")
+        case .stream, .ndi: return .solid("#000000")
         case .sign(let s): return .solid(s.background)
         default: return background
         }
     }
 
     private var dim: Double {
-        switch frame { case .blank, .stream, .sign: return 0; default: return background.effectiveDim }
+        switch frame { case .blank, .stream, .ndi, .sign: return 0; default: return background.effectiveDim }
     }
 
     @ViewBuilder private func content(width w: Double, height h: Double) -> some View {
@@ -97,6 +97,8 @@ struct SlidePreview: View {
                 Text(title.isEmpty ? "Live stream" : title).font(.system(size: h * 0.08, weight: .heavy)).foregroundStyle(.white).multilineTextAlignment(.center)
                 Text("HLS feed plays here on the TV").font(.system(size: h * 0.03)).foregroundStyle(.white.opacity(0.7))
             }.padding(h * 0.06)
+        case .ndi(let title, let source, let fit):
+            NdiPlaceholderContent(title: title, source: source, fit: fit, width: w, height: h)
         case .blank:
             EmptyView()
         case .sign(let s):
@@ -117,6 +119,7 @@ struct SlidePreview: View {
         case .countdown(let title, _, _): return "Countdown \(title)"
         case .media(_, let kind, _): return kind == .video ? "Video" : kind == .audio ? "Audio" : "Image"
         case .stream(let title): return "Live stream \(title)"
+        case .ndi(let title, let source, _): return "Experimental NDI source \(title.isEmpty ? source : title). No preview, the picture appears on the TV."
         case .blank: return "Blank screen"
         case .sign(let s): return "Sign: \(s.title)"
         }

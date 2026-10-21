@@ -14,9 +14,9 @@ final class MockContentServiceTests: XCTestCase {
         XCTAssertEqual(kids.count, 2); XCTAssertEqual(signage.count, 2); XCTAssertEqual(decks.count, 2); XCTAssertEqual(themes.count, 2); XCTAssertEqual(songs.count, 5)
         // every slide kind appears in the demo decks, every item type in the demo playlists
         let kinds = Set(decks.flatMap(\.slides).compactMap(\.kind))
-        XCTAssertEqual(kinds, Set(DeckSlide.Kind.allCases))
+        XCTAssertEqual(kinds, Set(DeckSlide.Kind.allCases).subtracting([.ndi]))   // NDI is experimental: demo content has none unless -ndiseed
         let types = Set((kids + signage).flatMap(\.items).compactMap(\.typeName))
-        XCTAssertEqual(types, Set(PlaylistItem.TypeName.allCases))
+        XCTAssertEqual(types, Set(PlaylistItem.TypeName.allCases).subtracting([.ndi]))
         // every song and media reference in the demo content exists
         let songIds = Set(songs.map { $0.id.uuidString.lowercased() })
         let media = try await AppModule.allCases.asyncFlatMap { try await s.listMedia(organizationId: self.org, module: $0, kinds: []) }

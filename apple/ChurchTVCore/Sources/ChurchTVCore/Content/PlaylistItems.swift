@@ -133,7 +133,7 @@ public struct UnknownItem: Hashable, Sendable {
 /// One entry of a Kids or Signage playlist.
 public struct PlaylistItem: Identifiable, Hashable, Sendable, RawObjectCodable {
     public enum TypeName: String, Hashable, Sendable, CaseIterable {
-        case video, image, countdown, lyrics, youtube, sign, stream
+        case video, image, countdown, lyrics, youtube, sign, stream, ndi
         public var label: String {
             switch self {
             case .video: return "Video"
@@ -143,6 +143,7 @@ public struct PlaylistItem: Identifiable, Hashable, Sendable, RawObjectCodable {
             case .youtube: return "YouTube"
             case .sign: return "Sign"
             case .stream: return "Live stream"
+            case .ndi: return NdiText.label
             }
         }
         public var symbol: String {
@@ -154,13 +155,14 @@ public struct PlaylistItem: Identifiable, Hashable, Sendable, RawObjectCodable {
             case .youtube: return "play.rectangle"
             case .sign: return "textformat"
             case .stream: return "dot.radiowaves.left.and.right"
+            case .ndi: return "web.camera"
             }
         }
     }
 
     public enum Content: Hashable, Sendable {
         case video(MediaClip), image(MediaClip), countdown(CountdownItem), lyrics(LyricsItem)
-        case youtube(YouTubeItem), sign(SignItem), stream(StreamItem), unknown(UnknownItem)
+        case youtube(YouTubeItem), sign(SignItem), stream(StreamItem), ndi(NdiItem), unknown(UnknownItem)
     }
 
     /// Stable identity for lists and drag-to-reorder. Not stored in JSON, ignored by ==.
@@ -199,6 +201,7 @@ public struct PlaylistItem: Identifiable, Hashable, Sendable, RawObjectCodable {
         case .youtube: return newYouTube(channelId: youtubeChannelId, churchName: churchName.isEmpty ? "Live now" : churchName)
         case .sign: return newSign(background: signBackground)
         case .stream: return newStream()
+        case .ndi: return newNdi()
         }
     }
 
@@ -213,6 +216,7 @@ public struct PlaylistItem: Identifiable, Hashable, Sendable, RawObjectCodable {
         case .youtube: return .youtube
         case .sign: return .sign
         case .stream: return .stream
+        case .ndi: return .ndi
         case .unknown: return nil
         }
     }
@@ -225,6 +229,7 @@ public struct PlaylistItem: Identifiable, Hashable, Sendable, RawObjectCodable {
         case .youtube(let y): return y.title
         case .sign(let s): return s.title
         case .stream(let s): return s.title
+        case .ndi(let n): return n.ndi.title
         case .unknown(let u): return u.raw["title"]?.stringValue ?? ""
         }
     }
@@ -241,6 +246,7 @@ public struct PlaylistItem: Identifiable, Hashable, Sendable, RawObjectCodable {
         case .youtube(let y): return (y.videoId ?? "").isEmpty && (y.channelId ?? "").isEmpty ? "needs a YouTube video chosen." : nil
         case .sign(let s): return s.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "needs a title." : nil
         case .stream(let s): return StreamItem.isValidURL(s.url) ? nil : "needs a stream link (starting with https://)."
+        case .ndi(let n): return n.ndi.problem
         case .unknown: return nil
         }
     }
@@ -272,6 +278,9 @@ public struct PlaylistItem: Identifiable, Hashable, Sendable, RawObjectCodable {
             let s = StreamItem(title: o.takeString("title") ?? "", url: o.takeString("url") ?? "", seconds: o.takeInt("seconds"), audio: o.takeBool("audio") ?? false,
                                fallback: o.takeEnum("fallback") ?? .skip, extra: o)
             self.init(.stream(s))
+        case "ndi":
+            let n = NdiSettings(consuming: &o)
+            self.init(.ndi(NdiItem(ndi: n, extra: o)))
         default:
             self.init(.unknown(UnknownItem(raw: object)))
         }
@@ -305,6 +314,8 @@ public struct PlaylistItem: Identifiable, Hashable, Sendable, RawObjectCodable {
         case .stream(let s):
             var o = s.extra; o["type"] = .string("stream"); o["title"] = .string(s.title); o["url"] = .string(s.url)
             o.putNullable("seconds", s.seconds); o["audio"] = .bool(s.audio); o["fallback"] = .string(s.fallback.rawValue); return o
+        case .ndi(let n):
+            var o = n.extra; o["type"] = .string("ndi"); n.ndi.write(into: &o, writesTitle: true); return o
         case .unknown(let u): return u.raw
         }
     }

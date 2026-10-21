@@ -25,9 +25,11 @@ struct PlaylistItemEditorView: View {
             case .youtube: YouTubeForm(item: youtubeBinding, branding: branding)
             case .sign: SignForm(sign: signBinding, branding: branding)
             case .stream: StreamForm(kind: kind, stream: streamBinding)
+            case .ndi(let n):
+                if model.ndiEnabled { NdiFormSections(ndi: ndiBinding) } else { NdiReadOnlySection(ndi: n.ndi) }
             case .unknown(let u): UnknownItemSection(item: u)
             }
-            if let problem = item.problem, !isCountdown {
+            if let problem = item.problem, !isCountdown, model.ndiEnabled || item.typeName != .ndi {
                 Section { Label(problem.prefix(1).uppercased() + problem.dropFirst(), systemImage: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(.orange) }
             }
         }
@@ -62,6 +64,10 @@ struct PlaylistItemEditorView: View {
     private var signBinding: Binding<SignItem> {
         Binding(get: { if case .sign(let s) = item.content { return s }; return SignItem() },
                 set: { item.content = .sign($0) })
+    }
+    private var ndiBinding: Binding<NdiSettings> {
+        Binding(get: { if case .ndi(let n) = item.content { return n.ndi }; return NdiSettings() },
+                set: { new in if case .ndi(var n) = item.content { n.ndi = new; item.content = .ndi(n) } })
     }
     private var streamBinding: Binding<StreamItem> {
         Binding(get: { if case .stream(let s) = item.content { return s }; return StreamItem() },

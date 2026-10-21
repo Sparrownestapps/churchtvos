@@ -5,6 +5,11 @@ import Foundation
 extension MockService {
     // MARK: Playlists
 
+    /// Same refusal as the database trigger: with the NDI flag off, an NDI entry cannot be added or changed (removing is fine).
+    private func checkNdi(old: [NdiSettings], new: [NdiSettings]) throws {
+        if !Self.demoNdiEnabled, NdiRules.addsOrChanges(old: old, new: new) { throw ChurchError(NdiRules.notEnabledMessage) }
+    }
+
     private func delay() async { try? await Task.sleep(nanoseconds: 120_000_000) }
 
     public func listPlaylists(kind: PlaylistKind, organizationId: UUID) async throws -> [Playlist] {
@@ -15,6 +20,7 @@ extension MockService {
     public func createPlaylist(kind: PlaylistKind, draft: PlaylistDraft) async throws -> Playlist {
         await delay()
         let d = draft.cleaned()
+        try checkNdi(old: [], new: d.items.ndiEntries)
         let row = Playlist(id: d.id, organizationId: Self.churchId, siteId: d.siteId, name: d.name, items: d.items, createdAt: Date(), updatedAt: Date())
         if kind == .kids { store.kids.append(row) } else { store.signage.append(row) }
         return row
@@ -25,6 +31,7 @@ extension MockService {
         let d = draft.cleaned()
         func apply(_ list: inout [Playlist]) throws -> Playlist {
             guard let i = list.firstIndex(where: { $0.id == d.id }) else { throw ChurchError("Couldn't save \"\(d.name)\". It may have been deleted, or you may not have permission.") }
+            try checkNdi(old: list[i].items.ndiEntries, new: d.items.ndiEntries)
             list[i].name = d.name; list[i].siteId = d.siteId; list[i].items = d.items; list[i].updatedAt = Date()
             return list[i]
         }
@@ -56,6 +63,7 @@ extension MockService {
     public func createDeck(draft: DeckDraft) async throws -> SlideDeck {
         await delay()
         let d = draft.cleaned()
+        try checkNdi(old: [], new: d.slides.ndiEntries)
         let row = SlideDeck(id: d.id, organizationId: Self.churchId, siteId: d.siteId, name: d.name, themeId: d.themeId, background: d.background,
                             slides: d.slides, loops: d.loops, createdAt: Date(), updatedAt: Date())
         store.decks.append(row)
@@ -68,6 +76,7 @@ extension MockService {
         guard let i = store.decks.firstIndex(where: { $0.id == d.id }) else {
             throw ChurchError("Couldn't save \"\(d.name)\". It may have been deleted, or you may not have permission.")
         }
+        try checkNdi(old: store.decks[i].slides.ndiEntries, new: d.slides.ndiEntries)
         store.decks[i].name = d.name; store.decks[i].siteId = d.siteId; store.decks[i].themeId = d.themeId
         store.decks[i].background = d.background; store.decks[i].slides = d.slides; store.decks[i].loops = d.loops
         store.decks[i].updatedAt = Date()

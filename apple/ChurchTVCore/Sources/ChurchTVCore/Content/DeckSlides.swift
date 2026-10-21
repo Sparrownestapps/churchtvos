@@ -64,7 +64,7 @@ public struct BlankSlideContent: Hashable, Sendable {
 /// One slide of a deck.
 public struct DeckSlide: Identifiable, Hashable, Sendable, RawObjectCodable {
     public enum Kind: String, Hashable, Sendable, CaseIterable {
-        case text, media, song, countdown, stream, blank
+        case text, media, song, countdown, stream, ndi, blank
         /// Names as in the website's "Add slide" menu.
         public var name: String {
             switch self {
@@ -73,6 +73,7 @@ public struct DeckSlide: Identifiable, Hashable, Sendable, RawObjectCodable {
             case .song: return "Song"
             case .countdown: return "Countdown"
             case .stream: return "Live stream"
+            case .ndi: return NdiText.label
             case .blank: return "Blank"
             }
         }
@@ -83,6 +84,7 @@ public struct DeckSlide: Identifiable, Hashable, Sendable, RawObjectCodable {
             case .song: return "music.note"
             case .countdown: return "timer"
             case .stream: return "dot.radiowaves.left.and.right"
+            case .ndi: return "web.camera"
             case .blank: return "rectangle.fill"
             }
         }
@@ -94,6 +96,8 @@ public struct DeckSlide: Identifiable, Hashable, Sendable, RawObjectCodable {
         case song(SongSlideContent)
         case countdown(CountdownSettings)
         case stream(StreamSlideContent)
+        /// EXPERIMENTAL NDI source (see Ndi.swift).
+        case ndi(NdiSettings)
         case blank(BlankSlideContent)
         /// A kind this app does not know (written by a newer website). Kept untouched; only id/background/notes are editable.
         case unknown(kind: String)
@@ -119,6 +123,7 @@ public struct DeckSlide: Identifiable, Hashable, Sendable, RawObjectCodable {
         case .song: return .song
         case .countdown: return .countdown
         case .stream: return .stream
+        case .ndi: return .ndi
         case .blank: return .blank
         case .unknown: return nil
         }
@@ -144,6 +149,7 @@ public struct DeckSlide: Identifiable, Hashable, Sendable, RawObjectCodable {
         case .song: return DeckSlide(id: id, content: .song(SongSlideContent()))
         case .countdown: return DeckSlide(id: id, content: .countdown(.new))
         case .stream: return DeckSlide(id: id, content: .stream(StreamSlideContent()))
+        case .ndi: return DeckSlide(id: id, content: .ndi(NdiSettings()))
         case .blank: return DeckSlide(id: id, content: .blank(BlankSlideContent()))
         }
     }
@@ -174,6 +180,8 @@ public struct DeckSlide: Identifiable, Hashable, Sendable, RawObjectCodable {
         case "stream":
             content = .stream(StreamSlideContent(title: o.takeString("title"), url: o.takeString("url") ?? "", audio: o.takeBool("audio"),
                                                  fallback: o.takeEnum("fallback"), seconds: o.takeInt("seconds")))
+        case "ndi":
+            content = .ndi(NdiSettings(consuming: &o))
         case "blank":
             content = .blank(BlankSlideContent(color: o.takeString("color")))
         default:
@@ -207,6 +215,9 @@ public struct DeckSlide: Identifiable, Hashable, Sendable, RawObjectCodable {
             o["kind"] = .string("stream")
             o.put("title", s.title); o["url"] = .string(s.url); o.put("audio", s.audio); o.put("fallback", s.fallback)
             if let sec = s.seconds { o["seconds"] = .number(Double(sec)) } else { o["seconds"] = .null }
+        case .ndi(let n):
+            o["kind"] = .string("ndi")
+            n.write(into: &o, writesTitle: true)
         case .blank(let b):
             o["kind"] = .string("blank")
             o.put("color", b.color)
@@ -226,6 +237,7 @@ public struct DeckSlide: Identifiable, Hashable, Sendable, RawObjectCodable {
         case .song(let s): return s.songId.isEmpty ? "needs a song chosen." : nil
         case .stream(let s): return StreamItem.isValidURL(s.url) ? nil : "needs a stream link starting with https://."
         case .countdown(let c): return c.problem
+        case .ndi(let n): return n.problem
         case .text(let t):
             let empty = (t.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (t.body ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             return empty ? "is an empty text slide. Add some words or delete it." : nil
@@ -243,6 +255,7 @@ public struct DeckSlide: Identifiable, Hashable, Sendable, RawObjectCodable {
         case .text(var t): t.title = trim(t.title); t.body = trim(t.body); s.content = .text(t)
         case .countdown(var c): c.title = trim(c.title); s.content = .countdown(c)
         case .stream(var st): st.title = trim(st.title); st.url = st.url.trimmingCharacters(in: .whitespacesAndNewlines); s.content = .stream(st)
+        case .ndi(let n): s.content = .ndi(n.cleaned())
         default: break
         }
         return s

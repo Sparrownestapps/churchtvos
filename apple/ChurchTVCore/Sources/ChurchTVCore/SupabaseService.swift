@@ -85,11 +85,22 @@ public final class SupabaseService: ChurchService, @unchecked Sendable {
     public func loadChurches() async throws -> [ChurchAccess] {
         try await guarded {
             let uid = try await currentUserId()
-            let memberships: [Membership] = try await rows(
-                client.from("memberships")
-                    .select("id,organization_id,role,modules,site_ids,organizations(id,name,slug)")
-                    .eq("user_id", value: uid.uuidString.lowercased())
-            )
+            // `ndi_enabled` (experimental NDI flag) needs migration 20261023000001; fall back to the old columns if it is not applied yet.
+            let userId = uid.uuidString.lowercased()
+            let memberships: [Membership]
+            do {
+                memberships = try await rows(
+                    client.from("memberships")
+                        .select("id,organization_id,role,modules,site_ids,organizations(id,name,slug,ndi_enabled)")
+                        .eq("user_id", value: userId)
+                )
+            } catch {
+                memberships = try await rows(
+                    client.from("memberships")
+                        .select("id,organization_id,role,modules,site_ids,organizations(id,name,slug)")
+                        .eq("user_id", value: userId)
+                )
+            }
             guard !memberships.isEmpty else { return [] }
             let orgIds = memberships.map { $0.organizationId.uuidString.lowercased() }
             let entitlements: [EntitlementRow] = try await rows(

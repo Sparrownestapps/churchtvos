@@ -18,8 +18,9 @@ enum PlaylistEditing {
     static func duplicate(_ item: PlaylistItem) -> PlaylistItem { PlaylistItem(item.content) }
 
     /// Inserts the copy right after the original.
-    static func duplicate(at index: Int, in items: inout [PlaylistItem]) {
-        guard items.indices.contains(index) else { return }
+    /// `allowNdi` is false for a church without the NDI flag: the server refuses a second NDI entry there.
+    static func duplicate(at index: Int, in items: inout [PlaylistItem], allowNdi: Bool = true) {
+        guard items.indices.contains(index), allowNdi || items[index].typeName != .ndi else { return }
         items.insert(duplicate(items[index]), at: index + 1)
     }
 
@@ -52,6 +53,7 @@ enum PlaylistEditing {
         case .image(let c): return c.seconds
         case .sign(let s): return s.seconds
         case .stream(let s): return s.seconds
+        case .ndi(let n): return n.ndi.seconds
         case .countdown(let c):
             let s = c.countdown
             return s.effectiveMode == .duration && s.effectiveAtZero == .next ? s.seconds : nil
@@ -105,6 +107,7 @@ enum PlaylistEditing {
             return (blank(y.title, live ? "Live now" : "Choose a YouTube video"), live ? "YouTube · live now" : "YouTube")
         case .sign(let s): return (blank(s.title, "Sign"), "Sign · \(s.seconds) s")
         case .stream(let s): return (blank(s.title, "Live stream"), "Live stream · " + (s.seconds.map { "\($0) s" } ?? "until Next"))
+        case .ndi(let n): return (n.ndi.label, "NDI · experimental · " + (n.ndi.seconds.map { "\($0) s" } ?? "until Next"))
         case .unknown(let u): return ("Unknown item (\(u.typeName))", "Made by a newer app. Kept as it is.")
         }
     }

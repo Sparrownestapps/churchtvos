@@ -95,8 +95,8 @@ enum DeckEditing {
 
     /// Copies the slide at `index` right after it, with a new id. Returns the copy's id.
     @discardableResult
-    static func duplicate(_ index: Int, in slides: inout [DeckSlide]) -> String? {
-        guard slides.indices.contains(index) else { return nil }
+    static func duplicate(_ index: Int, in slides: inout [DeckSlide], allowNdi: Bool = true) -> String? {
+        guard slides.indices.contains(index), allowNdi || slides[index].kind != .ndi else { return nil }
         let copy = slides[index].duplicated(existing: slides)
         slides.insert(copy, at: index + 1)
         return copy.id
@@ -144,6 +144,7 @@ enum DeckEditing {
         case .stream(let s):
             let t = oneLine(s.title)
             return t.isEmpty ? "Live stream" : t
+        case .ndi(let n): return n.label
         case .blank: return "Blank"
         case .unknown(let k): return k.isEmpty ? "Unknown slide" : "Unknown (\(k))"
         }
@@ -158,7 +159,7 @@ enum DeckEditing {
     /// Slides that cannot have a background override in the website's editor (blank and stream draw their own screen).
     static func supportsBackground(_ slide: DeckSlide) -> Bool {
         switch slide.content {
-        case .blank, .stream, .unknown: return false
+        case .blank, .stream, .ndi, .unknown: return false
         default: return true
         }
     }

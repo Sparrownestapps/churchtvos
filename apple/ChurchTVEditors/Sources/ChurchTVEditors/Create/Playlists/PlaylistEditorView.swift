@@ -36,6 +36,8 @@ public struct PlaylistEditorView: View {
     private var canSave: Bool { PlaylistEditing.canSave(draft: draft, original: original, kind: kind) && !saving }
     private var problem: String? { draft.problem(kind: kind) }
     private var defaultColor: String { branding?.primaryColor ?? SlideMetrics.defaultNavy }
+    /// The item types in the Add menu. EXPERIMENTAL: NDI is offered in Kids playlists only when the church has the flag.
+    private var addableTypes: [PlaylistItem.TypeName] { kind.itemTypes + (kind == .kids && model.ndiEnabled ? [.ndi] : []) }
     private var canPlayNow: Bool { kind == .kids && !draft.isNew && !dirty && model.canPlayNow }
 
     public var body: some View {
@@ -167,7 +169,7 @@ public struct PlaylistEditorView: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(text.title).font(.body).foregroundStyle(.primary).lineLimit(1)
-                    Text("\(index + 1). \(text.detail)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    Text("\(index + 1). \(item.typeName == .ndi && !model.ndiEnabled ? "NDI · switched off" : text.detail)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 4)
                 if invalid { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).accessibilityLabel("Needs attention") }
@@ -182,27 +184,29 @@ public struct PlaylistEditorView: View {
         .accessibilityHint("Opens the item editor")
         .accessibilityAction(named: "Move up") { move(index, by: -1) }
         .accessibilityAction(named: "Move down") { move(index, by: 1) }
-        .accessibilityAction(named: "Duplicate") { PlaylistEditing.duplicate(at: index, in: &draft.items) }
+        .accessibilityAction(named: "Duplicate") { PlaylistEditing.duplicate(at: index, in: &draft.items, allowNdi: model.ndiEnabled) }
         .accessibilityAction(named: "Delete") { draft.items.remove(at: index) }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) { draft.items.remove(at: index) } label: { Label("Delete", systemImage: "trash") }
         }
         .swipeActions(edge: .leading) {
-            Button { withAnimation { PlaylistEditing.duplicate(at: index, in: &draft.items) }; Haptics.selection() } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
+            Button { withAnimation { PlaylistEditing.duplicate(at: index, in: &draft.items, allowNdi: model.ndiEnabled) }; Haptics.selection() } label: { Label("Duplicate", systemImage: "plus.square.on.square") }
                 .tint(.indigo)
+                .disabled(item.typeName == .ndi && !model.ndiEnabled)
         }
     }
 
     private var addSection: some View {
         Section {
             Menu {
-                ForEach(kind.itemTypes, id: \.self) { type in
+                ForEach(addableTypes, id: \.self) { type in
                     Button { add(type) } label: { Label(PlaylistEditorLabels.menuLabel(type, kind: kind), systemImage: type.symbol) }
                 }
             } label: {
                 Label("Add item", systemImage: "plus.circle.fill").frame(maxWidth: .infinity, alignment: .leading)
             }
-            .accessibilityHint("Choose what to add: " + kind.itemTypes.map { PlaylistEditorLabels.menuLabel($0, kind: kind) }.joined(separator: ", "))
+            .accessibilityHint("Choose what to add: " + addableTypes.map { PlaylistEditorLabels.menuLabel($0, kind: kind) }.joined(separator: ", "))
+            ImportButton(playlistItems: $draft.items, kind: kind)
         }
     }
 
@@ -261,6 +265,7 @@ enum PlaylistEditorLabels {
         case .sign: return "Sign"
         case .stream: return "Live stream"
         case .youtube: return "YouTube"
+        case .ndi: return NdiText.label
         default: return type.label
         }
     }

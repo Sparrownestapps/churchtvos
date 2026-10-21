@@ -177,6 +177,7 @@ public struct PlaylistDraft: Hashable, Identifiable, Sendable {
         var d = self
         d.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         d.items = items.map { item in
+            if case .ndi(var n) = item.content { n.ndi = n.ndi.cleaned(); return PlaylistItem(.ndi(n), uid: item.uid) }
             guard case .lyrics(var l) = item.content, !l.isLibrary else { return item }
             l.slides = l.slides.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
             return PlaylistItem(.lyrics(l), uid: item.uid)

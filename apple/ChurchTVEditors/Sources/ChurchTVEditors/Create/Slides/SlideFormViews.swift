@@ -40,6 +40,8 @@ struct SlideFormSections: View {
             case .song: SongSlideForm(content: songBinding)
             case .countdown: CountdownFieldsView(settings: countdownBinding, module: .slides)
             case .stream: StreamSlideForm(content: streamBinding)
+            case .ndi(let n):
+                if model.ndiEnabled { NdiFormSections(ndi: ndiBinding) } else { NdiReadOnlySection(ndi: n) }
             case .blank:
                 Section("Screen colour") { ColorRow(title: "Colour", hex: Binding(get: { blankContent.color ?? "#000000" }, set: { slide.content = .blank(BlankSlideContent(color: $0)) })) }
             case .unknown(let kind):
@@ -78,6 +80,9 @@ struct SlideFormSections: View {
     }
     private var countdownBinding: Binding<CountdownSettings> {
         Binding(get: { if case .countdown(let c) = slide.content { return c }; return .new }, set: { slide.content = .countdown($0) })
+    }
+    private var ndiBinding: Binding<NdiSettings> {
+        Binding(get: { if case .ndi(let n) = slide.content { return n }; return NdiSettings() }, set: { slide.content = .ndi($0) })
     }
     private var streamBinding: Binding<StreamSlideContent> {
         Binding(get: { if case .stream(let s) = slide.content { return s }; return StreamSlideContent() }, set: { slide.content = .stream($0) })

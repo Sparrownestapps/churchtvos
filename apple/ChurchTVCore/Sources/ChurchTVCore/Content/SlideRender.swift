@@ -90,6 +90,8 @@ public enum PreviewFrame: Hashable, Sendable {
     case countdown(title: String, seconds: Int, until: String?)
     case media(url: String, kind: MediaKind, fit: ContentFit)
     case stream(title: String)
+    /// EXPERIMENTAL NDI source: a placeholder only (no NDI preview on the phone or Mac).
+    case ndi(title: String, source: String, fit: NdiFit)
     case blank(color: String)
     /// A Signage text sign (drawn by `PlaylistItemPreview`, not by the theme text plan).
     case sign(SignItem)
@@ -116,6 +118,8 @@ public enum SlideRender {
             return [.countdown(title: c.title ?? "", seconds: c.seconds ?? 0, until: until)]
         case .stream(let s):
             return [.stream(title: s.title ?? "")]
+        case .ndi(let n):
+            return [.ndi(title: n.title, source: n.source, fit: n.fit)]
         case .blank(let b):
             return [.blank(color: b.color ?? "#000000")]
         case .unknown:
@@ -146,6 +150,7 @@ public enum SlideRender {
         case .youtube(let y): return text("YouTube", y.title)
         case .sign(let s): return [.sign(s)]
         case .stream(let s): return [.stream(title: s.title)]
+        case .ndi(let n): return [.ndi(title: n.ndi.title, source: n.ndi.source, fit: n.ndi.fit)]
         case .unknown(let u): return text("Unknown item", "A newer app can edit this (\(u.typeName)).")
         case .lyrics(let l):
             var words: [LyricSlide] = []
@@ -241,7 +246,7 @@ public enum SlideRender {
             if let until { push(.time, "Starts at \(clock12(until))", SlideMetrics.countdownPct * 0.45, 800) }
             else { push(.time, countdownText(seconds), SlideMetrics.countdownPct, 800) }
             return TextPlan(blocks: blocks, align: .center, color: t.textColor, top: m, bottom: 100 - m)
-        case .media, .stream, .blank, .sign:
+        case .media, .stream, .ndi, .blank, .sign:
             return nil
         }
     }
@@ -327,6 +332,7 @@ public enum DeckOutline {
             case .media(let m): add(m.mediaKind == .video ? "Video" : "Picture", slide.id)
             case .countdown(let c): add(firstNonBlank(c.title).map { "Countdown: \($0)" } ?? "Countdown", slide.id)
             case .stream(let s): add(firstNonBlank(s.title).map { "Live: \($0)" } ?? "Live stream", slide.id)
+            case .ndi(let n): add(n.label, slide.id)
             case .blank: add("Blank", slide.id)
             case .unknown: add("—", slide.id)
             case .song(let s):
@@ -361,6 +367,7 @@ public enum PlaylistOutline {
             case .youtube: out.append("YouTube")
             case .sign(let s): out.append(blankOr(s.title, "Sign"))
             case .stream: out.append("Live stream")
+            case .ndi(let n): out.append(n.ndi.label)
             case .unknown: break
             case .lyrics(let l):
                 var words: [String] = []

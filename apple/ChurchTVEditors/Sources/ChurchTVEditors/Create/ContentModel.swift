@@ -45,6 +45,8 @@ public final class ContentModel {
     var service: any ChurchService { host.service }
     var organizationId: UUID? { host.church?.id }
     public var church: ChurchAccess? { host.church }
+    /// EXPERIMENTAL: the church has the NDI flag (`organizations.ndi_enabled`). Without it the NDI option is hidden and existing NDI entries are read-only.
+    public var ndiEnabled: Bool { church?.organization.ndiEnabled ?? false }
     /// The church's TVs (empty on a host that has none, such as the Mac editors). Used for schedule time zones and Play now.
     var screens: [ScreenInfo] { host.screens }
     var isDemo: Bool { host.service.isDemo }

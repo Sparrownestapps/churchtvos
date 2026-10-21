@@ -15,13 +15,13 @@ final class SlidesEditingTests: XCTestCase {
     func testNewSlideDefaultsMatchTheWebsite() {
         var list: [DeckSlide] = []
         for k in DeckSlide.Kind.allCases { DeckEditing.add(k, to: &list, after: nil) }
-        XCTAssertEqual(list.count, 6)
-        XCTAssertEqual(Set(list.map(\.id)).count, 6, "ids are unique")
+        XCTAssertEqual(list.count, DeckSlide.Kind.allCases.count)
+        XCTAssertEqual(Set(list.map(\.id)).count, list.count, "ids are unique")
         guard case .countdown(let c) = list[3].content else { return XCTFail() }
         XCTAssertEqual(c.atZero, .hold)
         XCTAssertEqual(c.ifPassed, .zero)
         XCTAssertEqual(c.seconds, 300)
-        guard case .blank(let b) = list[5].content else { return XCTFail() }
+        guard case .blank(let b) = list[6].content else { return XCTFail() }
         XCTAssertEqual(b.color, "#000000")
         guard case .media(let m) = list[1].content else { return XCTFail() }
         XCTAssertEqual(m.fit, .contain)

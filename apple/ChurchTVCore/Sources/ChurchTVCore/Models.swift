@@ -74,8 +74,20 @@ public struct Organization: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
     public var name: String
     public var slug: String?
-    public init(id: UUID, name: String, slug: String? = nil) {
-        self.id = id; self.name = name; self.slug = slug
+    /// EXPERIMENTAL NDI sources switched on for this church (`organizations.ndi_enabled`). Members can read it, only the platform admin changes it.
+    /// Absent (an older database) or null means off.
+    public var ndiEnabled: Bool
+    public init(id: UUID, name: String, slug: String? = nil, ndiEnabled: Bool = false) {
+        self.id = id; self.name = name; self.slug = slug; self.ndiEnabled = ndiEnabled
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, name, slug, ndiEnabled }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        slug = try c.decodeIfPresent(String.self, forKey: .slug)
+        ndiEnabled = (try? c.decodeIfPresent(Bool.self, forKey: .ndiEnabled)) ?? false
     }
 }
 
