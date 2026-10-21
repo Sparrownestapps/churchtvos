@@ -206,7 +206,7 @@ public struct PlaylistEditorView: View {
                 Label("Add item", systemImage: "plus.circle.fill").frame(maxWidth: .infinity, alignment: .leading)
             }
             .accessibilityHint("Choose what to add: " + addableTypes.map { PlaylistEditorLabels.menuLabel($0, kind: kind) }.joined(separator: ", "))
-            ImportButton(playlistItems: $draft.items, kind: kind)
+            ImportButton(playlistItems: $draft.items, kind: kind, siteId: draft.siteId)
         }
     }
 

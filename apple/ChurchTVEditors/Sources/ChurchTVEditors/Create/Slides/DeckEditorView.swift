@@ -167,6 +167,7 @@ public struct DeckEditorView: View {
         Section {
             HStack {
                 if !readOnly { addMenu }
+                ImportButton(deckSlides: $draft.slides, siteId: draft.siteId, readOnly: readOnly) { selectedId = $0 }.buttonStyle(.bordered)
                 Spacer()
                 if draft.slides.count > 1 && !readOnly {
                     Button { showReorder = true } label: { Label("Reorder", systemImage: "arrow.up.arrow.down") }
@@ -196,10 +197,10 @@ public struct DeckEditorView: View {
         }
     }
 
-    private var addMenu: some View {
     /// EXPERIMENTAL: NDI is offered only when the church has the flag.
     private var addableKinds: [DeckSlide.Kind] { DeckSlide.Kind.allCases.filter { $0 != .ndi || model.ndiEnabled } }
 
+    private var addMenu: some View {
         Menu {
             ForEach(addableKinds, id: \.self) { k in
                 Button { add(k) } label: { Label("\(k.name): \(Self.hint(k))", systemImage: k.symbol) }
@@ -215,8 +216,8 @@ public struct DeckEditorView: View {
         case .song: return "lyrics from the library"
         case .countdown: return "a timer"
         case .stream: return "a live HLS feed"
-        case .blank: return "a plain colour"
         case .ndi: return "a live camera or computer"
+        case .blank: return "a plain colour"
         }
     }
 
@@ -272,8 +273,8 @@ public struct DeckEditorView: View {
             Button { DeckEditing.move(i, by: 1, in: &draft.slides) } label: { Label("Later", systemImage: "arrow.right").frame(maxWidth: .infinity) }
                 .disabled(i == draft.slides.count - 1).accessibilityLabel("Move slide \(i + 1) later")
             Button { duplicate(i) } label: { Label("Duplicate", systemImage: "plus.square.on.square").frame(maxWidth: .infinity) }
-            Button(role: .destructive) { deleteIndex = i } label: { Label("Delete", systemImage: "trash").frame(maxWidth: .infinity) }
                 .disabled(!canDuplicate(draft.slides[i]))
+            Button(role: .destructive) { deleteIndex = i } label: { Label("Delete", systemImage: "trash").frame(maxWidth: .infinity) }
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
@@ -324,9 +325,9 @@ public struct DeckEditorView: View {
         Haptics.selection()
     }
 
-    private func duplicate(_ i: Int) {
     private func canDuplicate(_ s: DeckSlide) -> Bool { s.kind != .ndi || model.ndiEnabled }
 
+    private func duplicate(_ i: Int) {
         if let id = DeckEditing.duplicate(i, in: &draft.slides, allowNdi: model.ndiEnabled) { selectedId = id; Haptics.selection() }
     }
 
