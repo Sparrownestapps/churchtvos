@@ -44,7 +44,14 @@ data class DeviceState(
     val kids: KidsState = KidsState(),
     val signage: SignageState = SignageState(),
     val slides: SlidesState = SlidesState(),
+    val override: OverrideInfo? = null,
 )
+
+/** A "play this now" request from a remote: it replaces the schedule until [until] or until someone stops it. */
+@Serializable
+data class OverrideInfo(val kind: String, val until: String, val deck: Deck? = null, val playlist: Playlist? = null) {
+    val untilInstant: java.time.Instant get() = java.time.OffsetDateTime.parse(until).toInstant()
+}
 
 @Serializable
 data class OrganizationInfo(val name: String, val branding: BrandingInfo = BrandingInfo(), val status: String = "active")
@@ -143,6 +150,29 @@ class SupabaseApi {
             put("p_device_id", id)
             put("p_secret", secret)
         })
+
+    /** Commands waiting for this TV (the server drops stale ones). */
+    suspend fun pollCommands(id: String, secret: String): String =
+        rpc("device_poll_commands", buildJsonObject {
+            put("p_device_id", id)
+            put("p_secret", secret)
+        })
+
+    suspend fun reportStatus(id: String, secret: String, status: PlaybackStatus, includeOutline: Boolean) {
+        rpc("device_report_status", buildJsonObject {
+            put("p_device_id", id)
+            put("p_secret", secret)
+            put("p_module", status.module)
+            put("p_state", status.state)
+            put("p_title", status.title)
+            put("p_item_label", status.label)
+            put("p_slide_index", status.index)
+            put("p_slide_count", status.count)
+            if (includeOutline) put("p_outline", kotlinx.serialization.json.JsonArray(status.outline.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+            status.refKind?.let { put("p_ref_kind", it) }
+            status.refId?.let { put("p_ref_id", it) }
+        })
+    }
 
     private suspend fun rpc(name: String, body: JsonObject): String = withContext(Dispatchers.IO) {
         val connection = URL("$SUPABASE_URL/rest/v1/rpc/$name").openConnection() as HttpURLConnection

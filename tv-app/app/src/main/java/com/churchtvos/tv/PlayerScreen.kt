@@ -52,16 +52,42 @@ import kotlinx.coroutines.delay
 
 /** [onExit] is Back; [onFinished] is reaching the end of the slides (signage loops, demo restarts). */
 @Composable
-fun PlayerScreen(slides: List<Slide>, onExit: () -> Unit, onFinished: () -> Unit = onExit) {
+fun PlayerScreen(slides: List<Slide>, onExit: () -> Unit, onFinished: () -> Unit = onExit, report: PlayerReport? = null) {
     val context = LocalContext.current
     val rotated = LocalRotated.current
     var index by remember { mutableIntStateOf(0) }
     val slide = slides.getOrNull(index)
+    var blank by remember { mutableStateOf(false) }
+
+    // Remote control: tell phones what is on screen, and obey them.
+    val outline = remember(slides) { slides.map { it.label() } }
+    LaunchedEffect(index, blank, report) {
+        if (report != null) {
+            Remote.status.value = PlaybackStatus(
+                module = report.module, state = if (blank) "blank" else "playing", title = report.title,
+                label = slide?.label().orEmpty(), index = index, count = slides.size, outline = outline,
+                refKind = report.refKind, refId = report.refId,
+            )
+        }
+    }
+    DisposableEffect(report) { onDispose { if (report != null) Remote.idle() } }
 
     val next by rememberUpdatedState {
         if (index < slides.lastIndex) index++ else onFinished()
     }
     val previous = { if (index > 0) index-- }
+    LaunchedEffect(Unit) {
+        Remote.commands.collect { c ->
+            when (c) {
+                RemoteCommand.Next -> next()
+                RemoteCommand.Previous -> previous()
+                is RemoteCommand.Jump -> { blank = false; index = c.index.coerceIn(0, slides.lastIndex) }
+                is RemoteCommand.Blank -> blank = c.on ?: !blank
+                RemoteCommand.Stop -> onExit()
+                else -> Unit
+            }
+        }
+    }
 
     val currentSlide by rememberUpdatedState(slide)
     var streamFailed by remember { mutableStateOf(false) }
@@ -83,6 +109,10 @@ fun PlayerScreen(slides: List<Slide>, onExit: () -> Unit, onFinished: () -> Unit
         }
         player.addListener(listener)
         onDispose { player.release() }
+    }
+
+    LaunchedEffect(blank) {
+        if (blank) player.pause() else if (slide is Slide.Video || slide is Slide.Stream) player.play()
     }
 
     LaunchedEffect(streamFailed) {
@@ -196,6 +226,7 @@ fun PlayerScreen(slides: List<Slide>, onExit: () -> Unit, onFinished: () -> Unit
                 is Slide.Video, null -> Unit
             }
         }
+        if (blank) Box(Modifier.fillMaxSize().background(Color.Black))
     }
 }
 

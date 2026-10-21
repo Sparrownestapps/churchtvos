@@ -138,6 +138,7 @@ fun App(sync: TvSync, cache: MediaCache, settingsOpen: Boolean, onSettingsChange
     val context = androidx.compose.ui.platform.LocalContext.current
     val state by sync.state.collectAsState()
     LaunchedEffect(Unit) { sync.run() }
+    LaunchedEffect(Unit) { sync.runRemote() }
 
     var now by remember { mutableStateOf(Instant.now()) }
     LaunchedEffect(Unit) {
@@ -148,6 +149,20 @@ fun App(sync: TvSync, cache: MediaCache, settingsOpen: Boolean, onSettingsChange
     }
 
     val device = state.device
+    // A "play this now" request from a remote ends when it times out, finishes, or someone stops it (Stop or Back).
+    var dismissedUntil by remember { mutableStateOf<String?>(null) }
+    val currentOverride by androidx.compose.runtime.rememberUpdatedState(device?.override)
+    val message by Remote.message.collectAsState()
+    LaunchedEffect(Unit) {
+        Remote.commands.collect { c ->
+            when (c) {
+                is RemoteCommand.Message -> Remote.message.value = ActiveMessage(c.text, c.background, System.currentTimeMillis() + c.seconds * 1000L)
+                RemoteCommand.ClearMessage -> Remote.message.value = null
+                RemoteCommand.Stop -> dismissedUntil = currentOverride?.until
+                else -> Unit
+            }
+        }
+    }
     var demo by remember { mutableStateOf<String?>(null) }
     var demoMenu by remember { mutableStateOf(false) }
     var autoLaunch by remember { mutableStateOf(sync.store.autoLaunch) }
@@ -186,6 +201,10 @@ fun App(sync: TvSync, cache: MediaCache, settingsOpen: Boolean, onSettingsChange
                     "This account is paused",
                     "Please ask your church's administrator to contact Church TV OS support.",
                 )
+                device.override?.takeIf { it.until != dismissedUntil && it.untilInstant.isAfter(now) } != null -> {
+                    val o = device.override!!
+                    OverrideScreen(o, state, cache, onDone = { dismissedUntil = o.until })
+                }
                 else -> {
                     val module = device.moduleNow(now.toEpochMilli())
                     // Each module can have its own look, and its own splash when the TV starts or switches into it.
@@ -214,6 +233,7 @@ fun App(sync: TvSync, cache: MediaCache, settingsOpen: Boolean, onSettingsChange
             }
         }
     }
+    MessageOverlay(message)
     }
 }
 
@@ -228,7 +248,7 @@ private fun KidsModule(device: DeviceState, state: TvUiState, now: Instant, cach
 
     if (active != null) {
         val slides = remember(active) { active.toSlides(cache) }
-        PlayerScreen(slides, onExit = { playing = null })
+        PlayerScreen(slides, onExit = { playing = null }, report = PlayerReport(Module.KIDS, active.name, "playlist", active.id))
         return
     }
 
@@ -294,6 +314,6 @@ private fun SignageModule(device: DeviceState, now: Instant, cache: MediaCache) 
             })
                 .toSlides(cache)
         }
-        PlayerScreen(slides, onExit = { loop++ })
+        PlayerScreen(slides, onExit = { loop++ }, report = PlayerReport(Module.SIGNAGE, playable.name))
     }
 }

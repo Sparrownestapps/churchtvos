@@ -17,11 +17,14 @@ import PeoplePage from './pages/PeoplePage'
 import SettingsPage from './pages/SettingsPage'
 import GetStartedPage from './pages/GetStartedPage'
 import { helpUrl } from './links'
+import { canControlNav } from './control/logic'
 import TrialBanner from './admin/TrialBanner'
 import { canLeave } from './slides/unsaved'
 import './getstarted.css'
 
 // The calendar (and FullCalendar) loads on first visit so the main bundle stays small.
+// The Control page (live remote for the TVs) is lazy too.
+const ControlPage = lazy(() => import('./control/ControlPage'))
 const CalendarPage = lazy(() => import('./calendar/CalendarPage'))
 // The shared song library (and its editor/importer) loads on first visit too.
 const SongsPage = lazy(() => import('./pages/SongsPage'))
@@ -35,7 +38,7 @@ const AdminActivityPage = lazy(() => import('./admin/ActivityPage'))
 const adminPage = (page: ReactNode) => <Suspense fallback={<p className="muted">Loading…</p>}>{page}</Suspense>
 const slidesPage = (page: ReactNode) => <Suspense fallback={<p className="muted">Loading…</p>}>{page}</Suspense>
 
-type PageDef = { label: string; title?: string; render: () => ReactNode; module?: Module; adminOnly?: boolean; /** Only the platform owner; hidden from everyone else. */ platformOnly?: boolean; /** Shown to anyone who has at least one of these applications. */ anyModule?: Module[] }
+type PageDef = { label: string; title?: string; render: () => ReactNode; module?: Module; adminOnly?: boolean; /** Only the platform owner; hidden from everyone else. */ platformOnly?: boolean; /** Shown to anyone who has at least one of these applications. */ anyModule?: Module[]; /** Extra rule, given the app state (e.g. a role check). */ visibleIf?: (s: AppState) => boolean }
 
 /**
  * Pages each application contributes to its nav group. Adding an application = one row in the `modules`
@@ -91,6 +94,17 @@ function buildNav(modules: ModuleDef[]) {
     ),
   }
   groups.unshift({ title: 'Schedule', pages: ['calendar'] })
+  pages.control = {
+    label: 'Control',
+    title: 'Control',
+    visibleIf: (s) => canControlNav(s.role, s.moduleOn),
+    render: () => (
+      <Suspense fallback={<p className="muted">Loading the remote…</p>}>
+        <ControlPage />
+      </Suspense>
+    ),
+  }
+  groups.unshift({ title: 'Control', pages: ['control'] })
   pages.getstarted = { label: 'Get started', adminOnly: true, render: () => <GetStartedPage /> }
   groups.unshift({ title: 'Start', pages: ['getstarted'] })
   // The song library belongs to the church, not to one application, so it sits outside the Kids group.
@@ -335,6 +349,7 @@ function OrgApp(props: OrgAppProps) {
       if (def.adminOnly && !state.isAdmin) return false
       if (def.module && !state.hasModule(def.module)) return false
       if (def.anyModule && !def.anyModule.some((m) => state.hasModule(m))) return false
+      if (def.visibleIf && !def.visibleIf(state)) return false
       return true
     },
     [state, PAGES],

@@ -145,7 +145,7 @@ private fun DeckSlide.listLabel(): String = when (this) {
  * Play/Pause = black screen on/off, Back = stop.
  */
 @Composable
-fun SlidesPlayer(deck: Deck, cache: MediaCache, onExit: () -> Unit, onFinished: () -> Unit = onExit) {
+fun SlidesPlayer(deck: Deck, cache: MediaCache, onExit: () -> Unit, onFinished: () -> Unit = onExit, report: Boolean = true) {
     val context = LocalContext.current
     val rotated = LocalRotated.current
     val slides = remember(deck) {
@@ -176,6 +176,31 @@ fun SlidesPlayer(deck: Deck, cache: MediaCache, onExit: () -> Unit, onFinished: 
         if (index < slides.lastIndex) index++ else if (deck.loop) index = 0 else onFinished()
     }
     val previous = { blank = false; if (index > 0) index-- }
+
+    // Remote control: report what is on screen, obey commands.
+    val outline = remember(slides) { slides.map { it.listLabel() } }
+    LaunchedEffect(index, blank) {
+        if (report) {
+            Remote.status.value = PlaybackStatus(
+                module = Module.SLIDES, state = if (blank) "blank" else "playing", title = deck.name,
+                label = slides.getOrNull(index)?.listLabel().orEmpty(), index = index, count = slides.size, outline = outline,
+                refKind = "deck", refId = deck.id,
+            )
+        }
+    }
+    DisposableEffect(report) { onDispose { if (report) Remote.idle() } }
+    LaunchedEffect(Unit) {
+        Remote.commands.collect { c ->
+            when (c) {
+                RemoteCommand.Next -> next()
+                RemoteCommand.Previous -> previous()
+                is RemoteCommand.Jump -> { blank = false; showList = false; index = c.index.coerceIn(0, slides.lastIndex) }
+                is RemoteCommand.Blank -> blank = c.on ?: !blank
+                RemoteCommand.Stop -> onExit()
+                else -> Unit
+            }
+        }
+    }
 
     val bgPlayer = remember { ExoPlayer.Builder(context).build().apply { repeatMode = Player.REPEAT_MODE_ALL; volume = 0f } }
     val fgPlayer = remember { ExoPlayer.Builder(context).build() }

@@ -133,3 +133,19 @@ fun PlaylistItem.Lyrics.toLyricSlides(): List<Slide> {
     val words = slides.mapIndexed { i, text -> Slide.Lyric(title, text, i + 1, slides.size) }
     return if (showTitle) listOf<Slide>(Slide.SongTitle(title, authors, ccli, copyright)) + words else words
 }
+
+/** Short description of a slide for remotes ("Jump to slide" lists and the now-showing line). */
+fun Slide.label(): String = when (this) {
+    is Slide.Video -> "Video"
+    is Slide.Image -> "Picture"
+    is Slide.Bundled -> "Slide"
+    is Slide.Countdown -> title.ifBlank { "Countdown" }
+    is Slide.Lyric -> "$song · Part $number of $count"
+    is Slide.SongTitle -> "$title (title)"
+    is Slide.YouTube -> "YouTube"
+    is Slide.Sign -> title.ifBlank { "Sign" }
+    is Slide.Stream -> "Live stream"
+}
+
+/** What a player tells remotes about itself. Null means "do not report" (demo mode). */
+data class PlayerReport(val module: String, val title: String, val refKind: String? = null, val refId: String? = null)

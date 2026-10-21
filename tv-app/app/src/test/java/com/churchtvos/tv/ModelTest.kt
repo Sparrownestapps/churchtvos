@@ -183,4 +183,53 @@ class ModelTest {
         val b = AppJson.decodeFromString<DeviceState>("""{"paired":true,"screen":{"name":"X","autoplay":true}}""")
         assertEquals(true, b.screen.autoplay)
     }
+
+    @Test
+    fun remoteCommandsParseAndUnknownOnesAreIgnored() {
+        val raw = AppJson.decodeFromString<List<RawCommand>>(
+            """[{"id":1,"command":"next","payload":{}},
+                {"id":2,"command":"jump","payload":{"index":3}},
+                {"id":3,"command":"blank","payload":{"on":true}},
+                {"id":4,"command":"blank","payload":{}},
+                {"id":5,"command":"message","payload":{"text":"Nursery: baby 12","seconds":9999,"background":"#112233"}},
+                {"id":6,"command":"message","payload":{"text":"  "}},
+                {"id":7,"command":"jump","payload":{}},
+                {"id":8,"command":"warp","payload":{}},
+                {"id":9,"command":"start","payload":{"kind":"deck","id":"x"}},
+                {"id":10,"command":"stop"}]""",
+        ).map { it.toRemoteCommand() }
+        assertEquals(RemoteCommand.Next, raw[0])
+        assertEquals(RemoteCommand.Jump(3), raw[1])
+        assertEquals(RemoteCommand.Blank(true), raw[2])
+        assertEquals(RemoteCommand.Blank(null), raw[3])
+        assertEquals(RemoteCommand.Message("Nursery: baby 12", 300, "#112233"), raw[4])
+        assertEquals(null, raw[5])
+        assertEquals(null, raw[6])
+        assertEquals(null, raw[7])
+        assertEquals(RemoteCommand.Start, raw[8])
+        assertEquals(RemoteCommand.Stop, raw[9])
+    }
+
+    @Test
+    fun overrideDecodesDeckAndPlaylist() {
+        val state = AppJson.decodeFromString<DeviceState>(
+            """{"paired":true,"override":{"kind":"deck","until":"2026-10-22T20:00:00+00:00","deck":{"id":"d","name":"Now","slides":[{"id":"a","kind":"text","title":"Hi"}]}}}""",
+        )
+        val o = state.override!!
+        assertEquals("deck", o.kind)
+        assertEquals("Now", o.deck?.name)
+        assertEquals(java.time.Instant.parse("2026-10-22T20:00:00Z"), o.untilInstant)
+        val p = AppJson.decodeFromString<DeviceState>(
+            """{"paired":true,"override":{"kind":"playlist","until":"2026-10-22T20:00:00+00:00","playlist":{"id":"p","name":"Kids","items":[]}}}""",
+        )
+        assertEquals("Kids", p.override?.playlist?.name)
+        assertEquals(null, AppJson.decodeFromString<DeviceState>("""{"paired":true}""").override)
+    }
+
+    @Test
+    fun slideLabelsForRemotes() {
+        val lyrics = PlaylistItem.Lyrics("Song", listOf("a", "b"), showTitle = true).toLyricSlides()
+        assertEquals(listOf("Song (title)", "Song · Part 1 of 2", "Song · Part 2 of 2"), lyrics.map { it.label() })
+        assertEquals("Countdown", Slide.Countdown("", CountdownSpec(), null).label())
+    }
 }

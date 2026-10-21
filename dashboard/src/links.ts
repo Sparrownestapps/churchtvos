@@ -20,6 +20,7 @@ export const HELP_PAGES = {
   signage: 'signage.html',
   slides: 'slides.html',
   calendar: 'calendar.html',
+  control: 'control.html',
   branding: 'branding.html',
   people: 'people.html',
   portrait: 'portrait.html',
