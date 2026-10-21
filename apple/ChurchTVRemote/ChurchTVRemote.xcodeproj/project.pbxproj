@@ -11,7 +11,6 @@
 		17B88114773CE03D4F93E7A8 /* ChurchTVCore in Frameworks */ = {isa = PBXBuildFile; productRef = F8743893256EF6C3C362A0E8 /* ChurchTVCore */; };
 		271F44296BA02AC753AD0FE4 /* ChurchTVRemoteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 050B0ADB4EDD90BD36AF9EFB /* ChurchTVRemoteApp.swift */; };
 		34A1FCE4268AC7C432E9664A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0553A85CA0BF14E7CC944EF2 /* Assets.xcassets */; };
-		4E557D2491C50B3B66021606 /* AddMediaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F575DF503839AA2C6CD758C9 /* AddMediaView.swift */; };
 		57A7817C8D467C08076EF433 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B90FB16F4B31456B3FCC29B /* SettingsView.swift */; };
 		68A9EE716DC7BD5A5F69993D /* AppModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 901A7ECD71D0B33D7719B35A /* AppModelTests.swift */; };
 		81D4E5DA21812404BFAA5AE0 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B265954A2575574FA547070 /* TodayView.swift */; };
@@ -20,34 +19,16 @@
 		CCDD86459649BE815C034EE4 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1AB31A79D081C496388220 /* RootView.swift */; };
 		D0D2F73771D5B132E3425707 /* RemoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F698CC3AFECD0D001902B665 /* RemoteView.swift */; };
 		D98AD02697BC55B38DB29EB2 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B9123FCF6218F6163C37C74 /* SignInView.swift */; };
-		EB3B581F612260C89407CA30 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07C7B7C552C5F4A82A19B258 /* Haptics.swift */; };
 		FED1DE07BA70CDE6512880C6 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EF7D4CB365D41513DE0215 /* AppModel.swift */; };
-		E307BDA18FF961B22FFA83FD /* ContentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 032CF49E2BD9F60180DEAAE8 /* ContentModel.swift */; };
 		BE2863A717DDE940CF44DEF1 /* CreateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92AC556F1CBF61716AB87247 /* CreateView.swift */; };
-		75141F8D1DFD8D89096A6EDF /* EditorPlaceholders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69F2CD450F61BB53944DCFBB /* EditorPlaceholders.swift */; };
-		2C696DCA23CF189AE90E9CA6 /* ColorControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47292D18BA94DBD11C76EAFA /* ColorControls.swift */; };
-		8024B3B5C08F8351BE4E5BD6 /* CountdownFieldsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 899F11EACA165480CD89140D /* CountdownFieldsView.swift */; };
-		814E87421F1ACA896E998E97 /* KitGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBA65ADD26F94E6D19E8089F /* KitGalleryView.swift */; };
-		3841FF5A6A35837B7F67589D /* KitSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D81C7105DDE1C7C6386F894 /* KitSupport.swift */; };
-		33E3DFC53B82C2354A7DD754 /* MediaPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7186F37923DC59E75DF89E4F /* MediaPickerView.swift */; };
-		9CD329C5F46E10327E1A238E /* SlidePreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C6D0BB4CB3066593D1D648 /* SlidePreview.swift */; };
-		4BB65E977B3FB557623AE113 /* SongPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9EF2DD0C72CF71CF1974FD7 /* SongPickerView.swift */; };
 		985ABCA78A433BE5DF69DF7A /* CreateSectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21D27607D1EC3635C7DC1754 /* CreateSectionTests.swift */; };
-		BBC1587FC56BF20D48C4E55A /* PlaylistEditLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 460901723BA0C92FD504B771 /* PlaylistEditLogic.swift */; };
-		72E09BC8A7D66CC196C162F6 /* PlaylistEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8A5B62CDE01E5A38FA034C /* PlaylistEditorView.swift */; };
-		B131A3ECFF51BFDA3A79B3F0 /* PlaylistItemEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C85463822F9036BC8C22D47A /* PlaylistItemEditorView.swift */; };
 		A1533AB055D46454995FE26F /* PlaylistPlayNow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A3E6A4617946E282303E3D /* PlaylistPlayNow.swift */; };
-		500C4D70B64DE4BEE8680019 /* BackgroundPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AF4B77F6C2A5D7D76B8D933 /* BackgroundPickerView.swift */; };
-		A2CD2A2D5E3E9261C65C100D /* DeckEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F80C169A7D23754EA790D3CC /* DeckEditorView.swift */; };
-		424C0B03FD7A78F6CE0CC921 /* SlideFormViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0CFF55222B80051374EBFC /* SlideFormViews.swift */; };
-		6AB1A988BA226A2AD821D748 /* SlidesEditingLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0240ACA7E71E4F9E51FD3139 /* SlidesEditingLogic.swift */; };
-		9B4F66282190FC63BD08292F /* ThemeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF0340A4361B0A1A750796F1 /* ThemeEditorView.swift */; };
-		604043C32FB6E889FE04D922 /* PlaylistEditingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08A73DFF4FB8A457B175B190 /* PlaylistEditingTests.swift */; };
-		F8B2960532114DC76F5768FD /* SlidesEditingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C19A0BF897F2E27C5FD9787D /* SlidesEditingTests.swift */; };
-		3BA37D7DBC309DA9F050F232 /* ScheduleSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99D599013DDC2E57CCE6F9F0 /* ScheduleSections.swift */; };
-		6F9E68C0E10D08DB5F94A93A /* ScheduleSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 048EB881F0B8FD1967E83354 /* ScheduleSheet.swift */; };
-		8E275A4AC02681F06478C3D7 /* ScheduleSheetModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC4114CEA7A384877DFDAFB9 /* ScheduleSheetModel.swift */; };
-		1AB5AF832475ED930FED947B /* ScheduleUpcomingSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB29EEE135A9747A4266136C /* ScheduleUpcomingSection.swift */; };
+		45620FB3A2B466BD001C4AA1 /* ChurchTVEditors in Frameworks */ = {isa = PBXBuildFile; productRef = 30581A7D6AF650CFF82A1BDD /* ChurchTVEditors */; };
+		99A7067DA0579B57CAAECACF /* DeckPlayNow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BE73246735F743F1C900257 /* DeckPlayNow.swift */; };
+		95F8D01F725F33FEE18E162A /* EditorsBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D683FBF4AB145CDDA06F2DFF /* EditorsBridge.swift */; };
+		705B430E16FBB1B8F05BCABD /* ChurchTVCalendar in Frameworks */ = {isa = PBXBuildFile; productRef = D3029B10D6C60C6B5380C1D7 /* ChurchTVCalendar */; };
+		7ECF09D7F80CBEB3272A63D7 /* CalendarQuickAdd.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06FE67BBA6696F26B0FF4B51 /* CalendarQuickAdd.swift */; };
+		263224BC7B42EAC7709E4A37 /* CalendarTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D034D9FFA9F0C2F8B204443 /* CalendarTab.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -64,7 +45,6 @@
 		050B0ADB4EDD90BD36AF9EFB /* ChurchTVRemoteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChurchTVRemoteApp.swift; sourceTree = "<group>"; };
 		0553A85CA0BF14E7CC944EF2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		06B5BFF79F7454B063B93A9E /* ChurchTVRemote.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ChurchTVRemote.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		07C7B7C552C5F4A82A19B258 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
 		401E31F7A9D7138929A70184 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		4A1AB31A79D081C496388220 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		588A0FE1FC0AA5E611BA7D0E /* ScreensView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreensView.swift; sourceTree = "<group>"; };
@@ -77,35 +57,17 @@
 		901A7ECD71D0B33D7719B35A /* AppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTests.swift; sourceTree = "<group>"; };
 		B6C59E6794FFFE9895D1479A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F2F3A7ADB8542E91E704F760 /* ChurchTVRemoteTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ChurchTVRemoteTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		F575DF503839AA2C6CD758C9 /* AddMediaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddMediaView.swift; sourceTree = "<group>"; };
 		F698CC3AFECD0D001902B665 /* RemoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteView.swift; sourceTree = "<group>"; };
 		F6EF7D4CB365D41513DE0215 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
-		032CF49E2BD9F60180DEAAE8 /* ContentModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentModel.swift; sourceTree = "<group>"; };
 		92AC556F1CBF61716AB87247 /* CreateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateView.swift; sourceTree = "<group>"; };
-		69F2CD450F61BB53944DCFBB /* EditorPlaceholders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorPlaceholders.swift; sourceTree = "<group>"; };
-		47292D18BA94DBD11C76EAFA /* ColorControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorControls.swift; sourceTree = "<group>"; };
-		899F11EACA165480CD89140D /* CountdownFieldsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountdownFieldsView.swift; sourceTree = "<group>"; };
-		EBA65ADD26F94E6D19E8089F /* KitGalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KitGalleryView.swift; sourceTree = "<group>"; };
-		1D81C7105DDE1C7C6386F894 /* KitSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KitSupport.swift; sourceTree = "<group>"; };
-		7186F37923DC59E75DF89E4F /* MediaPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaPickerView.swift; sourceTree = "<group>"; };
-		A5C6D0BB4CB3066593D1D648 /* SlidePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlidePreview.swift; sourceTree = "<group>"; };
-		E9EF2DD0C72CF71CF1974FD7 /* SongPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongPickerView.swift; sourceTree = "<group>"; };
 		21D27607D1EC3635C7DC1754 /* CreateSectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateSectionTests.swift; sourceTree = "<group>"; };
-		460901723BA0C92FD504B771 /* PlaylistEditLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistEditLogic.swift; sourceTree = "<group>"; };
-		5E8A5B62CDE01E5A38FA034C /* PlaylistEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistEditorView.swift; sourceTree = "<group>"; };
-		C85463822F9036BC8C22D47A /* PlaylistItemEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistItemEditorView.swift; sourceTree = "<group>"; };
 		B1A3E6A4617946E282303E3D /* PlaylistPlayNow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistPlayNow.swift; sourceTree = "<group>"; };
-		8AF4B77F6C2A5D7D76B8D933 /* BackgroundPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundPickerView.swift; sourceTree = "<group>"; };
-		F80C169A7D23754EA790D3CC /* DeckEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckEditorView.swift; sourceTree = "<group>"; };
-		3A0CFF55222B80051374EBFC /* SlideFormViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideFormViews.swift; sourceTree = "<group>"; };
-		0240ACA7E71E4F9E51FD3139 /* SlidesEditingLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlidesEditingLogic.swift; sourceTree = "<group>"; };
-		BF0340A4361B0A1A750796F1 /* ThemeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeEditorView.swift; sourceTree = "<group>"; };
-		08A73DFF4FB8A457B175B190 /* PlaylistEditingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistEditingTests.swift; sourceTree = "<group>"; };
-		C19A0BF897F2E27C5FD9787D /* SlidesEditingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlidesEditingTests.swift; sourceTree = "<group>"; };
-		99D599013DDC2E57CCE6F9F0 /* ScheduleSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleSections.swift; sourceTree = "<group>"; };
-		048EB881F0B8FD1967E83354 /* ScheduleSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleSheet.swift; sourceTree = "<group>"; };
-		DC4114CEA7A384877DFDAFB9 /* ScheduleSheetModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleSheetModel.swift; sourceTree = "<group>"; };
-		FB29EEE135A9747A4266136C /* ScheduleUpcomingSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleUpcomingSection.swift; sourceTree = "<group>"; };
+		A19800F8C0863CFD1F6F8F44 /* ChurchTVEditors */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ChurchTVEditors; path = ../ChurchTVEditors; sourceTree = SOURCE_ROOT; };
+		6BE73246735F743F1C900257 /* DeckPlayNow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckPlayNow.swift; sourceTree = "<group>"; };
+		D683FBF4AB145CDDA06F2DFF /* EditorsBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorsBridge.swift; sourceTree = "<group>"; };
+		4B87E15B237989A364313E47 /* ChurchTVCalendar */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ChurchTVCalendar; path = ../ChurchTVCalendar; sourceTree = SOURCE_ROOT; };
+		06FE67BBA6696F26B0FF4B51 /* CalendarQuickAdd.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarQuickAdd.swift; sourceTree = "<group>"; };
+		2D034D9FFA9F0C2F8B204443 /* CalendarTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarTab.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -113,6 +75,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				705B430E16FBB1B8F05BCABD /* ChurchTVCalendar in Frameworks */,
+				45620FB3A2B466BD001C4AA1 /* ChurchTVEditors in Frameworks */,
 				17B88114773CE03D4F93E7A8 /* ChurchTVCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -136,8 +100,6 @@
 			children = (
 				901A7ECD71D0B33D7719B35A /* AppModelTests.swift */,
 				21D27607D1EC3635C7DC1754 /* CreateSectionTests.swift */,
-				08A73DFF4FB8A457B175B190 /* PlaylistEditingTests.swift */,
-				C19A0BF897F2E27C5FD9787D /* SlidesEditingTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -155,6 +117,8 @@
 		AC971CBE93E4806CB23C0C28 /* Packages */ = {
 			isa = PBXGroup;
 			children = (
+				4B87E15B237989A364313E47 /* ChurchTVCalendar */,
+				A19800F8C0863CFD1F6F8F44 /* ChurchTVEditors */,
 				76A6676CE3E97B073DFAADCD /* ChurchTVCore */,
 			);
 			name = Packages;
@@ -163,13 +127,12 @@
 		D956AF91C03A0B71F4C3AF69 /* App */ = {
 			isa = PBXGroup;
 			children = (
-				F575DF503839AA2C6CD758C9 /* AddMediaView.swift */,
 				F6EF7D4CB365D41513DE0215 /* AppModel.swift */,
+				C9593FA19BD53CE24CEBECB8 /* Calendar */,
 				050B0ADB4EDD90BD36AF9EFB /* ChurchTVRemoteApp.swift */,
 				401E31F7A9D7138929A70184 /* Components.swift */,
 				CBDBE5BA006D6AA51EDB6351 /* Create */,
-				07C7B7C552C5F4A82A19B258 /* Haptics.swift */,
-				EF858F1ACA7B266CD4498BCE /* Kit */,
+				D683FBF4AB145CDDA06F2DFF /* EditorsBridge.swift */,
 				5CFFC6281C9D42F429A37FBF /* PushManager.swift */,
 				F698CC3AFECD0D001902B665 /* RemoteView.swift */,
 				4A1AB31A79D081C496388220 /* RootView.swift */,
@@ -193,62 +156,28 @@
 		CBDBE5BA006D6AA51EDB6351 /* Create */ = {
 			isa = PBXGroup;
 			children = (
-				032CF49E2BD9F60180DEAAE8 /* ContentModel.swift */,
 				92AC556F1CBF61716AB87247 /* CreateView.swift */,
-				69F2CD450F61BB53944DCFBB /* EditorPlaceholders.swift */,
+				6BE73246735F743F1C900257 /* DeckPlayNow.swift */,
 				C73BCBB1B8A8468FF219209C /* Playlists */,
-				7731068496CA5824820E9A88 /* Schedule */,
-				23F320F20DDE792BC06045D0 /* Slides */,
 			);
 			path = Create;
-			sourceTree = "<group>";
-		};
-		EF858F1ACA7B266CD4498BCE /* Kit */ = {
-			isa = PBXGroup;
-			children = (
-				47292D18BA94DBD11C76EAFA /* ColorControls.swift */,
-				899F11EACA165480CD89140D /* CountdownFieldsView.swift */,
-				EBA65ADD26F94E6D19E8089F /* KitGalleryView.swift */,
-				1D81C7105DDE1C7C6386F894 /* KitSupport.swift */,
-				7186F37923DC59E75DF89E4F /* MediaPickerView.swift */,
-				A5C6D0BB4CB3066593D1D648 /* SlidePreview.swift */,
-				E9EF2DD0C72CF71CF1974FD7 /* SongPickerView.swift */,
-			);
-			path = Kit;
 			sourceTree = "<group>";
 		};
 		C73BCBB1B8A8468FF219209C /* Playlists */ = {
 			isa = PBXGroup;
 			children = (
-				460901723BA0C92FD504B771 /* PlaylistEditLogic.swift */,
-				5E8A5B62CDE01E5A38FA034C /* PlaylistEditorView.swift */,
-				C85463822F9036BC8C22D47A /* PlaylistItemEditorView.swift */,
 				B1A3E6A4617946E282303E3D /* PlaylistPlayNow.swift */,
 			);
 			path = Playlists;
 			sourceTree = "<group>";
 		};
-		23F320F20DDE792BC06045D0 /* Slides */ = {
+		C9593FA19BD53CE24CEBECB8 /* Calendar */ = {
 			isa = PBXGroup;
 			children = (
-				8AF4B77F6C2A5D7D76B8D933 /* BackgroundPickerView.swift */,
-				F80C169A7D23754EA790D3CC /* DeckEditorView.swift */,
-				3A0CFF55222B80051374EBFC /* SlideFormViews.swift */,
-				0240ACA7E71E4F9E51FD3139 /* SlidesEditingLogic.swift */,
-				BF0340A4361B0A1A750796F1 /* ThemeEditorView.swift */,
+				06FE67BBA6696F26B0FF4B51 /* CalendarQuickAdd.swift */,
+				2D034D9FFA9F0C2F8B204443 /* CalendarTab.swift */,
 			);
-			path = Slides;
-			sourceTree = "<group>";
-		};
-		7731068496CA5824820E9A88 /* Schedule */ = {
-			isa = PBXGroup;
-			children = (
-				99D599013DDC2E57CCE6F9F0 /* ScheduleSections.swift */,
-				048EB881F0B8FD1967E83354 /* ScheduleSheet.swift */,
-				DC4114CEA7A384877DFDAFB9 /* ScheduleSheetModel.swift */,
-				FB29EEE135A9747A4266136C /* ScheduleUpcomingSection.swift */,
-			);
-			path = Schedule;
+			path = Calendar;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -268,6 +197,8 @@
 			);
 			name = ChurchTVRemote;
 			packageProductDependencies = (
+				D3029B10D6C60C6B5380C1D7 /* ChurchTVCalendar */,
+				30581A7D6AF650CFF82A1BDD /* ChurchTVEditors */,
 				F8743893256EF6C3C362A0E8 /* ChurchTVCore */,
 			);
 			productName = ChurchTVRemote;
@@ -321,6 +252,8 @@
 			mainGroup = 23280B5B154CB7CCB01B1110;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				82DA21C1B69EA8FFDA8915B1 /* XCLocalSwiftPackageReference "../ChurchTVCalendar" */,
+				3460420BCFFB083D2010BB4B /* XCLocalSwiftPackageReference "../ChurchTVEditors" */,
 				BF5027EE108977D6046B3B07 /* XCLocalSwiftPackageReference "../ChurchTVCore" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -352,8 +285,6 @@
 			files = (
 				68A9EE716DC7BD5A5F69993D /* AppModelTests.swift in Sources */,
 				985ABCA78A433BE5DF69DF7A /* CreateSectionTests.swift in Sources */,
-				604043C32FB6E889FE04D922 /* PlaylistEditingTests.swift in Sources */,
-				F8B2960532114DC76F5768FD /* SlidesEditingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -361,11 +292,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4E557D2491C50B3B66021606 /* AddMediaView.swift in Sources */,
 				FED1DE07BA70CDE6512880C6 /* AppModel.swift in Sources */,
 				271F44296BA02AC753AD0FE4 /* ChurchTVRemoteApp.swift in Sources */,
 				93A6D489EDD276D93ECCCC5C /* Components.swift in Sources */,
-				EB3B581F612260C89407CA30 /* Haptics.swift in Sources */,
 				141994FD8769763CE899E625 /* PushManager.swift in Sources */,
 				D0D2F73771D5B132E3425707 /* RemoteView.swift in Sources */,
 				CCDD86459649BE815C034EE4 /* RootView.swift in Sources */,
@@ -373,29 +302,12 @@
 				57A7817C8D467C08076EF433 /* SettingsView.swift in Sources */,
 				D98AD02697BC55B38DB29EB2 /* SignInView.swift in Sources */,
 				81D4E5DA21812404BFAA5AE0 /* TodayView.swift in Sources */,
-				E307BDA18FF961B22FFA83FD /* ContentModel.swift in Sources */,
 				BE2863A717DDE940CF44DEF1 /* CreateView.swift in Sources */,
-				75141F8D1DFD8D89096A6EDF /* EditorPlaceholders.swift in Sources */,
-				2C696DCA23CF189AE90E9CA6 /* ColorControls.swift in Sources */,
-				8024B3B5C08F8351BE4E5BD6 /* CountdownFieldsView.swift in Sources */,
-				814E87421F1ACA896E998E97 /* KitGalleryView.swift in Sources */,
-				3841FF5A6A35837B7F67589D /* KitSupport.swift in Sources */,
-				33E3DFC53B82C2354A7DD754 /* MediaPickerView.swift in Sources */,
-				9CD329C5F46E10327E1A238E /* SlidePreview.swift in Sources */,
-				4BB65E977B3FB557623AE113 /* SongPickerView.swift in Sources */,
-				BBC1587FC56BF20D48C4E55A /* PlaylistEditLogic.swift in Sources */,
-				72E09BC8A7D66CC196C162F6 /* PlaylistEditorView.swift in Sources */,
-				B131A3ECFF51BFDA3A79B3F0 /* PlaylistItemEditorView.swift in Sources */,
 				A1533AB055D46454995FE26F /* PlaylistPlayNow.swift in Sources */,
-				500C4D70B64DE4BEE8680019 /* BackgroundPickerView.swift in Sources */,
-				A2CD2A2D5E3E9261C65C100D /* DeckEditorView.swift in Sources */,
-				424C0B03FD7A78F6CE0CC921 /* SlideFormViews.swift in Sources */,
-				6AB1A988BA226A2AD821D748 /* SlidesEditingLogic.swift in Sources */,
-				9B4F66282190FC63BD08292F /* ThemeEditorView.swift in Sources */,
-				3BA37D7DBC309DA9F050F232 /* ScheduleSections.swift in Sources */,
-				6F9E68C0E10D08DB5F94A93A /* ScheduleSheet.swift in Sources */,
-				8E275A4AC02681F06478C3D7 /* ScheduleSheetModel.swift in Sources */,
-				1AB5AF832475ED930FED947B /* ScheduleUpcomingSection.swift in Sources */,
+				99A7067DA0579B57CAAECACF /* DeckPlayNow.swift in Sources */,
+				95F8D01F725F33FEE18E162A /* EditorsBridge.swift in Sources */,
+				7ECF09D7F80CBEB3272A63D7 /* CalendarQuickAdd.swift in Sources */,
+				263224BC7B42EAC7709E4A37 /* CalendarTab.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -650,12 +562,28 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../ChurchTVCore;
 		};
+		3460420BCFFB083D2010BB4B /* XCLocalSwiftPackageReference "../ChurchTVEditors" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../ChurchTVEditors;
+		};
+		82DA21C1B69EA8FFDA8915B1 /* XCLocalSwiftPackageReference "../ChurchTVCalendar" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../ChurchTVCalendar;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		F8743893256EF6C3C362A0E8 /* ChurchTVCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ChurchTVCore;
+		};
+		30581A7D6AF650CFF82A1BDD /* ChurchTVEditors */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChurchTVEditors;
+		};
+		D3029B10D6C60C6B5380C1D7 /* ChurchTVCalendar */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChurchTVCalendar;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

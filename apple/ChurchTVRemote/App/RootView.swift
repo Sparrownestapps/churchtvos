@@ -62,8 +62,8 @@ struct PhoneView: View {
             NavigationStack { RemoteTab() }
                 .tabItem { Label("Remote", systemImage: "dot.radiowaves.left.and.right") }
                 .tag(AppTab.remote)
-            NavigationStack { TodayView() }
-                .tabItem { Label("Today", systemImage: "calendar") }
+            NavigationStack { TodayCalendarTab() }   // Calendar: Today | Calendar segments (App/Calendar/CalendarTab.swift)
+                .tabItem { Label("Schedule", systemImage: "calendar") }
                 .tag(AppTab.today)
             // Only for owners, admins and editors of a church with Kids, Signage or Slides live. Not shown (and not locked) for others.
             if model.canCreate {
@@ -118,7 +118,7 @@ struct ScreenPickerMenu: View {
 }
 
 enum PadSelection: Hashable {
-    case screen(UUID), today, create, media, settings
+    case screen(UUID), today, calendar, create, media, settings
 }
 
 struct PadView: View {
@@ -139,6 +139,7 @@ struct PadView: View {
                 }
                 Section("More") {
                     Label("Today", systemImage: "calendar").tag(PadSelection.today)
+                    if !(model.church?.modules.isEmpty ?? true) { Label("Calendar", systemImage: "calendar.day.timeline.left").tag(PadSelection.calendar) }
                     if model.canCreate { Label("Create", systemImage: "square.and.pencil").tag(PadSelection.create) }
                     if model.canAddMedia { Label("Add media", systemImage: "photo.badge.plus").tag(PadSelection.media) }
                     Label("Settings", systemImage: "gearshape").tag(PadSelection.settings)
@@ -163,6 +164,7 @@ struct PadView: View {
                             .toolbar { ToolbarItem(placement: .topBarTrailing) { AddMediaButton() } }
                     } else { placeholder }
                 case .today: TodayView()
+                case .calendar: CalendarTab()
                 case .create: EmptyView()
                 case .media: AddMediaView(embedded: true)
                 case .settings: SettingsView()
@@ -173,7 +175,8 @@ struct PadView: View {
         }
         .onAppear {
             if selection == nil {
-                if model.iPhoneTab == .create, model.canCreate { selection = .create }   // test launch argument `-tab create`
+                if CalendarLaunch.opensCalendar { selection = .calendar }   // test launch argument `-calendar`
+                else if model.iPhoneTab == .create, model.canCreate { selection = .create }   // test launch argument `-tab create`
                 else { selection = model.selectedScreenId.map(PadSelection.screen) }
             }
         }
