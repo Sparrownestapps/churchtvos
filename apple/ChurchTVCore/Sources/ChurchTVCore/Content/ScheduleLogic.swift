@@ -26,7 +26,7 @@ public struct CalendarDay: Hashable, Comparable, Codable, Sendable, CustomString
 
     /// 0 = Sunday ... 6 = Saturday (like the database).
     public var weekday: Int { (CalendarDay.gmt.component(.weekday, from: noonUTC) + 6) % 7 }
-    var noonUTC: Date { CalendarDay.gmt.date(from: DateComponents(year: year, month: month, day: day, hour: 12))! }
+    public var noonUTC: Date { CalendarDay.gmt.date(from: DateComponents(year: year, month: month, day: day, hour: 12))! }
 
     public func adding(days n: Int) -> CalendarDay {
         let d = CalendarDay.gmt.date(byAdding: .day, value: n, to: noonUTC)!
@@ -204,10 +204,12 @@ public struct SeriesOccurrence: Hashable, Identifiable, Sendable {
     public var endsAt: Date
     public var itemId: UUID?
     public var occurrenceNo: Int?
+    /// True when a "changed date" exception replaced the item for this date (`is_override` of the occurrences function).
+    public var isOverride: Bool
     public var id: String { "\(seriesId)-\(onDate)" }
-    public init(seriesId: UUID, locationId: UUID, onDate: CalendarDay, startsAt: Date, endsAt: Date, itemId: UUID?, occurrenceNo: Int? = nil) {
+    public init(seriesId: UUID, locationId: UUID, onDate: CalendarDay, startsAt: Date, endsAt: Date, itemId: UUID?, occurrenceNo: Int? = nil, isOverride: Bool = false) {
         self.seriesId = seriesId; self.locationId = locationId; self.onDate = onDate; self.startsAt = startsAt; self.endsAt = endsAt
-        self.itemId = itemId; self.occurrenceNo = occurrenceNo
+        self.itemId = itemId; self.occurrenceNo = occurrenceNo; self.isOverride = isOverride
     }
 }
 

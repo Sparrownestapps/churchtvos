@@ -26,7 +26,7 @@ public struct MediaUploadRequest: Sendable {
 }
 
 /// Everything the apps need from the back end. `SupabaseService` talks to the real project; `MockService` powers demo mode.
-public protocol ChurchService: ContentService, ScheduleService {
+public protocol ChurchService: ContentService, ScheduleService, CalendarService {
     var isDemo: Bool { get }
 
     // Session

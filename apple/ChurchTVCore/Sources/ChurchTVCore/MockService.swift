@@ -54,9 +54,11 @@ public actor MockService: ChurchService {
         let aud = Self.id(1), kids = Self.id(2), lobby = Self.id(3), youth = Self.id(4)
         let now = Date()
 
+        // The demo screens sit in the demo locations (MockContent) so the calendar can filter by room.
+        let locationIds: [String: UUID] = ["Auditorium": MockContentStore.uuid(5, 1), "Kids Wing": MockContentStore.uuid(5, 2), "Lobby": MockContentStore.uuid(5, 3), "Youth Loft": MockContentStore.uuid(5, 4)]
         func make(_ id: UUID, _ name: String, _ loc: String, module: String, appVersion: String, lastSeen: Date, online: Bool,
                   state: PlaybackState, title: String?, outline: [String], index: Int, kind: String?, ref: UUID?) -> MockScreen {
-            let screen = Screen(id: id, organizationId: MockService.churchId, locationId: UUID(), name: name, orientation: "landscape",
+            let screen = Screen(id: id, organizationId: MockService.churchId, locationId: locationIds[loc] ?? UUID(), name: name, orientation: "landscape",
                                 defaultModule: module, model: "Fire TV Stick 4K", appVersion: appVersion, lastSeenAt: lastSeen)
             let info = ScreenInfo(screen: screen, locationName: loc, siteName: site.name, timeZoneId: TimeZone.current.identifier, status: nil)
             return MockScreen(info: info, online: online, statusModule: module, state: state, title: title, outline: outline, index: index, refKind: kind, refId: ref)

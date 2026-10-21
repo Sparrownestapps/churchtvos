@@ -18,7 +18,7 @@ extension SupabaseService: ScheduleService {
     }
     private struct OccRow: Decodable {
         let seriesId: UUID; let locationId: UUID; let onDate: String; let startsAt: Date; let endsAt: Date
-        let deckId: UUID?; let playlistId: UUID?; let occurrenceNo: Int?
+        let deckId: UUID?; let playlistId: UUID?; let occurrenceNo: Int?; let isOverride: Bool?
     }
     private struct SlotRow: Decodable {
         let id: UUID; let screenId: UUID?; let groupId: UUID?; let playlistId: UUID; let days: [Int]
@@ -72,7 +72,7 @@ extension SupabaseService: ScheduleService {
                                            endDate: r.endDate.flatMap { CalendarDay(string: $0) }, itemIds: r.deckIds ?? r.playlistIds ?? [], onEnd: OnEnd(rawValue: r.onEnd) ?? .loop)
                 },
                 occurrences: occRows.compactMap { r in
-                    CalendarDay(string: r.onDate).map { SeriesOccurrence(seriesId: r.seriesId, locationId: r.locationId, onDate: $0, startsAt: r.startsAt, endsAt: r.endsAt, itemId: r.deckId ?? r.playlistId, occurrenceNo: r.occurrenceNo) }
+                    CalendarDay(string: r.onDate).map { SeriesOccurrence(seriesId: r.seriesId, locationId: r.locationId, onDate: $0, startsAt: r.startsAt, endsAt: r.endsAt, itemId: r.deckId ?? r.playlistId, occurrenceNo: r.occurrenceNo, isOverride: r.isOverride ?? false) }
                 })
         }
     }
@@ -104,4 +104,66 @@ extension SupabaseService: ScheduleService {
         }
     }
     private struct SeriesIdOnly: Decodable { let seriesId: UUID }
+}
+
+// MARK: - Calendar (range reads and row updates)
+
+extension SupabaseService: CalendarService {
+    private struct RuleRow: Decodable {
+        let id: UUID; let screenId: UUID?; let groupId: UUID?; let module: String; let days: [Int]
+        let startTime: String; let endTime: String; let priority: Int; let createdAt: Date?
+    }
+
+    public func scheduleRange(module: AppModule, organizationId: UUID, from: Date, to: Date) async throws -> ScheduleSnapshot {
+        if module == .signage { return try await scheduleSnapshot(module: .signage, organizationId: organizationId, now: from) }
+        guard let dated = ScheduleTable.dated(module), let seriesTable = ScheduleTable.series(module) else { return .empty }
+        return try await scheduled {
+            let org = organizationId.uuidString.lowercased()
+            let fromS = ChurchJSON.formatTimestamp(from), toS = ChurchJSON.formatTimestamp(to)
+            let cutoff = ChurchJSON.formatTimestamp(from.addingTimeInterval(-14 * 86_400))
+            // Same filter as the website: starts before the end, and ends after the start (or is open-ended and recent).
+            let datedRows: [DatedRow] = try await rows(
+                client.from(dated.rawValue).select("id,location_id,\(dated.itemColumn),starts_at,ends_at").eq("organization_id", value: org)
+                    .lt("starts_at", value: toS).or("ends_at.gt.\(fromS),and(ends_at.is.null,starts_at.gt.\(cutoff))").order("starts_at").limit(1000))
+            let seriesRows: [SeriesRow] = try await rows(
+                client.from(seriesTable.rawValue).select("id,location_id,name,days,start_time,end_time,start_date,end_date,\(seriesTable.rotationColumn),on_end")
+                    .eq("organization_id", value: org).order("start_date"))
+            let fn = module == .slides ? "deck_series_occurrences" : "kids_series_occurrences"
+            let occRows: [OccRow] = try await rows(try client.rpc(fn, params: RangeParams(pOrg: org, pFrom: fromS, pTo: toS)))
+            return ScheduleSnapshot(
+                dated: datedRows.compactMap { r in (r.deckId ?? r.playlistId).map { DatedSchedule(id: r.id, locationId: r.locationId, itemId: $0, startsAt: r.startsAt, endsAt: r.endsAt) } },
+                series: seriesRows.compactMap { r in
+                    guard let a = ClockTime(db: r.startTime), let b = ClockTime(db: r.endTime), let sd = CalendarDay(string: r.startDate) else { return nil }
+                    return RepeatingSeries(id: r.id, locationId: r.locationId, name: r.name, days: r.days, startTime: a, endTime: b, startDate: sd,
+                                           endDate: r.endDate.flatMap { CalendarDay(string: $0) }, itemIds: r.deckIds ?? r.playlistIds ?? [], onEnd: OnEnd(rawValue: r.onEnd) ?? .loop)
+                },
+                occurrences: occRows.compactMap { r in
+                    CalendarDay(string: r.onDate).map { SeriesOccurrence(seriesId: r.seriesId, locationId: r.locationId, onDate: $0, startsAt: r.startsAt, endsAt: r.endsAt, itemId: r.deckId ?? r.playlistId, occurrenceNo: r.occurrenceNo, isOverride: r.isOverride ?? false) }
+                })
+        }
+    }
+
+    public func listModuleRules(organizationId: UUID) async throws -> [ModuleRule] {
+        try await scheduled {
+            let list: [RuleRow] = try await rows(client.from("screen_schedules").select("id,screen_id,group_id,module,days,start_time,end_time,priority,created_at").eq("organization_id", value: organizationId.uuidString.lowercased()))
+            return list.compactMap { r in
+                guard let a = ClockTime(db: r.startTime), let b = ClockTime(db: r.endTime) else { return nil }
+                return ModuleRule(id: r.id, screenId: r.screenId, groupId: r.groupId, module: r.module, days: r.days, startTime: a, endTime: b, endIsEndOfDay: r.endTime.hasPrefix("23:59:59"), priority: r.priority, createdAt: r.createdAt ?? .distantPast)
+            }
+        }
+    }
+
+    public func updateScheduleRow(_ table: CalendarTable, id: UUID, values: [String: RawJSON]) async throws {
+        try await scheduled {
+            let saved: [IdOnly] = try await rows(client.from(table.rawValue).update(values).eq("id", value: id.uuidString.lowercased()).select("id"))
+            if saved.isEmpty { throw ChurchError("Couldn't change it. It may be gone, or you may not have permission.") }
+        }
+    }
+
+    public func insertScheduleRow(_ table: CalendarTable, values: [String: RawJSON]) async throws {
+        try await scheduled {
+            let saved: [IdOnly] = try await rows(client.from(table.rawValue).insert(values).select("id"))
+            if saved.isEmpty { throw ChurchError("The schedule was not saved. You may not have permission.") }
+        }
+    }
 }
