@@ -57,8 +57,9 @@ private struct Sidebar: View {
                 if !items.isEmpty {
                     Section(group.rawValue) {
                         ForEach(items) { s in
-                            Label(s.title, systemImage: s.symbol).tag(s)
+                            Label(s.title, systemImage: s.symbol)
                                 .badge(s == .screens && model.offlineCount > 0 ? Text("\(model.offlineCount)") : nil)
+                                .tag(s)
                         }
                     }
                 }
