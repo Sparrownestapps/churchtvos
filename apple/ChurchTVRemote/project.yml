@@ -1,0 +1,85 @@
+# XcodeGen spec. Regenerate the Xcode project with:  xcodegen generate
+# (see ../README.md). The generated ChurchTVRemote.xcodeproj is checked in too, so XcodeGen is optional.
+name: ChurchTVRemote
+options:
+  bundleIdPrefix: com.churchtvos
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # Set your Apple Developer team here (or pick it in Xcode: target > Signing & Capabilities). Left empty on purpose.
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+packages:
+  ChurchTVCore:
+    path: ../ChurchTVCore
+targets:
+  ChurchTVRemote:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: App
+      - path: Resources
+    dependencies:
+      - package: ChurchTVCore
+    info:
+      path: Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Church TV OS Remote
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        NSPhotoLibraryUsageDescription: Church TV OS Remote reads the photos and videos you choose so it can add them to your church's media library.
+        NSPhotoLibraryAddUsageDescription: Church TV OS Remote does not save to your photo library.
+        ITSAppUsesNonExemptEncryption: false
+        UIBackgroundModes:
+          - remote-notification
+    entitlements:
+      path: Resources/ChurchTVRemote.entitlements
+      properties:
+        # Push Notifications. Xcode swaps "development" for "production" automatically when you archive.
+        aps-environment: development
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.churchtvos.remote
+        PRODUCT_NAME: ChurchTVRemote
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: NO
+  ChurchTVRemoteTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: ChurchTVRemote
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.churchtvos.remote.tests
+schemes:
+  ChurchTVRemote:
+    build:
+      targets:
+        ChurchTVRemote: all
+    test:
+      targets:
+        - ChurchTVRemoteTests

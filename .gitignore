@@ -11,3 +11,11 @@ store/build/
 
 # NDI SDK is confidential and not redistributable
 vendor/
+
+# Apple builds (Xcode / SwiftPM output)
+apple/**/.build/
+apple/**/build/
+apple/**/DerivedData/
+apple/**/.swiftpm/
+apple/**/xcuserdata/
+*.xcuserstate
