@@ -24,3 +24,6 @@
 - Live: https://app.churchtvos.com (Netlify site churchtvos-app, team Sparrownest; GoDaddy CNAME app -> churchtvos-app.netlify.app).
 - Keith signed up (platform admin); Forward Church org created with internal-plan entitlements (kids + signage, 50 TVs).
 - Icon concept A chosen and built in. Branding v2 shipped: dark logo, per-module looks, full-screen splash (untested on a real TV).
+
+## Update (2026-10-21): experimental NDI source
+- Per-church flag `organizations.ndi_enabled` (platform admin only, audited), NDI items/slides in Kids playlists and Slides decks, `ndi` TV build flavor (version 1.6.0, code 7). Contract and build steps: NDI-CONTRACT.md. Untested on a real NDI feed; NDI licence for Android unconfirmed.

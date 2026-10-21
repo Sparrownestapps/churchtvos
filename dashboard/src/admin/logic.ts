@@ -24,6 +24,8 @@ export type AdminOrg = {
   deck_count: number
   playlist_count: number
   entitlements: AdminEnt[]
+  /** EXPERIMENTAL NDI switch (organizations.ndi_enabled). */
+  ndi_enabled: boolean
 }
 
 export type AdminEnt = {
@@ -62,6 +64,7 @@ export async function loadAdminOrgs(): Promise<AdminOrg[]> {
     playlist_count: Number(r.playlist_count),
     owner_emails: r.owner_emails ?? [],
     entitlements: r.entitlements ?? [],
+    ndi_enabled: !!r.ndi_enabled,
   }))
 }
 
@@ -204,12 +207,16 @@ export function describeAudit(a: AuditEntry, moduleName: (id: string) => string)
       return 'Reactivated'
     case 'church_reviewed':
       return 'Marked reviewed'
+    case 'ndi_enabled':
+      return 'Experimental NDI sources switched ON'
+    case 'ndi_disabled':
+      return 'Experimental NDI sources switched OFF'
     default:
       return a.action
   }
 }
 
-export const AUDIT_ACTIONS = ['plan_insert', 'plan_update', 'plan_delete', 'church_suspended', 'church_reactivated', 'church_reviewed']
+export const AUDIT_ACTIONS = ['plan_insert', 'plan_update', 'plan_delete', 'church_suspended', 'church_reactivated', 'church_reviewed', 'ndi_enabled', 'ndi_disabled']
 
 /** Date for <input type="date"> in the browser's time zone. */
 export function toDateInput(iso: string | null) {

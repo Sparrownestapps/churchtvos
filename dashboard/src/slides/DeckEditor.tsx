@@ -13,13 +13,14 @@ import SlideFrame from './SlideFrame'
 import { KIND_NAME, blankSlide, cleanSlide, firstProblem, framesFor, newSlideId, resolveBackground, resolveTheme, slideLabel, type NewKind } from './render'
 import { setUnsaved, useUnsavedGuard } from './unsaved'
 
-const KINDS: NewKind[] = ['text', 'media', 'song', 'countdown', 'stream', 'blank']
+const KINDS: NewKind[] = ['text', 'media', 'song', 'countdown', 'stream', 'ndi', 'blank']
 const KIND_HINT: Record<NewKind, string> = {
   text: 'Title and words',
   media: 'A picture or a video file',
   song: 'Lyrics from the Songs library',
   countdown: 'A timer counting down',
   stream: 'A live HLS video feed',
+  ndi: 'Experimental: a camera or computer on the same network',
   blank: 'A plain colour screen',
 }
 
@@ -247,7 +248,7 @@ export default function DeckEditor({
               </button>
               {menu && (
                 <div className="sl-menu" role="menu" onKeyDown={(e) => e.key === 'Escape' && setMenu(false)}>
-                  {KINDS.map((k) => (
+                  {KINDS.filter((k) => k !== 'ndi' || org.ndi_enabled).map((k) => (
                     <button key={k} role="menuitem" className="sl-menu-item" onClick={() => add(k)}>
                       <b>{KIND_NAME[k]}</b>
                       <span className="muted">{KIND_HINT[k]}</span>

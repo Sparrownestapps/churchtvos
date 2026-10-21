@@ -194,5 +194,6 @@ private val PlaylistItem.kindLabel: String
         is PlaylistItem.YouTube -> if (videoId == null) "LIVE" else "YOUTUBE"
         is PlaylistItem.Sign -> "SIGN"
         is PlaylistItem.Stream -> "STREAM"
+        is PlaylistItem.Ndi -> "NDI"
         is PlaylistItem.Unknown -> "—"
     }

@@ -375,3 +375,8 @@ tr.faded td { opacity: 0.45; }
 .audio-thumb .audio-icon { font-size: 28px; line-height: 1; }
 .audio-thumb audio { width: 92%; height: 30px; }
 .media-row .audio-thumb audio { display: none; }
+
+/* EXPERIMENTAL NDI source editor (NdiItem.tsx) */
+.ndi-preview { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; aspect-ratio: 16 / 9; max-width: 360px; width: 100%; padding: 12px; border-radius: 10px; background: #0b0f1a; color: #fff; font-size: 13px; }
+.ndi-preview .muted { color: rgba(255, 255, 255, 0.7); font-size: 12px; }
+.ndi-badge { font-weight: 800; letter-spacing: 2px; font-size: 12px; border: 1.5px solid currentColor; border-radius: 4px; padding: 1px 8px; }

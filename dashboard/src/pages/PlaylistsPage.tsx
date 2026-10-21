@@ -9,6 +9,7 @@ import CountdownFields from '../CountdownFields'
 import { countdownProblem } from '../slides/render'
 import { YouTubeItemEditor, newYouTubeItem } from '../YouTubeItem'
 import { StreamItemEditor, newStreamItem, validStreamUrl } from '../StreamItem'
+import { NdiItemEditor, NDI_LABEL, cleanNdi, newNdiItem, ndiProblem } from '../NdiItem'
 import { LyricsItemEditor, newLyricsItem, type SongLite } from '../LyricsItem'
 
 const KIND_LABEL: Record<PlaylistItem['type'], string> = {
@@ -18,6 +19,7 @@ const KIND_LABEL: Record<PlaylistItem['type'], string> = {
   lyrics: 'Lyrics',
   youtube: 'YouTube',
   stream: 'Live stream',
+  ndi: NDI_LABEL,
 }
 
 export default function PlaylistsPage() {
@@ -132,6 +134,7 @@ function PlaylistEditor({ playlist, media, folders, songs, onDone }: { playlist:
       lyrics: newLyricsItem(),
       youtube: newYouTubeItem(channelId, org.name),
       stream: newStreamItem(null),
+      ndi: newNdiItem(),
     }
     setItems((list) => [...list, blank[type]])
   }
@@ -150,12 +153,14 @@ function PlaylistEditor({ playlist, media, folders, songs, onDone }: { playlist:
     if (noYouTube >= 0) return alert(`Item ${noYouTube + 1} needs a YouTube video chosen.`)
     const badStream = items.findIndex((i) => i.type === 'stream' && !validStreamUrl(i.url))
     if (badStream >= 0) return alert(`Item ${badStream + 1} needs a stream link (starting with https://).`)
+    const badNdi = items.findIndex((i) => i.type === 'ndi' && ndiProblem(i))
+    if (badNdi >= 0) return alert(`Item ${badNdi + 1}: ${ndiProblem(items[badNdi] as Extract<PlaylistItem, { type: 'ndi' }>)}`)
     const badCountdown = items.findIndex((i) => i.type === 'countdown' && countdownProblem(i))
     if (badCountdown >= 0) return alert(`Item ${badCountdown + 1}: ${countdownProblem(items[badCountdown] as Extract<PlaylistItem, { type: 'countdown' }>)}`)
     const noSong = items.findIndex((i) => i.type === 'lyrics' && 'song_id' in i && !i.song_id)
     if (noSong >= 0) return alert(`Item ${noSong + 1} needs a song chosen from the library (or switch it to typed lyrics).`)
     const cleaned = items.map((i) =>
-      i.type === 'lyrics' && 'slides' in i ? { ...i, slides: i.slides.map((s) => s.trim()).filter(Boolean) } : i,
+      i.type === 'lyrics' && 'slides' in i ? { ...i, slides: i.slides.map((s) => s.trim()).filter(Boolean) } : i.type === 'ndi' ? cleanNdi(i) : i,
     )
     setSaving(true)
     const row = { organization_id: org.id, name: name.trim(), site_id: scope, items: cleaned }
@@ -229,6 +234,13 @@ function PlaylistEditor({ playlist, media, folders, songs, onDone }: { playlist:
 
           {item.type === 'stream' && <StreamItemEditor item={item} onChange={(next) => update(i, next)} />}
 
+          {item.type === 'ndi' &&
+            (org.ndi_enabled ? (
+              <NdiItemEditor item={item} onChange={(next) => update(i, next)} />
+            ) : (
+              <p className="note warn">NDI sources are switched off for this church, so this item is not shown on the TV and cannot be changed. You can remove it.</p>
+            ))}
+
           {item.type === 'youtube' && <YouTubeItemEditor item={item} onChange={(next) => update(i, next)} />}
 
           {item.type === 'lyrics' && <LyricsItemEditor item={item} songs={songs} onChange={(next) => update(i, next)} />}
@@ -255,6 +267,11 @@ function PlaylistEditor({ playlist, media, folders, songs, onDone }: { playlist:
         <button className="btn" onClick={() => add('stream')}>
           + Live stream
         </button>
+        {org.ndi_enabled && (
+          <button className="btn" onClick={() => add('ndi')} title="Experimental: needs the special NDI build of the TV app">
+            + {NDI_LABEL}
+          </button>
+        )}
       </div>
       <p className="muted">
         Tip: for screens turned to portrait, use portrait media (1080 x 1920). YouTube items don't rotate on portrait screens.

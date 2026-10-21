@@ -14,8 +14,24 @@ android {
         applicationId = "com.churchtvos.tv"
         minSdk = 25 // Fire OS 6 and newer
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.5.0"
+        versionCode = 7
+        versionName = "1.6.0"
+    }
+
+    // Two products from one code base. "store" is what goes to Amazon and Google Play: NO NDI code or libraries.
+    // "ndi" is the EXPERIMENTAL build that links the NDI Android SDK (licence unconfirmed: never publish it). See NDI-CONTRACT.md.
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("store") {
+            dimension = "distribution"
+            isDefault = true
+            buildConfigField("boolean", "NDI_AVAILABLE", "false")
+        }
+        create("ndi") {
+            dimension = "distribution"
+            versionNameSuffix = "-ndi" // shows in Settings and in the dashboard's screen list (app_version)
+            buildConfigField("boolean", "NDI_AVAILABLE", "true")
+        }
     }
 
     val signing = rootProject.file("keystore/keystore.properties").takeIf { it.exists() }?.let { file ->
@@ -56,7 +72,21 @@ android {
     }
 }
 
+// The ndi variants exist only when the NDI SDK has been dropped into app/ndi-sdk/ (it is gitignored; see NDI-CONTRACT.md),
+// so a plain `./gradlew assembleRelease bundleRelease` can only ever produce the store build. -PndiCompileOnly=true enables
+// them without the SDK to compile and unit-test the Kotlin side (the result has no NDI libraries and cannot be installed).
+val ndiSdkPresent = file("ndi-sdk/include/Processing.NDI.Lib.h").exists()
+val ndiCompileOnly = providers.gradleProperty("ndiCompileOnly").isPresent
+androidComponents {
+    beforeVariants { variant ->
+        if (variant.productFlavors.any { it.second == "ndi" }) variant.enable = ndiSdkPresent || ndiCompileOnly
+    }
+}
+
 dependencies {
+    // The NDI native code and libndi.so live in a separate module that only the ndi flavor depends on.
+    "ndiImplementation"(project(":ndi-native"))
+
     val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")

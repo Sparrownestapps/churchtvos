@@ -32,7 +32,7 @@ export default function ChurchDetail({ org, modules, onBack, onChanged }: Props)
 
   const moduleName = (id: string) => modules.find((m) => m.id === id)?.name ?? id.charAt(0).toUpperCase() + id.slice(1)
 
-  async function adminUpdate(args: { p_status?: string; p_reason?: string; p_notes?: string; p_reviewed?: boolean }) {
+  async function adminUpdate(args: { p_status?: string; p_reason?: string; p_notes?: string; p_reviewed?: boolean; p_ndi?: boolean }) {
     return attempt(async () => {
       setBusy(true)
       try {
@@ -80,6 +80,7 @@ export default function ChurchDetail({ org, modules, onBack, onChanged }: Props)
       </div>
 
       <PlanSection org={org} modules={modules} moduleName={moduleName} onChanged={onChanged} />
+      <ExperimentalSection org={org} busy={busy} onToggle={(on) => adminUpdate({ p_ndi: on })} />
       <SuspendSection org={org} busy={busy} onSubmit={adminUpdate} />
       <PeopleSection org={org} modules={modules} onChanged={onChanged} />
       <ScreensSection org={org} />
@@ -274,6 +275,37 @@ function EntitlementEditor({
 }
 
 // ───────── Suspend / reactivate ─────────
+
+function ExperimentalSection({ org, busy, onToggle }: { org: AdminOrg; busy: boolean; onToggle: (on: boolean) => Promise<boolean> }) {
+  const on = org.ndi_enabled
+  const { reloadOrg, org: current } = useApp()
+  async function flip() {
+    const msg = on
+      ? `Switch OFF experimental NDI sources for ${org.name}?\n\nExisting NDI items stay saved but stop playing on their TVs, and the editors hide the option.`
+      : `Switch ON experimental NDI sources for ${org.name}?\n\nThe NDI SDK licence for Android is unconfirmed. Do not enable this for customers. Only for churches you are testing with, on TVs running the special NDI build.`
+    if (!confirm(msg)) return
+    if (await onToggle(!on) && current.id === org.id) reloadOrg()
+  }
+  return (
+    <div className="card stack-sm">
+      <h3>
+        Experimental features <span className={`adm-badge ${on ? 'bad' : 'ok'}`}>{on ? 'NDI on' : 'All off'}</span>
+      </h3>
+      <p className="error" role="note">
+        <b>Do not enable for customers.</b> The NDI SDK licence for Android is unconfirmed: NDI's licence says Android and fixed-purpose devices need a
+        separate commercial agreement with NDI. Use only for churches you are testing with.
+      </p>
+      <label className="check">
+        <input type="checkbox" checked={on} disabled={busy} onChange={flip} />
+        <span>
+          <b>NDI source (experimental)</b> in Kids playlists and Slides decks. It plays only on TVs running the special NDI build of the TV app (the version ends in
+          "-ndi"). The normal store app skips these items.
+        </span>
+      </label>
+      <p className="muted">Who switched it and when is recorded in the activity log below.</p>
+    </div>
+  )
+}
 
 function SuspendSection({ org, busy, onSubmit }: { org: AdminOrg; busy: boolean; onSubmit: (a: { p_status: string; p_reason?: string }) => Promise<boolean> }) {
   const [reason, setReason] = useState('')

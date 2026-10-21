@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -134,6 +135,7 @@ private fun DeckSlide.listLabel(): String = when (this) {
     is DeckSlide.Media -> if (mediaKind == "video") "Video" else "Picture"
     is DeckSlide.Countdown -> title?.takeIf { it.isNotBlank() }?.let { "Countdown: $it" } ?: "Countdown"
     is DeckSlide.Stream -> title?.takeIf { it.isNotBlank() }?.let { "Live: $it" } ?: "Live stream"
+    is DeckSlide.Ndi -> "NDI: " + title.ifBlank { source }.ifBlank { "source" }
     is DeckSlide.Blank -> "Blank"
     is DeckSlide.SongTitle -> "$title (title)"
     is DeckSlide.Lyric -> "$song · ${label?.takeIf { it.isNotBlank() } ?: "Part $number"}"
@@ -148,8 +150,9 @@ private fun DeckSlide.listLabel(): String = when (this) {
 fun SlidesPlayer(deck: Deck, cache: MediaCache, onExit: () -> Unit, onFinished: () -> Unit = onExit, report: Boolean = true) {
     val context = LocalContext.current
     val rotated = LocalRotated.current
-    val slides = remember(deck) {
-        deck.playableSlides.filter { s ->
+    val ndiAllowed = LocalNdiAllowed.current
+    val slides = remember(deck, ndiAllowed) {
+        deck.playableSlides(ndiAllowed, NdiBuild.AVAILABLE).filter { s ->
             // A slide whose file never downloaded would be blank; skip it rather than stall.
             when (s) {
                 is DeckSlide.Media -> cache.fileFor(s.url).exists()
@@ -179,11 +182,12 @@ fun SlidesPlayer(deck: Deck, cache: MediaCache, onExit: () -> Unit, onFinished: 
 
     // Remote control: report what is on screen, obey commands.
     val outline = remember(slides) { slides.map { it.listLabel() } }
-    LaunchedEffect(index, blank) {
+    val liveNote by Remote.ndiNote.collectAsState()
+    LaunchedEffect(index, blank, liveNote) {
         if (report) {
             Remote.status.value = PlaybackStatus(
                 module = Module.SLIDES, state = if (blank) "blank" else "playing", title = deck.name,
-                label = slides.getOrNull(index)?.listLabel().orEmpty(), index = index, count = slides.size, outline = outline,
+                label = slides.getOrNull(index)?.listLabel().orEmpty() + (if (slide is DeckSlide.Ndi) liveNote?.let { " · $it" }.orEmpty() else ""), index = index, count = slides.size, outline = outline,
                 refKind = "deck", refId = deck.id,
             )
         }
@@ -262,6 +266,7 @@ fun SlidesPlayer(deck: Deck, cache: MediaCache, onExit: () -> Unit, onFinished: 
             is DeckSlide.Text -> slide.seconds
             is DeckSlide.Media -> if (slide.mediaKind == "image") slide.seconds else null
             is DeckSlide.Stream -> slide.seconds
+            is DeckSlide.Ndi -> slide.seconds
             else -> null
         }
         if (seconds != null && seconds > 0) {
@@ -335,6 +340,7 @@ fun SlidesPlayer(deck: Deck, cache: MediaCache, onExit: () -> Unit, onFinished: 
                         Text("Waiting for the live feed…", style = TextStyle(fontFamily = Lato, fontWeight = FontWeight.Bold, fontSize = 28.sp, color = Color.White, textAlign = TextAlign.Center))
                     }
                 }
+                is DeckSlide.Ndi -> NdiSlideView(slide.spec(), onUnavailable = { next() })
                 is DeckSlide.Blank -> Box(Modifier.fillMaxSize().background(parseHexColor(slide.color) ?: Color.Black))
                 else -> Unit
             }

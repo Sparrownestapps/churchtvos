@@ -5,6 +5,7 @@ import type { DeckSlide, SlideBackground, SlideLayout, ThemeConfig } from '../sl
 import type { SongForSlides } from '../slidesPages.types'
 import { contrast } from '../theme'
 import { expandSong } from '../songParsers'
+import { NDI_DEFAULTS, cleanNdi, ndiProblem } from '../ndiLogic'
 
 export const DEFAULT_NAVY = '#1f3a5f'
 
@@ -101,6 +102,7 @@ export type Frame =
   | { kind: 'countdown'; title: string; seconds: number; until?: string }
   | { kind: 'media'; url: string; media: 'image' | 'video'; fit: 'contain' | 'cover' }
   | { kind: 'stream'; title: string }
+  | { kind: 'ndi'; title: string; source: string }
   | { kind: 'blank'; color: string }
 
 /** The screens a deck slide produces. A song makes a title frame (if asked for) plus one frame per lyric slide. */
@@ -114,6 +116,8 @@ export function framesFor(slide: DeckSlide, songs: Map<string, SongForSlides>): 
       return [{ kind: 'countdown', title: slide.title ?? '', seconds: slide.seconds ?? 0, until: slide.mode === 'until' && slide.until ? slide.until : undefined }]
     case 'stream':
       return [{ kind: 'stream', title: slide.title ?? '' }]
+    case 'ndi':
+      return [{ kind: 'ndi', title: slide.title ?? '', source: slide.source }]
     case 'blank':
       return [{ kind: 'blank', color: slide.color ?? '#000000' }]
     case 'song': {
@@ -274,6 +278,8 @@ export function blankSlide(kind: NewKind, existing: { id: string }[]): DeckSlide
       return { id, kind, title: 'Service starts in', mode: 'duration', seconds: 300, at_zero: 'hold', if_passed: 'zero' }
     case 'stream':
       return { id, kind, title: '', url: '', audio: false, fallback: 'skip', seconds: null }
+    case 'ndi':
+      return { id, kind, title: '', ...NDI_DEFAULTS }
     case 'blank':
       return { id, kind, color: '#000000' }
   }
@@ -285,6 +291,7 @@ export const KIND_NAME: Record<NewKind, string> = {
   song: 'Song',
   countdown: 'Countdown',
   stream: 'Live stream',
+  ndi: 'NDI source (experimental)',
   blank: 'Blank',
 }
 
@@ -302,6 +309,8 @@ export function slideLabel(slide: DeckSlide, songs: Map<string, SongForSlides>, 
       return oneLine(slide.title) || 'Countdown'
     case 'stream':
       return oneLine(slide.title) || 'Live stream'
+    case 'ndi':
+      return oneLine(slide.title) || oneLine(slide.source) || 'NDI source'
     case 'blank':
       return 'Blank'
   }
@@ -318,6 +327,10 @@ export function firstProblem(slides: DeckSlide[], deckBackground: SlideBackgroun
     if (s.kind === 'media' && !s.url) return `Slide ${n} needs an image or video chosen.`
     if (s.kind === 'song' && !s.song_id) return `Slide ${n} needs a song chosen.`
     if (s.kind === 'stream' && !/^https?:\/\/\S+$/i.test(s.url.trim())) return `Slide ${n} needs a stream link starting with https://.`
+    if (s.kind === 'ndi') {
+      const bad = ndiProblem(s)
+      if (bad) return `Slide ${n}: ${bad}`
+    }
     if (s.kind === 'countdown') {
       const bad = countdownProblem(s)
       if (bad) return `Slide ${n}: ${bad}`
@@ -339,6 +352,11 @@ export function cleanSlide(s: DeckSlide): DeckSlide {
   }
   if (out.kind === 'countdown' || out.kind === 'stream') out.title = (out.title ?? '').trim()
   if (out.kind === 'stream') out.url = out.url.trim()
+  if (out.kind === 'ndi') {
+    const c = cleanNdi(out)
+    c.title = (c.title ?? '').trim()
+    return c
+  }
   return out
 }
 

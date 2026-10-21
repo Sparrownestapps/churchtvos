@@ -69,6 +69,21 @@ sealed interface PlaylistItem {
         val fallback: String = "skip", // "skip" or "hold"
     ) : PlaylistItem
 
+    /** EXPERIMENTAL NDI source (see NdiModel.kt). Plays only in the "ndi" build, and only when the church has the flag. */
+    @Serializable
+    @SerialName("ndi")
+    data class Ndi(
+        override val title: String = "",
+        val source: String = "",
+        val address: String? = null,
+        val audio: Boolean = false,
+        val fit: String = "fit",
+        val fallback: String = "skip",
+        @SerialName("fallback_text") val fallbackText: String = "",
+        @SerialName("max_wait_seconds") val maxWaitSeconds: Int = NDI_DEFAULT_WAIT,
+        val seconds: Int? = null,
+    ) : PlaylistItem
+
     /** Any item type this app version does not know: skipped instead of rejecting the whole playlist. */
     @Serializable
     @SerialName("unknown")
@@ -109,7 +124,10 @@ sealed interface Slide {
     data class YouTube(val videoId: String?, val channelId: String?, val start: Int?) : Slide
     data class Sign(val title: String, val subtext: String, val background: String, val seconds: Int, val align: String, val logo: Boolean) : Slide
     data class Stream(val url: String, val audio: Boolean, val seconds: Int?, val fallback: String) : Slide
+    data class Ndi(val spec: NdiSpec) : Slide
 }
+
+fun PlaylistItem.Ndi.spec() = NdiSpec(title, source, address, audio, fit, fallback, fallbackText, maxWaitSeconds, seconds)
 
 fun PlaylistItem.Countdown.spec() = CountdownSpec(mode, seconds, until, audio, atZero, ifPassed)
 
@@ -122,9 +140,17 @@ fun Playlist.toSlides(cache: MediaCache): List<Slide> = items.flatMap { item ->
         is PlaylistItem.YouTube -> listOf(Slide.YouTube(item.videoId, item.channelId, item.start))
         is PlaylistItem.Sign -> listOf(Slide.Sign(item.title, item.subtext, item.background, item.seconds, item.align, item.logo))
         is PlaylistItem.Stream -> listOf(Slide.Stream(item.url, item.audio, item.seconds, item.fallback))
+        is PlaylistItem.Ndi -> listOf(Slide.Ndi(item.spec()))
         is PlaylistItem.Unknown -> emptyList()
     }
 }
+
+/**
+ * Drops NDI slides that must not play: the church does not have the flag, or this build has no NDI and the slide would only
+ * be skipped anyway. Kept as a separate step so the rules are testable.
+ */
+fun List<Slide>.withoutBlockedNdi(flagOn: Boolean, buildHasNdi: Boolean): List<Slide> =
+    filter { it !is Slide.Ndi || it.spec.isPlayable(flagOn, buildHasNdi) }
 
 data class DownloadProgress(val done: Int, val total: Int)
 
@@ -145,6 +171,7 @@ fun Slide.label(): String = when (this) {
     is Slide.YouTube -> "YouTube"
     is Slide.Sign -> title.ifBlank { "Sign" }
     is Slide.Stream -> "Live stream"
+    is Slide.Ndi -> "NDI: " + spec.title.ifBlank { spec.source }.ifBlank { "source" }
 }
 
 /** What a player tells remotes about itself. Null means "do not report" (demo mode). */

@@ -34,6 +34,8 @@ data class DeviceState(
     val paired: Boolean,
     @SerialName("pairing_code") val pairingCode: String? = null,
     val organization: OrganizationInfo? = null,
+    /** Experimental features the church has been given (all off unless the platform admin switches them on). */
+    val experimental: ExperimentalInfo = ExperimentalInfo(),
     val site: String? = null,
     val location: String? = null,
     val timezone: String = "America/Toronto",

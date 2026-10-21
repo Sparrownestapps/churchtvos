@@ -86,6 +86,7 @@ private fun DeckSlide.homeLabel(): Pair<String, String> = when (this) {
     is DeckSlide.Media -> (if (mediaKind == "video") "VIDEO" else "PICTURE") to ""
     is DeckSlide.Countdown -> "COUNTDOWN" to (title ?: "")
     is DeckSlide.Stream -> "LIVE" to (title ?: "")
+    is DeckSlide.Ndi -> "NDI" to title
     is DeckSlide.Blank -> "BLANK" to ""
     is DeckSlide.SongTitle -> "SONG" to title
     is DeckSlide.Lyric -> "LYRICS" to "$song · ${label ?: "Part $number"}"

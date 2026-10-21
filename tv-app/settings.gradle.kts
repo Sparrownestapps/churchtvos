@@ -14,3 +14,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "ChurchTvOs"
 include(":app")
+include(":ndi-native")

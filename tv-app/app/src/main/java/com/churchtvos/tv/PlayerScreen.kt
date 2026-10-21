@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
@@ -52,20 +53,29 @@ import kotlinx.coroutines.delay
 
 /** [onExit] is Back; [onFinished] is reaching the end of the slides (signage loops, demo restarts). */
 @Composable
-fun PlayerScreen(slides: List<Slide>, onExit: () -> Unit, onFinished: () -> Unit = onExit, report: PlayerReport? = null) {
+fun PlayerScreen(allSlides: List<Slide>, onExit: () -> Unit, onFinished: () -> Unit = onExit, report: PlayerReport? = null) {
     val context = LocalContext.current
     val rotated = LocalRotated.current
+    // Experimental NDI slides only play when the church has the flag; a build without NDI drops the ones it could only skip.
+    val ndiAllowed = LocalNdiAllowed.current
+    val slides = remember(allSlides, ndiAllowed) { allSlides.withoutBlockedNdi(ndiAllowed, NdiBuild.AVAILABLE) }
+    if (slides.isEmpty() && allSlides.isNotEmpty()) {
+        // Everything was blocked: do not spin (a Signage loop restarts on finish). Wait a moment, then finish.
+        val finished by rememberUpdatedState(onFinished)
+        LaunchedEffect(Unit) { delay(5_000); finished() }
+    }
     var index by remember { mutableIntStateOf(0) }
     val slide = slides.getOrNull(index)
     var blank by remember { mutableStateOf(false) }
 
     // Remote control: tell phones what is on screen, and obey them.
     val outline = remember(slides) { slides.map { it.label() } }
-    LaunchedEffect(index, blank, report) {
+    val liveNote by Remote.ndiNote.collectAsState()
+    LaunchedEffect(index, blank, report, liveNote) {
         if (report != null) {
             Remote.status.value = PlaybackStatus(
                 module = report.module, state = if (blank) "blank" else "playing", title = report.title,
-                label = slide?.label().orEmpty(), index = index, count = slides.size, outline = outline,
+                label = slide?.label().orEmpty() + (if (slide is Slide.Ndi) liveNote?.let { " · $it" }.orEmpty() else ""), index = index, count = slides.size, outline = outline,
                 refKind = report.refKind, refId = report.refId,
             )
         }
@@ -155,6 +165,10 @@ fun PlayerScreen(slides: List<Slide>, onExit: () -> Unit, onFinished: () -> Unit
             delay(slide.seconds * 1000L)
             next()
         }
+        if (slide is Slide.Ndi && slide.spec.seconds != null) {
+            delay(slide.spec.seconds * 1000L)
+            next()
+        }
     }
 
     BackHandler(onBack = onExit)
@@ -223,6 +237,7 @@ fun PlayerScreen(slides: List<Slide>, onExit: () -> Unit, onFinished: () -> Unit
                 is Slide.YouTube -> YouTubeSlide(slide, youtube, onEnded = { next() })
                 is Slide.Sign -> SignSlide(slide)
                 is Slide.Stream -> if (streamFailed) StreamNotice(slide)
+                is Slide.Ndi -> NdiSlideView(slide.spec, onUnavailable = { next() })
                 is Slide.Video, null -> Unit
             }
         }

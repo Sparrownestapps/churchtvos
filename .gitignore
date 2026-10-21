@@ -19,3 +19,9 @@ apple/**/DerivedData/
 apple/**/.swiftpm/
 apple/**/xcuserdata/
 *.xcuserstate
+
+# NDI SDK extracted for the experimental "ndi" build: confidential, never commit (see NDI-CONTRACT.md)
+tv-app/app/ndi-sdk/
+tv-app/ndi-native/.cxx/
+tv-app/ndi-native/build/
+NDI SDK for Android/

@@ -1,3 +1,5 @@
+import type { NdiConfig } from './types'
+
 // Slides module data shapes. CONTRACT shared by the dashboard, the database function deck_expand() and the TV app.
 // Do not change a field name or meaning without changing all three. See SLIDES-MODULE-PLAN.md.
 
@@ -78,12 +80,15 @@ export type StreamSlide = SlideBase & {
   seconds?: number | null
 }
 
+/** EXPERIMENTAL NDI source. Same fields as the Kids item; see NdiConfig in types.ts and NDI-CONTRACT.md. Only saved when the church has the flag. */
+export type NdiSlide = SlideBase & { kind: 'ndi'; title?: string } & NdiConfig
+
 export type BlankSlide = SlideBase & {
   kind: 'blank'
   color?: string // default '#000000'
 }
 
-export type DeckSlide = TextSlide | MediaSlide | SongSlide | CountdownSlide | StreamSlide | BlankSlide
+export type DeckSlide = TextSlide | MediaSlide | SongSlide | CountdownSlide | StreamSlide | NdiSlide | BlankSlide
 
 /** slide_themes.config */
 export type ThemeConfig = {

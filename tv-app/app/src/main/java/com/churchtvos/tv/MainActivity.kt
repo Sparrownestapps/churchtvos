@@ -101,7 +101,10 @@ class MainActivity : ComponentActivity() {
                     Oriented(debugOrientation ?: "landscape") {
                         if (debugSign != null) {
                             val item = AppJson.decodeFromString<PlaylistItem>(debugSign)
-                            PlayerScreen(Playlist("debug", "debug", listOf(item)).toSlides(cache), onExit = { finish() })
+                            // Debug only: pretend the church has the experimental NDI flag so an "ndi" item can be tried.
+                            androidx.compose.runtime.CompositionLocalProvider(LocalNdiAllowed provides true) {
+                                PlayerScreen(Playlist("debug", "debug", listOf(item)).toSlides(cache), onExit = { finish() })
+                            }
                         } else {
                             val sample = Playlist("debug", "Week 3: Noah and the Ark", listOf(
                                 PlaylistItem.Countdown("Service starts in", 300),
@@ -170,7 +173,7 @@ fun App(sync: TvSync, cache: MediaCache, settingsOpen: Boolean, onSettingsChange
     val demoNow = demo
 
     val zone = remember(device?.timezone) { runCatching { java.time.ZoneId.of(device?.timezone) }.getOrDefault(java.time.ZoneId.systemDefault()) }
-    androidx.compose.runtime.CompositionLocalProvider(LocalTimeZone provides zone) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalTimeZone provides zone, LocalNdiAllowed provides (device?.experimental?.ndi == true)) {
     BrandTheme(device?.brand() ?: Brand()) {
         Oriented(device?.screen?.orientation ?: "landscape") {
             when {
@@ -309,6 +312,7 @@ private fun SignageModule(device: DeviceState, now: Instant, cache: MediaCache) 
                 when {
                     it is PlaylistItem.Image && it.seconds == null -> it.copy(seconds = 10)
                     it is PlaylistItem.Stream && it.seconds == null -> it.copy(seconds = 30) // a loop must move on
+                    it is PlaylistItem.Ndi && it.seconds == null -> it.copy(seconds = 30)
                     else -> it
                 }
             })

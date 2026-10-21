@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import '../slides.css'
-import type { BlankSlide, CountdownSlide, DeckSlide, MediaSlide, SlideLayout, SongSlide, StreamSlide, TextSlide } from '../slidesTypes'
+import { useApp } from '../context'
+import { NdiFields } from '../NdiItem'
+import type { BlankSlide, CountdownSlide, DeckSlide, MediaSlide, NdiSlide, SlideLayout, SongSlide, StreamSlide, TextSlide } from '../slidesTypes'
 import type { Media } from '../types'
 import type { SlidesLibrary, SongForSlides } from '../slidesPages.types'
 import { isHex } from '../lib'
@@ -258,6 +260,12 @@ function StreamEditor({ slide, onChange }: Props<StreamSlide>) {
   )
 }
 
+function NdiEditor({ slide, onChange }: Props<NdiSlide>) {
+  const { org } = useApp()
+  if (!org.ndi_enabled) return <p className="note warn">NDI sources are switched off for this church, so this slide is not shown on the TV and cannot be changed. You can delete it.</p>
+  return <NdiFields value={slide} onPatch={(p) => onChange({ ...slide, ...p })} />
+}
+
 function BlankEditor({ slide, onChange }: Props<BlankSlide>) {
   return <ColorField label="Screen colour" value={slide.color ?? '#000000'} onChange={(color) => onChange({ ...slide, color })} />
 }
@@ -265,7 +273,7 @@ function BlankEditor({ slide, onChange }: Props<BlankSlide>) {
 /** The editor for whichever kind of slide is selected, plus its background and private notes. */
 export default function SlideEditor({ slide, onChange, lib, songs, readOnly }: Props<DeckSlide> & { readOnly: boolean }) {
   const common = { lib, songs }
-  const hasBackground = slide.kind !== 'blank' && slide.kind !== 'stream'
+  const hasBackground = slide.kind !== 'blank' && slide.kind !== 'stream' && slide.kind !== 'ndi'
   return (
     <fieldset className="sl-fieldset stack" disabled={readOnly}>
       <legend className="sr-only">{KIND_NAME[slide.kind]} slide</legend>
@@ -276,6 +284,7 @@ export default function SlideEditor({ slide, onChange, lib, songs, readOnly }: P
         {slide.kind === 'song' && <SongEditor slide={slide} onChange={onChange} {...common} />}
         {slide.kind === 'countdown' && <CountdownEditor slide={slide} onChange={onChange} {...common} />}
         {slide.kind === 'stream' && <StreamEditor slide={slide} onChange={onChange} {...common} />}
+        {slide.kind === 'ndi' && <NdiEditor slide={slide} onChange={onChange} {...common} />}
         {slide.kind === 'blank' && <BlankEditor slide={slide} onChange={onChange} {...common} />}
       </div>
       {hasBackground && (

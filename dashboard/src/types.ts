@@ -40,6 +40,8 @@ export type Organization = {
   created_at: string
   /** 'suspended' = paused by the platform owner: nothing is live. */
   status?: 'active' | 'suspended'
+  /** EXPERIMENTAL features switched on by the platform admin (see NDI-CONTRACT.md). Absent or false = off. */
+  ndi_enabled?: boolean
 }
 
 export type Membership = {
@@ -102,6 +104,7 @@ export type PlaylistItem =
   // video_id null + channel_id set = whatever that channel is live-streaming when the item plays
   | { type: 'youtube'; title: string; video_id: string | null; channel_id: string | null; start: number | null }
   | StreamItem
+  | NdiItem
 
 /**
  * Lyrics: typed by hand (legacy shape, `slides`) or taken from the song library (`song_id`; the server expands it into
@@ -157,6 +160,31 @@ export type StreamItem = {
   /** If the feed is down: move on, or show a "waiting for feed" card for a while first. */
   fallback: 'skip' | 'hold'
 }
+
+/**
+ * EXPERIMENTAL: an NDI source (a camera or computer on the same network). Shared by Kids playlist items (`type: 'ndi'`) and
+ * Slides deck slides (`kind: 'ndi'`). The server only accepts it for churches the platform admin has enabled it for
+ * (organizations.ndi_enabled), and only the experimental TV build (the "ndi" flavor, app version ending "-ndi") can play it.
+ * Contract: NDI-CONTRACT.md at the repository root. Keep the two in step.
+ */
+export type NdiConfig = {
+  /** NDI source name exactly as NDI lists it, "MACHINE (Source)". Required. */
+  source: string
+  /** Optional host or IP with optional :port, for networks where discovery does not work. */
+  address?: string | null
+  audio: boolean
+  /** fit = whole picture visible (letterbox); fill = crop to fill the screen. */
+  fit: 'fit' | 'fill'
+  /** If the source is not available: skip the slide, or show fallback_text. */
+  fallback: 'skip' | 'message'
+  fallback_text?: string
+  /** Seconds to wait for the source (first connect, and after a drop) before the fallback applies. 3 to 120. */
+  max_wait_seconds: number
+  /** null = until the viewer presses next (Kids) / the playlist loops past it (Signage). */
+  seconds: number | null
+}
+
+export type NdiItem = { type: 'ndi'; title: string } & NdiConfig
 
 /** A text-only sign slide (Signage only). Must match the TV app (needs app 1.1.0+). */
 export type SignSlide = {

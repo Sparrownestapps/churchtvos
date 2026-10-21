@@ -93,6 +93,14 @@ fun SettingsScreen(
         TvButton("Close", onClick = onClose)
         Spacer(Modifier.height(20.dp))
         Text(detail, style = TextStyle(fontFamily = Lato, fontSize = 13.sp, color = Greyscale, textAlign = TextAlign.Center))
+        if (NdiBuild.AVAILABLE) {
+            // Required by NDI's licence wherever NDI is used. Only the experimental "ndi" build contains NDI.
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Experimental build with NDI support. NDI® is a registered trademark of Vizrt NDI AB. ndi.video",
+                style = TextStyle(fontFamily = Lato, fontSize = 12.sp, color = Greyscale, textAlign = TextAlign.Center),
+            )
+        }
     }
 }
 

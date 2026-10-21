@@ -72,5 +72,8 @@ object Remote {
     val status = MutableStateFlow(PlaybackStatus())
     val message = MutableStateFlow<ActiveMessage?>(null)
 
+    /** A short live note from the slide on screen (for example "NDI: Main camera, live"), added to the status label. */
+    val ndiNote = MutableStateFlow<String?>(null)
+
     fun idle() { status.value = PlaybackStatus() }
 }

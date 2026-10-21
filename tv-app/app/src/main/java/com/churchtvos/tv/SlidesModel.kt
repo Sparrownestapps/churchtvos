@@ -128,6 +128,22 @@ sealed interface DeckSlide {
         override val background: SlideBackground? = null,
     ) : DeckSlide
 
+    /** EXPERIMENTAL NDI source (see NdiModel.kt). */
+    @Serializable @SerialName("ndi")
+    data class Ndi(
+        val id: String = "",
+        val title: String = "",
+        val source: String = "",
+        val address: String? = null,
+        val audio: Boolean = false,
+        val fit: String = "fit",
+        val fallback: String = "skip",
+        @SerialName("fallback_text") val fallbackText: String = "",
+        @SerialName("max_wait_seconds") val maxWaitSeconds: Int = NDI_DEFAULT_WAIT,
+        val seconds: Int? = null,
+        override val background: SlideBackground? = null,
+    ) : DeckSlide
+
     @Serializable @SerialName("blank")
     data class Blank(val id: String = "", val color: String? = null) : DeckSlide
 
@@ -156,7 +172,13 @@ sealed interface DeckSlide {
     data class Unknown(val id: String = "") : DeckSlide
 }
 
+fun DeckSlide.Ndi.spec() = NdiSpec(title, source, address, audio, fit, fallback, fallbackText, maxWaitSeconds, seconds)
+
 val Deck.playableSlides: List<DeckSlide> get() = slides.filter { it !is DeckSlide.Unknown }
+
+/** [playableSlides] without NDI slides that must not play (flag off, or a build with no NDI that would only skip them). */
+fun Deck.playableSlides(ndiFlagOn: Boolean, buildHasNdi: Boolean): List<DeckSlide> =
+    playableSlides.filter { it !is DeckSlide.Ndi || it.spec().isPlayable(ndiFlagOn, buildHasNdi) }
 
 /** Remote files this deck needs on the TV before it can play (backgrounds, images, videos). */
 val Deck.mediaUrls: List<String>

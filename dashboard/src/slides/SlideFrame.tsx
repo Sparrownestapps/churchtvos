@@ -23,6 +23,8 @@ export function describeFrame(f: Frame): string {
       return f.media === 'video' ? 'Video' : 'Image'
     case 'stream':
       return `Live stream ${f.title}`
+    case 'ndi':
+      return `NDI source ${f.title || f.source}`
     case 'blank':
       return 'Blank screen'
   }
@@ -127,9 +129,9 @@ export type SlideFrameProps = {
 /** One 16:9 or 9:16 screen, drawn the way the TV draws it (all sizes are percent of the frame height). */
 export default function SlideFrame({ frame, theme, background, logo, portrait = false, live = false, className = '' }: SlideFrameProps) {
   const bg: SlideBackground =
-    frame.kind === 'blank' ? { type: 'color', color: frame.color } : frame.kind === 'stream' ? { type: 'color', color: '#000000' } : background
+    frame.kind === 'blank' ? { type: 'color', color: frame.color } : frame.kind === 'stream' || frame.kind === 'ndi' ? { type: 'color', color: '#000000' } : background
   const plan = useMemo(() => planText(frame, theme), [frame, theme])
-  const dim = frame.kind === 'blank' || frame.kind === 'stream' ? 0 : Math.min(0.8, Math.max(0, bg.dim ?? 0))
+  const dim = frame.kind === 'blank' || frame.kind === 'stream' || frame.kind === 'ndi' ? 0 : Math.min(0.8, Math.max(0, bg.dim ?? 0))
 
   return (
     <div
@@ -160,9 +162,17 @@ export default function SlideFrame({ frame, theme, background, logo, portrait = 
         </div>
       )}
 
+      {frame.kind === 'ndi' && (
+        <div className="sl-stream" style={{ fontFamily: FONT[theme.font] }}>
+          <span className="sl-live">● NDI</span>
+          <span className="sl-stream-title">{frame.title || frame.source || 'NDI source'}</span>
+          <span className="sl-stream-note">Experimental: NDI feed plays here on the TV</span>
+        </div>
+      )}
+
       {plan && <TextBox plan={plan} theme={theme} portrait={portrait} />}
 
-      {theme.logo.show && logo && frame.kind !== 'blank' && frame.kind !== 'stream' && (
+      {theme.logo.show && logo && frame.kind !== 'blank' && frame.kind !== 'stream' && frame.kind !== 'ndi' && (
         <img className={`sl-logo ${theme.logo.position.replace('_', '-')}`} src={logo} alt="" draggable={false} />
       )}
     </div>
