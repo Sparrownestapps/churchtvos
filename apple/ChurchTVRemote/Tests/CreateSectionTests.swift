@@ -1,6 +1,7 @@
 import XCTest
 import ChurchTVCore
 @testable import ChurchTVRemote
+@testable import ChurchTVEditors
 
 @MainActor
 final class CreateSectionTests: XCTestCase {

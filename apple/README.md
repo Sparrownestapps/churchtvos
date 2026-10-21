@@ -1,6 +1,7 @@
 # Church TV OS for Apple devices
 
 - `ChurchTVCore/` Swift package shared by every Apple app: models, Supabase wrapper (`SupabaseService`), `MockService` (demo mode), formatting, unit tests.
+- `ChurchTVEditors/` Swift package with the SwiftUI content editors (Create section, playlist/deck/theme editors, scheduling sheet, media/song pickers, UI kit). iOS 17 + macOS 14, depends only on ChurchTVCore. Used by the Remote app; the Mac app can import it.
 - `ChurchTVRemote/` the iPhone and iPad app (SwiftUI, bundle id `com.churchtvos.remote`, name "Church TV OS Remote"). `project.yml` is the XcodeGen spec; `ChurchTVRemote.xcodeproj` is generated from it and also checked in.
 - `ChurchTVMac/` the Mac app (SwiftUI + WKWebView, bundle id `com.churchtvos.mac`, name "Church TV OS"). See "Mac app" below.
 - `screenshots/` simulator screenshots taken in demo mode (`mac-*.png` are from the Mac app).
@@ -115,3 +116,11 @@ Regenerate the project after editing `project.yml`: `xcodegen generate` (XcodeGe
 
 ## Scheduling (build 2)
 `ScheduleSheet(target:)` (`App/Create/Schedule/`): Kids playlists and Slides decks go to locations (one-off `schedules`/`deck_schedules` or weekly `kids_series`/`deck_series` with a rotation, loop/stop), Signage playlists go to screens or screen groups (`signage_slots`, optional priority = highest existing + 1). Wall-clock times are converted in the site's time zone (`SiteClock`, DST safe); the sheet shows the zone and highlights it when it differs from the phone. Core: `Content/ScheduleLogic.swift` (form, rows, expander, overlap hints), `ScheduleService.swift` (`ChurchService` now also extends `ScheduleService`, defaults throw), `SupabaseService+Schedule.swift`, `MockService+Schedule.swift`. Upcoming list reads the `*_series_occurrences` RPCs (14 days); "Skip next date" writes a `skip` exception. Debug launch args: `-schedule deck|kids|signage`, `-schedmode repeat`, `-schedpick`, `-schedscroll when|upcoming`.
+
+## Editors package (`ChurchTVEditors/`)
+The editors moved out of `ChurchTVRemote/App/Create` and `App/Kit` into the package (`Sources/ChurchTVEditors/{Create,Kit}`). Tests that cover them are in `ChurchTVEditors/Tests`; `swift test` in the package folder, `xcodebuild -scheme ChurchTVEditors -destination 'platform=macOS' build` proves the Mac build.
+- **Host contract**: the editors read everything through `ContentModel` (SwiftUI environment: `.environment(contentModel)` once at the app root). `ContentModel(host:)` takes a `ContentHost` (service, church, screens, `loadPlayNow`, `loadSchedule`, `supportsPlayNow`, `playNowView`). The Remote's `AppModel` conforms (`App/EditorsBridge.swift`); a Mac host can leave the defaults (no TVs, no Play now).
+- **Public API**: `ContentHost`, `PlayNowTarget`, `ContentModel` (init, `reset()`, `church`, `canAddMedia`), `CreateRoot`, `CreateView`, `CreateRoute`, `CreateSection`, `PlaylistEditorView`, `DeckEditorView`, `ThemeEditorView`, `ScheduleSheet`, `AddMediaView`, `MediaPickerView`, `SongPickerView`, `Banner`, `Haptics`, `KitGalleryView` (DEBUG). Everything else is internal.
+- The Remote keeps thin aliases: `App/Create/CreateView.swift` (`CreateRoot`, `CreateView`) and `App/EditorsBridge.swift` (`Banner`, `Haptics`, `ScheduleSheet`, `AddMediaView`, `KitGalleryView`), so Remote files need no import. `PlaylistPlayNow.swift` and `DeckPlayNow.swift` stay in the Remote (they use its remote-control commands).
+- Platform shims are in `Kit/Platform.swift` (colours, JPEG conversion, keyboard/capitalisation modifiers, EditMode stand-in on macOS, sheet sizing, Cmd+S / Esc shortcuts). On the Mac: forms use the grouped style, sheets have minimum sizes, pushed editors are capped in width, the deck and theme editors always use the wide strip + preview + form layout, Reorder buttons are hidden (drag rows), haptics are no-ops.
+- `sync_xcodeproj.py` now also links the package and removes stale file references.

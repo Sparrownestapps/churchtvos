@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import ChurchTVCore
+import ChurchTVEditors
 
 @main
 struct ChurchTVRemoteApp: App {
@@ -11,6 +12,7 @@ struct ChurchTVRemoteApp: App {
         WindowGroup {
             RootView()
                 .environment(model)
+                .environment(model.content)   // the shared editors (ChurchTVEditors) read their state from ContentModel
                 .task { await model.bootstrap() }
         }
     }

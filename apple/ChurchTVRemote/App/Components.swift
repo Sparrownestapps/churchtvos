@@ -57,29 +57,6 @@ struct ModuleBadge: View {
     }
 }
 
-/// A banner for warnings and errors.
-struct Banner: View {
-    enum Style { case warning, error, info }
-    let text: String
-    var style: Style = .warning
-    var systemImage: String?
-
-    private var color: Color { style == .error ? .red : style == .warning ? .orange : .blue }
-    private var icon: String { systemImage ?? (style == .info ? "info.circle.fill" : "exclamationmark.triangle.fill") }
-
-    var body: some View {
-        Label {
-            Text(text).font(.subheadline).fixedSize(horizontal: false, vertical: true)
-        } icon: {
-            Image(systemName: icon).foregroundStyle(color)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
-    }
-}
-
 extension ScreenInfo {
     /// What to tell the user when the remote cannot be trusted right now (nil = all good).
     func remoteWarnings(now: Date = Date()) -> [String] {

@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import SwiftUI
 import ChurchTVCore
+import ChurchTVEditors
 
 /// App-wide state: session, current church, screens and their live status.
 @MainActor
@@ -42,7 +43,7 @@ final class AppModel {
 
     let push = PushManager.shared
     /// Content editing state (playlists, decks, themes, songs, media libraries) for the Create section and the editors.
-    @ObservationIgnored private(set) lazy var content = ContentModel(app: self)
+    @ObservationIgnored private(set) lazy var content = ContentModel(host: self)
 
     init(service: any ChurchService = SupabaseService()) {
         self.service = service
