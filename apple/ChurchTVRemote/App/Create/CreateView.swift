@@ -273,6 +273,18 @@ struct CreateView: View {
         if arg == "themes", sections.contains(.slides) { section = .slides; slidesTab = .themes }
         else if let a = arg.flatMap(CreateSection.init(rawValue:)), sections.contains(a) { section = a }
         else if !sections.contains(section), let first = sections.first { section = first }
+        #if DEBUG
+        // Test launch argument `-schedule deck|kids|signage` opens the Schedule sheet for a demo item.
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-schedule"), i + 1 < args.count {
+            switch args[i + 1] {
+            case "deck": scheduleTarget = .deck(id: MockService.sundayDeck.id, name: MockService.sundayDeck.name)
+            case "kids": scheduleTarget = .playlist(id: MockService.braveList.id, name: MockService.braveList.name, kind: .kids)
+            case "signage": scheduleTarget = .playlist(id: UUID(uuidString: "D0D0D0D0-0000-4000-8000-000700000001")!, name: "Lobby loop", kind: .signage)
+            default: break
+            }
+        }
+        #endif
     }
 
     // MARK: Actions

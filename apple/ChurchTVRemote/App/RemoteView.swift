@@ -179,6 +179,8 @@ struct PlayNowSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let screen: ScreenInfo
+    /// Item to have ticked when the sheet opens (the playlist editor's "Play now").
+    var preselect: PlayNowItem.ID?
     @State private var minutes = 60
     @State private var selected: PlayNowItem.ID?
     @State private var sending = false
@@ -217,7 +219,7 @@ struct PlayNowSheet: View {
                     Button("Start") { start() }.disabled(selected == nil || sending)
                 }
             }
-            .task { model.commandError = nil }
+            .task { model.commandError = nil; if selected == nil { selected = preselect } }
         }
         .presentationDetents([.large])
     }
