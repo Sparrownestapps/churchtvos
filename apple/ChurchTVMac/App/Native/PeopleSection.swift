@@ -94,6 +94,7 @@ struct PeopleSection: View {
             members = try await ops.listMembers(organizationId: org)
             sites = (try? await model.service.listSites(organizationId: org)) ?? []
             loadError = nil
+            if CommandLine.arguments.contains("-personpick"), selection == nil { selection = members.first(where: { $0.role == .editor })?.id }
         } catch { loadError = Formatting.message(for: error) }
         loaded = true
     }

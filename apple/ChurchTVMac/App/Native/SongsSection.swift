@@ -105,6 +105,7 @@ struct SongsSection: View {
             songs = try await app.service.listSongs(organizationId: org)
             usage = (try? await app.library?.songUsage(organizationId: org)) ?? [:]
             loadError = nil
+            if CommandLine.arguments.contains("-songpick"), selection == nil { selection = filtered.first?.id }
         } catch { loadError = Formatting.message(for: error) }
         loaded = true
     }

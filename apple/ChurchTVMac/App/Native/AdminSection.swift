@@ -418,8 +418,8 @@ private struct EntitlementEditor: View {
                 Picker("Status", selection: $status) { ForEach(AdminLogic.statuses, id: \.self) { Text($0).tag($0) } }.frame(width: 150)
                 Stepper(value: $limit, in: 0...9999) { Text("TV limit \(limit)") }.frame(width: 140)
                 TextField("Plan name", text: $plan).frame(width: 120)
-                VStack(alignment: .leading, spacing: 2) { Toggle("Trial / period ends", isOn: $hasEnd); if hasEnd { DatePicker("", selection: $end, displayedComponents: .date).labelsHidden() } }
-                VStack(alignment: .leading, spacing: 2) { Toggle("Grace ends", isOn: $hasGrace); if hasGrace { DatePicker("", selection: $grace, displayedComponents: .date).labelsHidden() } }
+                VStack(alignment: .leading, spacing: 2) { Toggle("Trial / period ends", isOn: $hasEnd).fixedSize(); if hasEnd { DatePicker("", selection: $end, displayedComponents: .date).labelsHidden() } }
+                VStack(alignment: .leading, spacing: 2) { Toggle("Grace ends", isOn: $hasGrace).fixedSize(); if hasGrace { DatePicker("", selection: $grace, displayedComponents: .date).labelsHidden() } }
                 Spacer()
                 Button(current == nil ? "Add" : "Save") { Task { await run { try await app.admin?.adminUpsertEntitlements([row]) } } }.buttonStyle(.borderedProminent)
                 if current != nil {
