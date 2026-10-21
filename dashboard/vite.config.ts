@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { handleYouTubeApi } from './api/youtube'
@@ -21,4 +22,5 @@ const youtubeApi: Plugin = {
 export default defineConfig({
   plugins: [react(), youtubeApi],
   server: { port: 5173 },
+  test: { include: ['src/**/*.test.ts'] },
 })

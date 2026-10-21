@@ -27,3 +27,8 @@
 
 ## Update (2026-10-21): experimental NDI source
 - Per-church flag `organizations.ndi_enabled` (platform admin only, audited), NDI items/slides in Kids playlists and Slides decks, `ndi` TV build flavor (version 1.6.0, code 7). Contract and build steps: NDI-CONTRACT.md. Untested on a real NDI feed; NDI licence for Android unconfirmed.
+
+## Update (2026-10-21): PDF / PowerPoint / picture import (web dashboard)
+- Import button on Decks, the deck editor, Playlists and the playlist editor. PDF pages are drawn in the browser (pdf.js 6.4.299, lazy chunk, worker bundled; fonts and cmaps copied to `dashboard/public/pdfjs/`) as 1920px JPEGs and become full-screen picture slides / Kids image items. .pptx (jszip 3.10.2, lazy chunk) becomes editable text slides with notes, picture slides, and optional video. PNG/JPG multi-select works too. No exact-look pptx render exists: the dialog tells users to export to PDF.
+- Contract for the Apple agent: PPTX-IMPORT-CONTRACT.md. Code: `dashboard/src/importer/`. Tests: `npm test` in dashboard (vitest + jsdom).
+- Not verified against live Supabase (no login in the build session): the upload + insert path reuses the Media page logic but was not run end to end.

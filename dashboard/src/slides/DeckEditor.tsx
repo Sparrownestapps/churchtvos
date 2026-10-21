@@ -12,6 +12,8 @@ import SlideEditor from './SlideEditors'
 import SlideFrame from './SlideFrame'
 import { KIND_NAME, blankSlide, cleanSlide, firstProblem, framesFor, newSlideId, resolveBackground, resolveTheme, slideLabel, type NewKind } from './render'
 import { setUnsaved, useUnsavedGuard } from './unsaved'
+import ImportDialog from '../importer/ImportDialog'
+import { insertAt } from '../importer/importLogic'
 
 const KINDS: NewKind[] = ['text', 'media', 'song', 'countdown', 'stream', 'ndi', 'blank']
 const KIND_HINT: Record<NewKind, string> = {
@@ -73,6 +75,7 @@ export default function DeckEditor({
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [menu, setMenu] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [drag, setDrag] = useState<{ from: number; over: number } | null>(null)
   const stripRef = useRef<HTMLDivElement>(null)
 
@@ -242,6 +245,10 @@ export default function DeckEditor({
         <div className="row spread wrap">
           <h3>Slides ({slides.length})</h3>
           {!readOnly && (
+            <div className="row wrap">
+              <button className="btn" onClick={() => setImportOpen(true)} title="Bring in a PDF, a PowerPoint or pictures">
+                Import PDF / PowerPoint…
+              </button>
             <div className="sl-addwrap">
               <button className="btn primary" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
                 + Add slide
@@ -256,6 +263,7 @@ export default function DeckEditor({
                   ))}
                 </div>
               )}
+            </div>
             </div>
           )}
         </div>
@@ -331,6 +339,23 @@ export default function DeckEditor({
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
+      )}
+      {importOpen && (
+        <ImportDialog
+          mode="deck"
+          target={{
+            count: slides.length,
+            existing: slides,
+            scope,
+            after: selected ? selIndex + 1 : slides.length,
+            add: (items, at) => {
+              const added = items as DeckSlide[]
+              setSlides((list) => insertAt(list, at, added))
+              if (added[0]) setSelectedId(added[0].id)
+            },
+          }}
+          onClose={() => setImportOpen(false)}
+        />
       )}
     </div>
   )

@@ -6,6 +6,7 @@ import type { Deck } from '../slidesTypes'
 import { attempt, must, scopeLabel, timeAgo, useLoad } from '../lib'
 import { ReadOnlyNote, useDefaultScope } from '../ui'
 import DeckEditor from './DeckEditor'
+import ImportDialog from '../importer/ImportDialog'
 import { MiniSlide } from './DeckPreview'
 import { useSlidesLibrary, useSongs, useThemes } from './data'
 
@@ -17,6 +18,7 @@ export default function DecksPage() {
   const [editing, setEditing] = useState<Deck | 'new' | null>(null)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<Sort>('updated')
+  const [importing, setImporting] = useState(false)
 
   const { data, error, reload } = useLoad(async () => must(await supabase.from('decks').select('*').eq('organization_id', org.id).order('updated_at', { ascending: false })) as Deck[], [org.id])
   const themes = useThemes()
@@ -84,6 +86,11 @@ export default function DecksPage() {
             + New deck
           </button>
         )}
+        {canCreate && (
+          <button className="btn" onClick={() => setImporting(true)} title="Make a deck from a PDF, a PowerPoint or pictures">
+            Import PDF / PowerPoint…
+          </button>
+        )}
         <input type="search" className="sl-search" aria-label="Search decks" placeholder="Search decks" value={search} onChange={(e) => setSearch(e.target.value)} />
         <label className="sl-sort">
           <span className="muted">Sort</span>
@@ -139,6 +146,7 @@ export default function DecksPage() {
           </div>
         )
       })}
+      {importing && <ImportDialog mode="deck" onClose={() => setImporting(false)} onCreated={reload} />}
     </div>
   )
 }

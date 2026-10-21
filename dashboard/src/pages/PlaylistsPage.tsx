@@ -10,6 +10,8 @@ import { countdownProblem } from '../slides/render'
 import { YouTubeItemEditor, newYouTubeItem } from '../YouTubeItem'
 import { StreamItemEditor, newStreamItem, validStreamUrl } from '../StreamItem'
 import { NdiItemEditor, NDI_LABEL, cleanNdi, newNdiItem, ndiProblem } from '../NdiItem'
+import ImportDialog from '../importer/ImportDialog'
+import { insertAt } from '../importer/importLogic'
 import { LyricsItemEditor, newLyricsItem, type SongLite } from '../LyricsItem'
 
 const KIND_LABEL: Record<PlaylistItem['type'], string> = {
@@ -26,6 +28,7 @@ export default function PlaylistsPage() {
   const { org, sites, canEditContent } = useApp()
   const defaultScope = useDefaultScope()
   const [editing, setEditing] = useState<Playlist | 'new' | null>(null)
+  const [importing, setImporting] = useState(false)
 
   const { data, reload } = useLoad(async () => {
     const [playlists, media, folders, songs] = await Promise.all([
@@ -70,6 +73,9 @@ export default function PlaylistsPage() {
         <div>
           <button className="btn primary" onClick={() => setEditing('new')}>
             + New playlist
+          </button>{' '}
+          <button className="btn" onClick={() => setImporting(true)} title="Make a playlist from a PDF, a PowerPoint or pictures">
+            Import PDF / PowerPoint…
           </button>
         </div>
       )}
@@ -109,6 +115,7 @@ export default function PlaylistsPage() {
           </div>
         )
       })}
+      {importing && <ImportDialog mode="playlist" onClose={() => setImporting(false)} onCreated={reload} />}
     </div>
   )
 }
@@ -121,6 +128,7 @@ function PlaylistEditor({ playlist, media, folders, songs, onDone }: { playlist:
   const [scope, setScope] = useState(playlist ? playlist.site_id : defaultScope)
   const [items, setItems] = useState<PlaylistItem[]>(playlist?.items ?? [])
   const [saving, setSaving] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   const update = (i: number, item: PlaylistItem) => setItems((list) => list.map((x, j) => (j === i ? item : x)))
   const move = (i: number, by: number) => setItems((list) => moveItem(list, i, by))
@@ -273,6 +281,12 @@ function PlaylistEditor({ playlist, media, folders, songs, onDone }: { playlist:
           </button>
         )}
       </div>
+      <div className="card row wrap">
+        <span className="muted">Import:</span>
+        <button className="btn" onClick={() => setImportOpen(true)} title="Add the pages of a PDF, a PowerPoint or pictures as slide items">
+          PDF / PowerPoint / pictures…
+        </button>
+      </div>
       <p className="muted">
         Tip: for screens turned to portrait, use portrait media (1080 x 1920). YouTube items don't rotate on portrait screens.
       </p>
@@ -285,6 +299,19 @@ function PlaylistEditor({ playlist, media, folders, songs, onDone }: { playlist:
           Cancel
         </button>
       </div>
+      {importOpen && (
+        <ImportDialog
+          mode="playlist"
+          target={{
+            count: items.length,
+            existing: [],
+            scope,
+            after: items.length,
+            add: (added, at) => setItems((list) => insertAt(list, at, added as PlaylistItem[])),
+          }}
+          onClose={() => setImportOpen(false)}
+        />
+      )}
     </div>
   )
 }

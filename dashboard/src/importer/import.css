@@ -1,0 +1,31 @@
+/* PDF / PowerPoint / picture importer dialog. Colours come from the dashboard's CSS variables (light and dark). */
+.imp { width: min(820px, 100%); max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; }
+.imp-body { overflow-y: auto; min-height: 0; padding-right: 2px; }
+.imp-drop { border: 2px dashed var(--line); border-radius: var(--radius); padding: 24px 16px; display: grid; justify-items: center; gap: 10px; text-align: center; background: var(--surface); }
+.imp-drop.on { border-color: var(--primary); background: var(--tint-primary); }
+.imp-list { list-style: none; margin: 0; padding: 0; display: grid; border: 1px solid var(--line); border-radius: 8px; max-height: 340px; overflow-y: auto; }
+.imp-row, .imp-status { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--card); }
+.imp-row:last-child, .imp-status:last-child { border-bottom: 0; }
+.imp-row.off { opacity: 0.55; }
+.imp-check { display: grid; place-items: center; padding: 6px; cursor: pointer; }
+.imp-check input { width: 20px; height: 20px; }
+.imp-thumb { width: 96px; aspect-ratio: 16 / 9; flex-shrink: 0; background: var(--media-bg); border-radius: 4px; overflow: hidden; display: grid; place-items: center; }
+.imp-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.imp-text-thumb { width: 100%; height: 100%; padding: 4px 6px; overflow: hidden; display: grid; align-content: start; gap: 2px; color: #fff; font-size: 9px; line-height: 1.2; white-space: pre-line; text-align: left; background: #1f3a5f; }
+.imp-text-thumb b { font-size: 10px; }
+.imp-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.imp-label { font-weight: 700; color: var(--primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imp-move { display: flex; gap: 2px; flex-shrink: 0; }
+.imp-media { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0; }
+.imp-media legend { font-weight: 700; font-size: 13px; padding: 0 6px; }
+.imp-opts { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.imp-opts .field.grow { min-width: 200px; }
+.imp-status { justify-content: space-between; flex-wrap: wrap; }
+.imp-status.fail { background: color-mix(in srgb, var(--danger) 8%, var(--card)); }
+.imp progress { width: 100%; }
+@media (max-width: 600px) {
+  .imp { max-height: 96vh; }
+  .imp-thumb { width: 72px; }
+  .imp-opts .field { flex: 1 1 100%; }
+  .imp-list { max-height: 300px; }
+}
