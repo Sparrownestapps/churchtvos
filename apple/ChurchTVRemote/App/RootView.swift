@@ -156,6 +156,7 @@ struct PadView: View {
             }
         }
         .onAppear { if selection == nil { selection = model.selectedScreenId.map(PadSelection.screen) } }
+        .onChange(of: model.selectedScreenId) { _, id in if selection == nil, let id { selection = .screen(id) } }
         .onChange(of: selection) { _, new in
             if case .screen(let id)? = new { model.selectedScreenId = id }
         }

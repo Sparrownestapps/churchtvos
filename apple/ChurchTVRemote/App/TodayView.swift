@@ -18,10 +18,9 @@ struct TodayView: View {
                     }
                     ForEach(entries) { e in EntryRow(entry: e, timeZone: info.timeZone) }
                 } header: {
-                    HStack(spacing: 6) {
-                        OnlineDot(online: info.isOnline())
-                        Text(info.screen.displayName)
-                        if !info.locationLine.isEmpty { Text("· \(info.locationLine)").foregroundStyle(.secondary) }
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) { OnlineDot(online: info.isOnline()); Text(info.screen.displayName) }
+                        if !info.locationLine.isEmpty { Text(info.locationLine).font(.caption).textCase(nil) }
                     }
                 }
             }
