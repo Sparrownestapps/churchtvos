@@ -11,12 +11,15 @@ public enum CreateRoute: Hashable {
 /// The Create section: owns its navigation stack (a tab on iPhone, the detail of the "Create" sidebar entry on iPad).
 public struct CreateRoot: View {
     @State private var path: [CreateRoute] = []
+    private let initialSection: String?
 
-    public init() {}
+    /// - Parameter initialSection: `kids`, `signage`, `slides` or `themes` pins the list to that one section (the Mac sidebar has one entry for each);
+    ///   nil shows the segmented pickers.
+    public init(initialSection: String? = nil) { self.initialSection = initialSection }
 
     public var body: some View {
         NavigationStack(path: $path) {
-            CreateView(path: $path)
+            CreateView(path: $path, pinnedSection: initialSection)
                 .navigationDestination(for: CreateRoute.self) { route in
                     switch route {
                     case .playlist(let kind, let draft): PlaylistEditorView(kind: kind, playlist: draft)
@@ -33,8 +36,9 @@ public struct CreateRoot: View {
 public struct CreateView: View {
     @Environment(ContentModel.self) private var model
     @Binding var path: [CreateRoute]
+    private let pinnedSection: String?
 
-    public init(path: Binding<[CreateRoute]>) { _path = path }
+    public init(path: Binding<[CreateRoute]>, pinnedSection: String? = nil) { _path = path; self.pinnedSection = pinnedSection }
 
     private enum SlidesTab: String, CaseIterable { case decks = "Decks", themes = "Themes" }
 
@@ -57,18 +61,27 @@ public struct CreateView: View {
 
     private var content: ContentModel { model }
     private var sections: [CreateSection] { CreateSection.allCases.filter { model.church?.editableModules.contains($0.module) ?? false } }
+    private var pinnedTitle: String {
+        switch pinnedSection {
+        case "kids": return "Kids playlists"
+        case "signage": return "Signage playlists"
+        case "slides": return "Slides decks"
+        case "themes": return "Themes"
+        default: return "Create"
+        }
+    }
     private var showingThemes: Bool { section == .slides && slidesTab == .themes }
 
     public var body: some View {
         List {
-            if sections.count > 1 {
+            if sections.count > 1 && pinnedSection == nil {
                 Section {
                     Picker("Module", selection: $section) { ForEach(sections) { Text($0.title).tag($0) } }
                         .pickerStyle(.segmented)
                         .listRowBackground(Color.clear).listRowInsets(EdgeInsets())
                 }
             }
-            if section == .slides {
+            if section == .slides && pinnedSection == nil {
                 Section {
                     Picker("Show", selection: $slidesTab) { ForEach(SlidesTab.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
                         .pickerStyle(.segmented)
@@ -83,7 +96,7 @@ public struct CreateView: View {
             }
         }
         .macReadableWidth(820)
-        .navigationTitle("Create")
+        .navigationTitle(pinnedTitle)
         .toolbar {
             ToolbarItem(placement: .trailingBar) { addMenu }
         }
@@ -274,7 +287,7 @@ public struct CreateView: View {
 
     /// Test launch argument `-create kids|signage|slides|themes`; otherwise the first module the member can edit.
     private func applyLaunchSection() {
-        let arg = model.initialCreateSection
+        let arg = pinnedSection ?? model.initialCreateSection
         if arg == "themes", sections.contains(.slides) { section = .slides; slidesTab = .themes }
         else if let a = arg.flatMap(CreateSection.init(rawValue:)), sections.contains(a) { section = a }
         else if !sections.contains(section), let first = sections.first { section = first }
