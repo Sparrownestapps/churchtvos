@@ -101,9 +101,11 @@ public struct ChurchAccess: Hashable, Identifiable, Sendable {
     public var role: Role
     /// Modules the member has access to AND the church has an active/trialing entitlement for.
     public var modules: [AppModule]
+    /// The member's site scope: nil = all sites, otherwise only these sites (`memberships.site_ids`).
+    public var siteIds: [UUID]?
     public var id: UUID { organization.id }
-    public init(organization: Organization, role: Role, modules: [AppModule]) {
-        self.organization = organization; self.role = role; self.modules = modules
+    public init(organization: Organization, role: Role, modules: [AppModule], siteIds: [UUID]? = nil) {
+        self.organization = organization; self.role = role; self.modules = modules; self.siteIds = siteIds
     }
 }
 
@@ -161,7 +163,13 @@ public struct Location: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
     public var name: String
     public var siteId: UUID?
-    public init(id: UUID, name: String, siteId: UUID? = nil) { self.id = id; self.name = name; self.siteId = siteId }
+    /// Which applications use the location (`locations.modules`: 'kids', 'signage', 'slides', ...). nil when the column was not loaded.
+    public var modules: [String]?
+    public init(id: UUID, name: String, siteId: UUID? = nil, modules: [String]? = nil) {
+        self.id = id; self.name = name; self.siteId = siteId; self.modules = modules
+    }
+    /// True when the location is tagged for `module`.
+    public func uses(_ module: AppModule) -> Bool { modules?.contains(module.rawValue) ?? false }
 }
 
 public struct Site: Codable, Hashable, Identifiable, Sendable {
@@ -301,12 +309,6 @@ public struct PlaylistRef: Codable, Hashable, Identifiable, Sendable {
     public init(id: UUID, name: String) { self.id = id; self.name = name }
 }
 
-public struct Song: Codable, Hashable, Identifiable, Sendable {
-    public let id: UUID
-    public var title: String
-    public init(id: UUID, title: String) { self.id = id; self.title = title }
-}
-
 /// What can be started on a screen with "Play now".
 public struct PlayNowItem: Hashable, Identifiable, Sendable {
     public enum Kind: String, Sendable { case deck, playlist }
@@ -326,12 +328,14 @@ public struct MediaFolder: Codable, Hashable, Identifiable, Sendable {
     public var module: String
     public var parentId: UUID?
     public var name: String
-    public init(id: UUID, module: String, parentId: UUID? = nil, name: String) {
-        self.id = id; self.module = module; self.parentId = parentId; self.name = name
+    /// nil = all sites (inherited by everything inside).
+    public var siteId: UUID?
+    public init(id: UUID, module: String, parentId: UUID? = nil, name: String, siteId: UUID? = nil) {
+        self.id = id; self.module = module; self.parentId = parentId; self.name = name; self.siteId = siteId
     }
 }
 
-public enum MediaKind: String, Codable, Sendable { case image, video }
+public enum MediaKind: String, Codable, Sendable { case image, video, audio }
 
 /// Row sent to `media` after the file is in storage. `module` and `folder` are required by the database
 /// (folder may be nil = library root).

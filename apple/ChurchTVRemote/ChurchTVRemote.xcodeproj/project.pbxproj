@@ -22,6 +22,17 @@
 		D98AD02697BC55B38DB29EB2 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B9123FCF6218F6163C37C74 /* SignInView.swift */; };
 		EB3B581F612260C89407CA30 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07C7B7C552C5F4A82A19B258 /* Haptics.swift */; };
 		FED1DE07BA70CDE6512880C6 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EF7D4CB365D41513DE0215 /* AppModel.swift */; };
+		E307BDA18FF961B22FFA83FD /* ContentModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 032CF49E2BD9F60180DEAAE8 /* ContentModel.swift */; };
+		BE2863A717DDE940CF44DEF1 /* CreateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92AC556F1CBF61716AB87247 /* CreateView.swift */; };
+		75141F8D1DFD8D89096A6EDF /* EditorPlaceholders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69F2CD450F61BB53944DCFBB /* EditorPlaceholders.swift */; };
+		2C696DCA23CF189AE90E9CA6 /* ColorControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47292D18BA94DBD11C76EAFA /* ColorControls.swift */; };
+		8024B3B5C08F8351BE4E5BD6 /* CountdownFieldsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 899F11EACA165480CD89140D /* CountdownFieldsView.swift */; };
+		814E87421F1ACA896E998E97 /* KitGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBA65ADD26F94E6D19E8089F /* KitGalleryView.swift */; };
+		3841FF5A6A35837B7F67589D /* KitSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D81C7105DDE1C7C6386F894 /* KitSupport.swift */; };
+		33E3DFC53B82C2354A7DD754 /* MediaPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7186F37923DC59E75DF89E4F /* MediaPickerView.swift */; };
+		9CD329C5F46E10327E1A238E /* SlidePreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C6D0BB4CB3066593D1D648 /* SlidePreview.swift */; };
+		4BB65E977B3FB557623AE113 /* SongPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9EF2DD0C72CF71CF1974FD7 /* SongPickerView.swift */; };
+		985ABCA78A433BE5DF69DF7A /* CreateSectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21D27607D1EC3635C7DC1754 /* CreateSectionTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -54,6 +65,17 @@
 		F575DF503839AA2C6CD758C9 /* AddMediaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddMediaView.swift; sourceTree = "<group>"; };
 		F698CC3AFECD0D001902B665 /* RemoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteView.swift; sourceTree = "<group>"; };
 		F6EF7D4CB365D41513DE0215 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		032CF49E2BD9F60180DEAAE8 /* ContentModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentModel.swift; sourceTree = "<group>"; };
+		92AC556F1CBF61716AB87247 /* CreateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateView.swift; sourceTree = "<group>"; };
+		69F2CD450F61BB53944DCFBB /* EditorPlaceholders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorPlaceholders.swift; sourceTree = "<group>"; };
+		47292D18BA94DBD11C76EAFA /* ColorControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorControls.swift; sourceTree = "<group>"; };
+		899F11EACA165480CD89140D /* CountdownFieldsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountdownFieldsView.swift; sourceTree = "<group>"; };
+		EBA65ADD26F94E6D19E8089F /* KitGalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KitGalleryView.swift; sourceTree = "<group>"; };
+		1D81C7105DDE1C7C6386F894 /* KitSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KitSupport.swift; sourceTree = "<group>"; };
+		7186F37923DC59E75DF89E4F /* MediaPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaPickerView.swift; sourceTree = "<group>"; };
+		A5C6D0BB4CB3066593D1D648 /* SlidePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlidePreview.swift; sourceTree = "<group>"; };
+		E9EF2DD0C72CF71CF1974FD7 /* SongPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongPickerView.swift; sourceTree = "<group>"; };
+		21D27607D1EC3635C7DC1754 /* CreateSectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateSectionTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -83,6 +105,7 @@
 			isa = PBXGroup;
 			children = (
 				901A7ECD71D0B33D7719B35A /* AppModelTests.swift */,
+				21D27607D1EC3635C7DC1754 /* CreateSectionTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -112,7 +135,9 @@
 				F6EF7D4CB365D41513DE0215 /* AppModel.swift */,
 				050B0ADB4EDD90BD36AF9EFB /* ChurchTVRemoteApp.swift */,
 				401E31F7A9D7138929A70184 /* Components.swift */,
+				CBDBE5BA006D6AA51EDB6351 /* Create */,
 				07C7B7C552C5F4A82A19B258 /* Haptics.swift */,
+				EF858F1ACA7B266CD4498BCE /* Kit */,
 				5CFFC6281C9D42F429A37FBF /* PushManager.swift */,
 				F698CC3AFECD0D001902B665 /* RemoteView.swift */,
 				4A1AB31A79D081C496388220 /* RootView.swift */,
@@ -131,6 +156,30 @@
 				F2F3A7ADB8542E91E704F760 /* ChurchTVRemoteTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		CBDBE5BA006D6AA51EDB6351 /* Create */ = {
+			isa = PBXGroup;
+			children = (
+				032CF49E2BD9F60180DEAAE8 /* ContentModel.swift */,
+				92AC556F1CBF61716AB87247 /* CreateView.swift */,
+				69F2CD450F61BB53944DCFBB /* EditorPlaceholders.swift */,
+			);
+			path = Create;
+			sourceTree = "<group>";
+		};
+		EF858F1ACA7B266CD4498BCE /* Kit */ = {
+			isa = PBXGroup;
+			children = (
+				47292D18BA94DBD11C76EAFA /* ColorControls.swift */,
+				899F11EACA165480CD89140D /* CountdownFieldsView.swift */,
+				EBA65ADD26F94E6D19E8089F /* KitGalleryView.swift */,
+				1D81C7105DDE1C7C6386F894 /* KitSupport.swift */,
+				7186F37923DC59E75DF89E4F /* MediaPickerView.swift */,
+				A5C6D0BB4CB3066593D1D648 /* SlidePreview.swift */,
+				E9EF2DD0C72CF71CF1974FD7 /* SongPickerView.swift */,
+			);
+			path = Kit;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -233,6 +282,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				68A9EE716DC7BD5A5F69993D /* AppModelTests.swift in Sources */,
+				985ABCA78A433BE5DF69DF7A /* CreateSectionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -252,6 +302,16 @@
 				57A7817C8D467C08076EF433 /* SettingsView.swift in Sources */,
 				D98AD02697BC55B38DB29EB2 /* SignInView.swift in Sources */,
 				81D4E5DA21812404BFAA5AE0 /* TodayView.swift in Sources */,
+				E307BDA18FF961B22FFA83FD /* ContentModel.swift in Sources */,
+				BE2863A717DDE940CF44DEF1 /* CreateView.swift in Sources */,
+				75141F8D1DFD8D89096A6EDF /* EditorPlaceholders.swift in Sources */,
+				2C696DCA23CF189AE90E9CA6 /* ColorControls.swift in Sources */,
+				8024B3B5C08F8351BE4E5BD6 /* CountdownFieldsView.swift in Sources */,
+				814E87421F1ACA896E998E97 /* KitGalleryView.swift in Sources */,
+				3841FF5A6A35837B7F67589D /* KitSupport.swift in Sources */,
+				33E3DFC53B82C2354A7DD754 /* MediaPickerView.swift in Sources */,
+				9CD329C5F46E10327E1A238E /* SlidePreview.swift in Sources */,
+				4BB65E977B3FB557623AE113 /* SongPickerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -356,7 +416,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 4K3495W2H2;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -444,7 +504,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 4K3495W2H2;
 				ENABLE_NS_ASSERTIONS = NO;

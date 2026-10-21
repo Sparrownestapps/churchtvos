@@ -10,10 +10,10 @@ public actor MockService: ChurchService {
 
     // MARK: Sample content
 
-    static let sundayDeck = Deck(id: UUID(uuidString: "D0D0D0D0-0000-4000-8000-0000000000D1")!, name: "Sunday 10:30 Service")
-    static let christmasDeck = Deck(id: UUID(uuidString: "D0D0D0D0-0000-4000-8000-0000000000D2")!, name: "Christmas Eve")
-    static let braveList = PlaylistRef(id: UUID(uuidString: "D0D0D0D0-0000-4000-8000-0000000000E1")!, name: "Week 3 · Brave Like David")
-    static let gardenList = PlaylistRef(id: UUID(uuidString: "D0D0D0D0-0000-4000-8000-0000000000E2")!, name: "Week 4 · The Good Gardener")
+    public static let sundayDeck = Deck(id: UUID(uuidString: "D0D0D0D0-0000-4000-8000-0000000000D1")!, name: "Sunday 10:30 Service")
+    public static let christmasDeck = Deck(id: UUID(uuidString: "D0D0D0D0-0000-4000-8000-0000000000D2")!, name: "Christmas Eve")
+    public static let braveList = PlaylistRef(id: UUID(uuidString: "D0D0D0D0-0000-4000-8000-0000000000E1")!, name: "Week 3 · Brave Like David")
+    public static let gardenList = PlaylistRef(id: UUID(uuidString: "D0D0D0D0-0000-4000-8000-0000000000E2")!, name: "Week 4 · The Good Gardener")
 
     static let sundayOutline = [
         "Countdown 5:00", "Welcome", "Great Are You Lord (title)", "Great Are You Lord · Verse 1", "Great Are You Lord · Chorus",
@@ -45,6 +45,8 @@ public actor MockService: ChurchService {
     private var order: [UUID]
     private var commandTimes: [Date] = []
     private var offlineAlerts = true
+    /// Editable demo content (playlists, decks, themes, songs, media). See MockService+Content.swift.
+    var store = MockContentStore.make()
     private let siteTZ = TimeZone.current.identifier
 
     public init() {
@@ -175,10 +177,10 @@ public actor MockService: ChurchService {
     public func playNowItems(organizationId: UUID, modules: [AppModule]) async throws -> [PlayNowItem] {
         var items: [PlayNowItem] = []
         if modules.contains(.slides) {
-            items += [Self.sundayDeck, Self.christmasDeck].map { PlayNowItem(kind: .deck, refId: $0.id, name: $0.name) }
+            items += store.decks.sorted { $0.name < $1.name }.map { PlayNowItem(kind: .deck, refId: $0.id, name: $0.name) }
         }
         if modules.contains(.kids) {
-            items += [Self.braveList, Self.gardenList].map { PlayNowItem(kind: .playlist, refId: $0.id, name: $0.name) }
+            items += store.kids.sorted { $0.name < $1.name }.map { PlayNowItem(kind: .playlist, refId: $0.id, name: $0.name) }
         }
         return items
     }
@@ -201,16 +203,11 @@ public actor MockService: ChurchService {
     // MARK: Media
 
     public func mediaFolders(organizationId: UUID, module: AppModule) async throws -> [MediaFolder] {
-        ["Sunday photos", "Announcements", "Events"].enumerated().map { i, n in
-            MediaFolder(id: UUID(uuidString: "D0D0D0D0-0000-4000-8000-0000000002\(i)0")!, module: module.rawValue, name: n)
-        }
+        store.folders.filter { $0.module == module.rawValue }.sorted { $0.name < $1.name }
     }
 
     public func uploadMedia(_ request: MediaUploadRequest, progress: @escaping @Sendable (Double) -> Void) async throws {
-        for step in 1...10 {
-            try await Task.sleep(nanoseconds: 120_000_000)
-            progress(Double(step) / 10)
-        }
+        _ = try await uploadMediaItem(request, progress: progress)
     }
 
     // MARK: Push

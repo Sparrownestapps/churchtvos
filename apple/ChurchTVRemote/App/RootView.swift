@@ -15,7 +15,11 @@ struct RootView: View {
             case .chooseChurch:
                 ChurchPickerView()
             case .ready:
+                #if DEBUG
+                if model.showKitGallery { KitGalleryView() } else { MainView() }
+                #else
                 MainView()
+                #endif
             }
         }
         .animation(.default, value: model.phase)
@@ -61,6 +65,12 @@ struct PhoneView: View {
             NavigationStack { TodayView() }
                 .tabItem { Label("Today", systemImage: "calendar") }
                 .tag(AppTab.today)
+            // Only for owners, admins and editors of a church with Kids, Signage or Slides live. Not shown (and not locked) for others.
+            if model.canCreate {
+                CreateRoot()
+                    .tabItem { Label("Create", systemImage: "square.and.pencil") }
+                    .tag(AppTab.create)
+            }
             NavigationStack { SettingsView() }
                 .tabItem { Label("Settings", systemImage: "gearshape") }
                 .tag(AppTab.settings)
@@ -108,7 +118,7 @@ struct ScreenPickerMenu: View {
 }
 
 enum PadSelection: Hashable {
-    case screen(UUID), today, media, settings
+    case screen(UUID), today, create, media, settings
 }
 
 struct PadView: View {
@@ -129,6 +139,7 @@ struct PadView: View {
                 }
                 Section("More") {
                     Label("Today", systemImage: "calendar").tag(PadSelection.today)
+                    if model.canCreate { Label("Create", systemImage: "square.and.pencil").tag(PadSelection.create) }
                     if model.canAddMedia { Label("Add media", systemImage: "photo.badge.plus").tag(PadSelection.media) }
                     Label("Settings", systemImage: "gearshape").tag(PadSelection.settings)
                 }
@@ -139,6 +150,9 @@ struct PadView: View {
                 if let e = model.loadError { Banner(text: e, style: .error).padding() }
             }
         } detail: {
+            if selection == .create {
+                CreateRoot()
+            } else {
             NavigationStack {
                 switch selection {
                 case .screen(let id):
@@ -149,13 +163,20 @@ struct PadView: View {
                             .toolbar { ToolbarItem(placement: .topBarTrailing) { AddMediaButton() } }
                     } else { placeholder }
                 case .today: TodayView()
+                case .create: EmptyView()
                 case .media: AddMediaView(embedded: true)
                 case .settings: SettingsView()
                 case nil: placeholder
                 }
             }
+            }
         }
-        .onAppear { if selection == nil { selection = model.selectedScreenId.map(PadSelection.screen) } }
+        .onAppear {
+            if selection == nil {
+                if model.iPhoneTab == .create, model.canCreate { selection = .create }   // test launch argument `-tab create`
+                else { selection = model.selectedScreenId.map(PadSelection.screen) }
+            }
+        }
         .onChange(of: model.selectedScreenId) { _, id in if selection == nil, let id { selection = .screen(id) } }
         .onChange(of: selection) { _, new in
             if case .screen(let id)? = new { model.selectedScreenId = id }

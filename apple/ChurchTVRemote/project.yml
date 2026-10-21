@@ -11,7 +11,7 @@ settings:
   base:
     SWIFT_VERSION: "5.0"
     MARKETING_VERSION: "1.0.0"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "2"
     # Set your Apple Developer team here (or pick it in Xcode: target > Signing & Capabilities). Left empty on purpose.
     DEVELOPMENT_TEAM: "4K3495W2H2"
     CODE_SIGN_STYLE: Automatic

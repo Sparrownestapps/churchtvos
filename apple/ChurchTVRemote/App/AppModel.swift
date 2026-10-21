@@ -33,11 +33,16 @@ final class AppModel {
     /// Last error from a remote command (shown in the Remote screen).
     var commandError: String?
     var iPhoneTab: AppTab = .screens
+    /// Launch-argument helpers for screenshots: `-create kids|signage|slides|themes` picks the Create list, `-kitgallery` shows the UI kit.
+    var initialCreateSection: String?
+    var showKitGallery = false
 
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private let lastChurchKey = "lastChurchId"
 
     let push = PushManager.shared
+    /// Content editing state (playlists, decks, themes, songs, media libraries) for the Create section and the editors.
+    @ObservationIgnored private(set) lazy var content = ContentModel(app: self)
 
     init(service: any ChurchService = SupabaseService()) {
         self.service = service
@@ -51,6 +56,8 @@ final class AppModel {
     var selectedScreen: ScreenInfo? { screens.first { $0.id == selectedScreenId } }
     var canControl: Bool { church?.role.canControl ?? false }
     var canAddMedia: Bool { (church?.role.canEditContent ?? false) && !(church?.modules.isEmpty ?? true) }
+    /// The Create section is for owners, admins and editors of a church with Kids, Signage or Slides live. Everyone else does not see it.
+    var canCreate: Bool { church?.showsCreateSection ?? false }
 
     // MARK: Launch and sign-in
 
@@ -65,9 +72,14 @@ final class AppModel {
                 case "remote": iPhoneTab = .remote
                 case "today": iPhoneTab = .today
                 case "settings": iPhoneTab = .settings
+                case "create": iPhoneTab = .create
                 default: break
                 }
             }
+            if let i = args.firstIndex(of: "-create"), i + 1 < args.count { initialCreateSection = args[i + 1] }
+            #if DEBUG
+            showKitGallery = args.contains("-kitgallery")
+            #endif
             return
         }
         if let u = await service.restoreSession() {
@@ -110,6 +122,7 @@ final class AppModel {
         if service.isDemo { service = SupabaseService() }
         user = nil; churches = []; church = nil; screens = []; schedule = []; playNowItems = []
         selectedScreenId = nil; lastRefresh = nil; loadError = nil; scheduleLoaded = false
+        content.reset()
         iPhoneTab = .screens
         phase = .signedOut
     }
@@ -139,6 +152,7 @@ final class AppModel {
         church = access
         if !isDemo { UserDefaults.standard.set(access.id.uuidString, forKey: lastChurchKey) }
         screens = []; schedule = []; playNowItems = []; selectedScreenId = nil; scheduleLoaded = false; loadError = nil
+        content.reset()
         phase = .ready
         await refreshScreens()
         selectedScreenId = screens.first(where: { $0.isOnline() && $0.supportsRemote })?.id ?? screens.first?.id
@@ -262,4 +276,4 @@ final class AppModel {
     }
 }
 
-enum AppTab: Hashable { case screens, remote, today, settings }
+enum AppTab: Hashable { case screens, remote, today, create, settings }

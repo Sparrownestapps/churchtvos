@@ -18,14 +18,14 @@ xcrun simctl launch booted com.churchtvos.remote
 Or open the project in Xcode and press Run. On the sign-in screen tap **Try the demo** (sample church, 4 TVs, simulated commands). Test helper launch arguments: `-demo` (skip sign-in) and `-tab remote|today|settings`.
 For iPad use `name=iPad Pro 13-inch (M5)`.
 
-Regenerate the project after changing `project.yml`: `brew install xcodegen` (or build it from source: github.com/yonaskolb/XcodeGen) then `xcodegen generate` in `ChurchTVRemote/`.
+Adding Swift files: XcodeGen includes everything under `App/` and `Tests/`. Without XcodeGen run `python3 sync_xcodeproj.py` in `ChurchTVRemote/` (adds the new files to the checked-in `.xcodeproj`, idempotent). Regenerate the project after changing `project.yml`: `brew install xcodegen` (or build it from source: github.com/yonaskolb/XcodeGen) then `xcodegen generate` in `ChurchTVRemote/`.
 
 ## Signing team
 `DEVELOPMENT_TEAM` is empty on purpose. Set it in Xcode (target > Signing & Capabilities > Team) or in `project.yml` under `settings.base.DEVELOPMENT_TEAM` and regenerate. The Push Notifications capability needs a real team; `aps-environment` is `development` in `Resources/ChurchTVRemote.entitlements` (Xcode switches to production when archiving). Debug builds register push tokens as `sandbox`, release builds as `production`.
 
 ## Tests
 ```
-cd apple/ChurchTVCore && swift test                      # 31 unit tests (incl. Mac support logic)
+cd apple/ChurchTVCore && swift test                      # 55 unit tests (incl. Mac support logic and content models)
 cd apple/ChurchTVRemote && xcodebuild ... -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO test
 ```
 
@@ -41,6 +41,38 @@ Only `ChurchTVCore/Sources/ChurchTVCore/Config.swift` holds the Supabase URL and
 - Today: reads `deck_schedules`, `schedules`, `screen_schedules` and the RPCs `deck_series_occurrences` / `kids_series_occurrences`.
 - Add media: PhotosPicker, upload to bucket `media` at `<org>/<uuid>-<filename>` then insert a `media` row. Photos are converted to JPEG. Editors and above only (operators are read-only on content). Progress is per file with a spinner-style bar because the SDK upload exposes no byte progress; background/resumable upload is not done. Folder is optional (the `folder_id` column is nullable); module is required. Warning above 200 MB.
 - Billing, sign-up and pricing are not in the app; links go to the website.
+
+# Build 2 architecture (content editing on the phone)
+
+Build 2 (CURRENT_PROJECT_VERSION 2) adds a **Create** section: Kids playlists, Signage playlists, Slides decks and themes. Stage 1 (this) is the shared foundation; stages 2 and 3 plug editors into it.
+
+## Core (ChurchTVCore/Sources/ChurchTVCore/Content, all additive)
+- `RawJSON.swift`: `RawJSON`, `RawObjectCodable`, `ContentJSON` coders. **Decode content with `ContentJSON.decoder()`, never `ChurchJSON.decoder()`** (its snake_case conversion would rename keys inside JSON columns). Every model keeps the keys it does not understand in `extra` and writes them back; unknown item types, slide kinds and background types survive whole.
+- `PlaylistItems.swift`: `PlaylistKind` (.kids/.signage, `itemTypes`), `PlaylistItem` (struct with stable `uid` and `content: .video/.image(MediaClip) .countdown(CountdownItem) .lyrics(LyricsItem) .youtube .sign .stream .unknown`), `PlaylistItem.new(_:kind:)` mirrors the website's Add buttons, `.problem` is the save validation text.
+- `Countdown.swift`: `CountdownSettings` (shared by Kids items and deck slides; `.new`, `setMode`, `setAudio`, `.problem`), `CountdownAudio`.
+- `DeckSlides.swift`: `DeckSlide` (id, background, notes, `content: .text/.media/.song/.countdown/.stream/.blank/.unknown`), `DeckSlide.new(_:existing:)`, `.problem`, `.cleaned()`.
+- `Theme.swift`: `SlideBackground` (flat struct, `kind` color/gradient/image/video), `ThemeConfig`, `SlideTheme`, `ThemePreset.all`, `ColorTools`.
+- `Rows.swift`: `Playlist` (both tables), `SlideDeck`, write payloads, **drafts** `PlaylistDraft` / `DeckDraft` (client-made `id`, `isNew`, `problem`, `cleaned()`), `ScheduleTarget` (.deck / .playlist).
+- `Songs.swift`: full `Song`, `SongSection`, `SongExpander.expand` (port of expandSong). `Media.swift`: `MediaItem`, `MediaLibrary` (folders, breadcrumb, search, counts). `SlideRender.swift`: port of render.ts (`ResolvedTheme`, `BackgroundResolver`, `PreviewFrame`, `SlideRender.frames/planText/fitScale`), `DeckOutline` / `PlaylistOutline` (labels exactly like the TV app). `ContentPermissions.swift`: role/module/site rules, `ChurchAccess.showsCreateSection`.
+- `ContentService.swift`: `ContentService` protocol (ChurchService extends it; defaults throw, so Mac keeps compiling). `SupabaseService+Content.swift` real tables; `MockService+Content.swift` + `MockContent.swift` in-memory demo content (2 Kids, 2 Signage, 2 decks with every slide kind, 2 themes, 5 songs, media with folders; demo files use `demo:` URLs drawn as gradients). Server refusals ("is used in...", "used by a repeating schedule") pass through as `ChurchError`. Demo: deleting the Sunday deck or the Week 3 playlist is refused like the server does.
+
+## App (ChurchTVRemote/App)
+- `Create/ContentModel.swift` (`model.content`): lists, songs, sites, themes, media libraries, `save(draft, kind:)`, `save(deckDraft)`, `save(theme)`, duplicate/delete. **Editors save only through these** (they validate with `problem`, call the service, keep lists in sync and throw a `ChurchError` with text safe to show).
+- `Create/CreateView.swift`: `CreateRoot` (own NavigationStack), segmented Kids/Signage/Slides (only modules the member may edit), Decks/Themes, '+' (name prompt then editor), swipe duplicate/delete/schedule, pull to refresh. Shown only when `model.canCreate` (owner/admin/editor with a live module); tab on iPhone, sidebar entry on iPad.
+- `Kit/`: `MediaPickerView(module:kinds:selectedId:onSelect:)`, `SongPickerView(selectedId:onSelect:)`, `ColorRow` / `ColorSwatches` / `OptionalColorRow`, `CountdownFieldsView(settings:module:)` (put inside a Form), `SlidePreview` (frame or deck slide, 16:9 / 9:16, `live` video), `SlidePreviewCard` (both shapes + stepper), `PlaylistItemPreview`, `MediaThumbnail`, `KitGalleryView` (DEBUG: launch `-demo -kitgallery -kitpage slides|items|controls`). `AddMediaView` gained optional `fixedModule`, `initialFolder`, `kinds` (`.audio` adds "Choose audio files" from Files), `onUploaded`.
+
+## What the next agents implement (replace the placeholder BODY in `Create/EditorPlaceholders.swift`, keep names and initialisers)
+1. **Playlist editor agent**: `PlaylistEditorView(kind: PlaylistKind, playlist: PlaylistDraft)`. Items per `kind.itemTypes`, add/reorder/duplicate/delete, per-type forms (media via MediaPickerView, lyrics typed or SongPickerView + show_title, countdown via CountdownFieldsView, youtube, stream, sign with ColorRow), `PlaylistItemPreview`, site scope picker (`model.content.selectableSites`, "All sites" only when `model.content.hasAllSites`).
+2. **Deck/theme editor agent**: `DeckEditorView(deck: DeckDraft)` and `ThemeEditorView(theme: SlideTheme)`. Slide strip with `SlidePreviewCard`, slide forms per `DeckSlide.Content`, background picker (`SlideBackground`), theme choice, loops; theme fields of `ThemeConfig`, presets, name uniqueness errors from the service.
+3. **Scheduling agent**: `ScheduleSheet(target: ScheduleTarget)`; already presented from the Create swipe actions and the Play now sheet. Locations: `model.content.locations`, `Location.uses(target.module)`; add `ContentService`-style methods for schedules in Core.
+
+## Conventions
+- Draft pattern: `@State var draft` copied from the row plus `let original`; unsaved changes = `draft != original`; confirm on back/dismiss when true; `interactiveDismissDisabled(draft != original)` for sheets. After a successful save set `original = saved draft`.
+- New things have a device-made `id` and `isNew == true`; the service inserts with that id (`createX`), existing ones update. Every insert sets `organization_id`; `site_id` is always sent (null = all sites).
+- Errors: `do { try await model.content.save(...) } catch { errorText = Formatting.message(for: error) }` shown in an alert or `Banner(style: .error)`; never swallow server messages.
+- Keep editing the typed model; never rebuild items from scratch (unknown keys live in `extra`).
+- Permissions: `ContentPermissions` / `ChurchAccess.editableModules`. Admins and owners are treated as having every module and all sites (database `in_site_scope`), even if `memberships.site_ids` is set.
+- Adding files: `python3 sync_xcodeproj.py` (or XcodeGen).
 
 # Mac app (`ChurchTVMac/`)
 

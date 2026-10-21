@@ -31,9 +31,19 @@ struct AddMediaView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     var embedded: Bool
+    /// Media picker flow (see `MediaPickerView`): lock the library, start in a folder, allow audio files from the Files app, and
+    /// get the new library rows back. All optional; the plain "Add media" screen uses none of them.
+    var fixedModule: AppModule? = nil
+    var initialFolder: UUID? = nil
+    /// Kinds the caller wants. Empty = photos and videos (the normal screen). Contains `.audio` = also offer "Choose audio files".
+    var kinds: Set<MediaKind> = []
+    var onUploaded: (([MediaItem]) -> Void)? = nil
 
     @State private var pickerItems: [PhotosPickerItem] = []
-    @State private var picked: [PickedMedia] = []
+    @State private var pickedPhotos: [PickedMedia] = []
+    @State private var pickedAudio: [PickedMedia] = []
+    @State private var importingAudio = false
+    @State private var startedInFolder = false
     @State private var preparing = false
     @State private var module: AppModule?
     @State private var folders: [MediaFolder] = []
@@ -46,7 +56,10 @@ struct AddMediaView: View {
     @State private var confirmLarge = false
     @State private var uploadTask: Task<Void, Never>?
 
-    private var modules: [AppModule] { model.church?.modules ?? [] }
+    private var picked: [PickedMedia] { pickedPhotos + pickedAudio }
+    private var showsPhotos: Bool { kinds.isEmpty || kinds.contains(.image) || kinds.contains(.video) }
+    private var showsAudio: Bool { kinds.contains(.audio) }
+    private var modules: [AppModule] { fixedModule.map { [$0] } ?? model.church?.modules ?? [] }
     private var total: Int64 { picked.reduce(0) { $0 + $1.size } }
     private var hasLarge: Bool { picked.contains { $0.size > Config.largeUploadWarningBytes } }
 
@@ -58,24 +71,34 @@ struct AddMediaView: View {
             if model.isDemo { Section { Banner(text: "Demo mode: files are not really uploaded.", style: .info, systemImage: "sparkles") } }
 
             Section("Library") {
-                Picker("Add to", selection: $module) {
-                    ForEach(modules) { Text($0.displayName).tag(Optional($0)) }
+                if fixedModule != nil {
+                    LabeledContent("Add to", value: module?.displayName ?? "")
+                } else {
+                    Picker("Add to", selection: $module) {
+                        ForEach(modules) { Text($0.displayName).tag(Optional($0)) }
+                    }
                 }
                 Picker("Folder", selection: $folderId) {
                     Text("No folder (top level)").tag(UUID?.none)
-                    ForEach(folders) { Text($0.name).tag(Optional($0.id)) }
+                    ForEach(folders.sorted { path($0) < path($1) }) { Text(path($0)).tag(Optional($0.id)) }
                 }
             }
 
-            Section("Photos and videos") {
-                PhotosPicker(selection: $pickerItems, maxSelectionCount: 20, matching: .any(of: [.images, .videos])) {
-                    Label(picked.isEmpty ? "Choose photos or videos" : "Change selection", systemImage: "photo.on.rectangle.angled")
+            Section(showsPhotos ? "Photos and videos" : "Audio") {
+                if showsPhotos {
+                    PhotosPicker(selection: $pickerItems, maxSelectionCount: 20, matching: .any(of: [.images, .videos])) {
+                        Label(pickedPhotos.isEmpty ? "Choose photos or videos" : "Change selection", systemImage: "photo.on.rectangle.angled")
+                    }
+                    .disabled(uploading)
                 }
-                .disabled(uploading)
+                if showsAudio {
+                    Button { importingAudio = true } label: { Label(pickedAudio.isEmpty ? "Choose audio files" : "Change audio files", systemImage: "music.note") }
+                        .disabled(uploading)
+                }
                 if preparing { HStack { ProgressView(); Text("Preparing…").foregroundStyle(.secondary) } }
                 ForEach(picked) { p in
                     HStack {
-                        Image(systemName: p.kind == .video ? "video.fill" : "photo.fill").foregroundStyle(.tint).accessibilityHidden(true)
+                        Image(systemName: p.kind == .video ? "video.fill" : p.kind == .audio ? "music.note" : "photo.fill").foregroundStyle(.tint).accessibilityHidden(true)
                         VStack(alignment: .leading) {
                             Text(p.filename).lineLimit(1)
                             Text(Formatting.bytes(p.size)).font(.caption).foregroundStyle(.secondary)
@@ -109,12 +132,20 @@ struct AddMediaView: View {
         .navigationTitle("Add media")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { if !embedded { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } } }
-        .onAppear { if module == nil { module = modules.first } }
+        .onAppear { if module == nil { module = fixedModule ?? modules.first } }
         .task(id: module) {
-            folderId = nil
+            folderId = (!startedInFolder && module == fixedModule) ? initialFolder : nil
+            startedInFolder = true
             if let module { folders = await model.folders(for: module) }
+            if folderId != nil, !folders.contains(where: { $0.id == folderId }) { folderId = nil }
         }
         .onChange(of: pickerItems) { _, items in Task { await prepare(items) } }
+        .fileImporter(isPresented: $importingAudio, allowedContentTypes: [.audio], allowsMultipleSelection: true) { result in
+            switch result {
+            case .success(let urls): importAudio(urls)
+            case .failure(let error): errorText = "Could not read the audio file: \(Formatting.message(for: error))"
+            }
+        }
         .confirmationDialog("Upload large files?", isPresented: $confirmLarge, titleVisibility: .visible) {
             Button("Upload anyway") { startUpload() }
             Button("Cancel", role: .cancel) {}
@@ -148,7 +179,36 @@ struct AddMediaView: View {
                 errorText = "Could not read one of the files: \(Formatting.message(for: error))"
             }
         }
-        picked = result
+        pickedPhotos = result
+    }
+
+    /// Audio files come from the Files app. They are copied (not loaded into memory) so long tracks work.
+    private func importAudio(_ urls: [URL]) {
+        errorText = nil; message = nil
+        var result: [PickedMedia] = []
+        for url in urls {
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let dir = FileManager.default.temporaryDirectory.appendingPathComponent("uploads", isDirectory: true)
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                let dest = dir.appendingPathComponent("\(UUID().uuidString)-\(url.lastPathComponent)")
+                try FileManager.default.copyItem(at: url, to: dest)
+                let size = (try? FileManager.default.attributesOfItem(atPath: dest.path)[.size] as? Int64) ?? 0
+                let type = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "audio/mpeg"
+                result.append(PickedMedia(url: dest, filename: url.lastPathComponent, kind: .audio, size: size, contentType: type))
+            } catch {
+                errorText = "Could not read \(url.lastPathComponent): \(Formatting.message(for: error))"
+            }
+        }
+        pickedAudio = result
+    }
+
+    /// "Series / Week 1" for nested folders.
+    private func path(_ f: MediaFolder) -> String {
+        var names = [f.name]; var cur = f.parentId; var guardCount = 0
+        while let id = cur, let p = folders.first(where: { $0.id == id }), guardCount < 20 { names.insert(p.name, at: 0); cur = p.parentId; guardCount += 1 }
+        return names.joined(separator: " / ")
     }
 
     private static func jpeg(from data: Data) -> Data? {
@@ -165,6 +225,7 @@ struct AddMediaView: View {
         let folder = folderId
         uploadTask = Task {
             var done = 0
+            var added: [MediaItem] = []
             for (i, f) in files.enumerated() {
                 if Task.isCancelled { break }
                 currentIndex = i; progress = 0
@@ -172,7 +233,7 @@ struct AddMediaView: View {
                 let req = MediaUploadRequest(organizationId: org, module: module, folderId: folder, fileURL: f.url, filename: f.filename,
                                              title: title, kind: f.kind, sizeBytes: f.size, contentType: f.contentType)
                 do {
-                    try await model.upload(req) { p in Task { @MainActor in progress = p } }
+                    if let item = try await model.content.uploadMedia(req, progress: { p in Task { @MainActor in progress = p } }) { added.append(item) }
                     done += 1
                     try? FileManager.default.removeItem(at: f.url)
                 } catch {
@@ -184,7 +245,8 @@ struct AddMediaView: View {
             if done > 0 {
                 message = "Added \(done) file\(done == 1 ? "" : "s") to \(module.displayName)."
                 Haptics.success()
-                picked = []; pickerItems = []
+                pickedPhotos = []; pickedAudio = []; pickerItems = []
+                if let onUploaded, !added.isEmpty { onUploaded(added) }
             } else if errorText != nil { Haptics.failure() }
         }
     }

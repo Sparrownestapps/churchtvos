@@ -3,7 +3,7 @@ import Supabase
 
 /// The real back end. Sessions are stored in the Keychain by the SDK's default storage on Apple platforms.
 public final class SupabaseService: ChurchService, @unchecked Sendable {
-    private let client: SupabaseClient
+    let client: SupabaseClient
     private let decoder = ChurchJSON.decoder()
 
     public var isDemo: Bool { false }
@@ -35,7 +35,7 @@ public final class SupabaseService: ChurchService, @unchecked Sendable {
     // MARK: Helpers
 
     /// Runs a call and turns SDK errors into readable `ChurchError`s (server "raise exception" texts pass through).
-    private func guarded<T>(_ work: () async throws -> T) async throws -> T {
+    func guarded<T>(_ work: () async throws -> T) async throws -> T {
         do { return try await work() }
         catch let e as PostgrestError { throw ChurchError(e.message) }
         catch let e as AuthError { throw ChurchError(Self.authMessage(e)) }
@@ -49,7 +49,7 @@ public final class SupabaseService: ChurchService, @unchecked Sendable {
         return text
     }
 
-    private func rows<T: Decodable>(_ builder: PostgrestBuilder, as type: T.Type = T.self) async throws -> [T] {
+    func rows<T: Decodable>(_ builder: PostgrestBuilder, as type: T.Type = T.self) async throws -> [T] {
         let response = try await builder.execute()
         do { return try decoder.decode([T].self, from: response.data) }
         catch { throw ChurchError("The server sent something unexpected (\(type)). Update the app and try again.") }
@@ -104,7 +104,7 @@ public final class SupabaseService: ChurchService, @unchecked Sendable {
                 let mods = AppModule.allCases.filter {
                     m.modules.contains($0.rawValue) && usable.contains($0.rawValue) && (availableIds.isEmpty || availableIds.contains($0.rawValue))
                 }
-                return ChurchAccess(organization: org, role: m.role, modules: mods)
+                return ChurchAccess(organization: org, role: m.role, modules: mods, siteIds: m.siteIds)
             }.sorted { $0.organization.name.localizedCaseInsensitiveCompare($1.organization.name) == .orderedAscending }
         }
     }
@@ -255,13 +255,17 @@ public final class SupabaseService: ChurchService, @unchecked Sendable {
 
     public func mediaFolders(organizationId: UUID, module: AppModule) async throws -> [MediaFolder] {
         try await guarded {
-            try await rows(client.from("media_folders").select("id,module,parent_id,name")
+            try await rows(client.from("media_folders").select("id,module,parent_id,name,site_id")
                 .eq("organization_id", value: organizationId.uuidString.lowercased())
                 .eq("module", value: module.rawValue).order("name"))
         }
     }
 
     public func uploadMedia(_ request: MediaUploadRequest, progress: @escaping @Sendable (Double) -> Void) async throws {
+        _ = try await uploadMediaItem(request, progress: progress)
+    }
+
+    public func uploadMediaItem(_ request: MediaUploadRequest, progress: @escaping @Sendable (Double) -> Void) async throws -> MediaItem? {
         try await guarded {
             progress(0.02)
             let path = MediaPath.make(organizationId: request.organizationId, filename: request.filename)
@@ -272,14 +276,17 @@ public final class SupabaseService: ChurchService, @unchecked Sendable {
             let publicURL = try bucket.getPublicURL(path: path)
             let row = NewMediaRow(organizationId: request.organizationId, module: request.module.rawValue, title: request.title,
                                   kind: request.kind, storagePath: path, url: publicURL.absoluteString, sizeBytes: request.sizeBytes, folderId: request.folderId)
+            let inserted: [MediaItem]
             do {
-                _ = try await client.from("media").insert(row).execute()
+                let response = try await client.from("media").insert(row).select(SupabaseService.mediaColumns).execute()
+                inserted = (try? ContentJSON.decoder().decode([MediaItem].self, from: response.data)) ?? []
             } catch {
                 // Do not leave an orphan file behind when the database refuses the row.
                 _ = try? await bucket.remove(paths: [path])
                 throw error
             }
             progress(1)
+            return inserted.first
         }
     }
 

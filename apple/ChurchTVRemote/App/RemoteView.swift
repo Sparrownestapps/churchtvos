@@ -182,6 +182,7 @@ struct PlayNowSheet: View {
     @State private var minutes = 60
     @State private var selected: PlayNowItem.ID?
     @State private var sending = false
+    @State private var scheduleTarget: ScheduleTarget?
     private let durations = [15, 30, 60, 90, 120, 240, 480]
 
     var body: some View {
@@ -200,8 +201,14 @@ struct PlayNowSheet: View {
                 if model.playNowItems.isEmpty {
                     Section { Text("No decks or playlists available for your church.").foregroundStyle(.secondary) }
                 }
+                if model.canCreate, let item = model.playNowItems.first(where: { $0.id == selected }) {
+                    Section {
+                        Button { scheduleTarget = target(for: item) } label: { Label("Schedule “\(item.name)”…", systemImage: "calendar.badge.plus") }
+                    } footer: { Text("Plan it for later instead of starting it now.") }
+                }
                 if let e = model.commandError { Section { Banner(text: e, style: .error) } }
             }
+            .sheet(item: $scheduleTarget) { ScheduleSheet(target: $0) }
             .navigationTitle("Play now")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -213,6 +220,10 @@ struct PlayNowSheet: View {
             .task { model.commandError = nil }
         }
         .presentationDetents([.large])
+    }
+
+    private func target(for item: PlayNowItem) -> ScheduleTarget {
+        item.kind == .deck ? .deck(id: item.refId, name: item.name) : .playlist(id: item.refId, name: item.name, kind: .kids)
     }
 
     private func rows(_ items: [PlayNowItem]) -> some View {
