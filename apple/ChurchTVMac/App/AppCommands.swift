@@ -1,37 +1,47 @@
 import SwiftUI
 import AppKit
+import ChurchTVCore
 
-/// The menu bar of the app (File, View, Go, Window, Help). The App, Edit and Window menus keep their standard items.
+/// The menu bar of the app: File, View (sidebar), Go (sections), Remote, Window, Help. App, Edit and Window keep their standard items.
 struct AppCommands: Commands {
     let model: MenuModel
     @Environment(\.openWindow) private var openWindow
-    private var web: WebModel { model.web }
+    private var nav: NavState { NavState.shared }
+
+    private var visible: [AppSection] { AppSection.visible(church: model.church, isPlatformAdmin: model.isPlatformAdmin) }
+    private var control: Bool { model.isSignedIn && model.canControl && (model.selectedScreen?.isOnline() ?? false) && (model.selectedScreen?.supportsRemote ?? false) }
 
     var body: some Commands {
+        SidebarCommands()
+
         // File
         CommandGroup(replacing: .newItem) {
-            Button("Open Dashboard in Browser") { NSWorkspace.shared.open(AppLinks.dashboard) }
-                .keyboardShortcut("o", modifiers: [.command, .shift])
+            Button("Pair a TV…") { show(); nav.go(.screens); nav.showPairSheet = true }
+                .keyboardShortcut("n", modifiers: [.command, .option]).disabled(!(model.church.map { ScreenRules.canManage($0.role) } ?? false))
+            Divider()
+            Button("Refresh") { Task { await model.refreshNow() } }.keyboardShortcut("r").disabled(!model.isSignedIn)
+            Button("Open Dashboard in Browser") { NSWorkspace.shared.open(AppLinks.dashboard) }.keyboardShortcut("o", modifiers: [.command, .shift])
         }
 
-        // View
-        CommandGroup(before: .toolbar) {
-            Button("Reload") { web.reload() }.keyboardShortcut("r")
-            Button("Back") { web.goBack() }.keyboardShortcut("[").disabled(!web.canGoBack)
-            Button("Forward") { web.goForward() }.keyboardShortcut("]").disabled(!web.canGoForward)
-            Divider()
-            Button("Actual Size") { web.resetZoom() }.keyboardShortcut("0")
-            Button("Zoom In") { web.zoomIn() }.keyboardShortcut("+")
-            Button("Zoom Out") { web.zoomOut() }.keyboardShortcut("-")
-            Divider()
-        }
-
-        // Go: the website's main sections
+        // Go: sections the signed-in person can see
         CommandMenu("Go") {
-            ForEach(Array(AppLinks.Section.allCases.enumerated()), id: \.element) { i, section in
-                Button(section.title) { show(); web.open(section) }
-                    .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")))
+            ForEach(Array(visible.prefix(10).enumerated()), id: \.element) { i, section in
+                Button(section.title) { show(); nav.go(section) }
+                    .keyboardShortcut(KeyEquivalent(Character("\((i + 1) % 10)")))
             }
+            if visible.isEmpty { Text("Sign in to see sections") }
+        }
+
+        // Remote (acts on the TV selected in Screens / Remote / the menu bar)
+        CommandMenu("Remote") {
+            Button("Next Slide") { send(.next) }.keyboardShortcut(.rightArrow, modifiers: [.command, .option]).disabled(!control)
+            Button("Previous Slide") { send(.previous) }.keyboardShortcut(.leftArrow, modifiers: [.command, .option]).disabled(!control)
+            Button("Blank / Unblank") { send(.blank(on: nil)) }.keyboardShortcut("b", modifiers: [.command, .option]).disabled(!control)
+            Button("Stop") { send(.stop) }.keyboardShortcut(".", modifiers: [.command, .option]).disabled(!control)
+            Divider()
+            Button("Send Message…") { show(); nav.go(.remote); nav.showMessageSheet = true }
+                .keyboardShortcut("m", modifiers: [.command, .option]).disabled(!control)
+            Button("Open Remote") { show(); nav.go(.remote) }.disabled(!model.isSignedIn)
         }
 
         // Window
@@ -49,6 +59,11 @@ struct AppCommands: Commands {
             Button("Terms of Service") { NSWorkspace.shared.open(AppLinks.terms) }
             Button("Delete My Account") { NSWorkspace.shared.open(AppLinks.deleteAccount) }
         }
+    }
+
+    private func send(_ c: RemoteCommand) {
+        guard let s = model.selectedScreen else { return }
+        Task { await model.send(c, to: s) }
     }
 
     private func show() {

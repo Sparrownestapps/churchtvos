@@ -13,7 +13,6 @@ struct SettingsView: View {
     @State private var alertsOn = false
     @State private var alertsLoaded = false
     @State private var alertsError: String?
-    @State private var showSignIn = false
 
     private var version: String {
         let i = Bundle.main.infoDictionary
@@ -46,7 +45,6 @@ struct SettingsView: View {
             Task { await model.push.refreshAuthorization(); await loadAlerts() }
         }
         .onChange(of: model.church?.id) { _, _ in Task { await loadAlerts() } }
-        .sheet(isPresented: $showSignIn) { NativeSignInSheet() }
     }
 
     // MARK: Account
@@ -64,14 +62,9 @@ struct SettingsView: View {
                 }
                 LabeledContent("Role", value: model.roleText)
                 Button(model.useDemo ? "Leave demo" : "Sign out of Church TV OS", role: .destructive) { Task { await model.signOut() } }
-                if !model.useDemo { Text("Signing out here also signs you out of the website in the app window.").font(.caption).foregroundStyle(.secondary) }
             } else {
-                Text(model.bridgeNote ?? "Not signed in. Sign in once on the website in the app window; the menu bar picks it up automatically.")
-                    .foregroundStyle(.secondary)
-                HStack {
-                    Button("Open sign-in page") { openWindow(id: "main"); NSApp.activate(ignoringOtherApps: true) }
-                    Button("Sign in here instead…") { showSignIn = true }
-                }
+                Text("Not signed in. Sign in from the app window.").foregroundStyle(.secondary)
+                Button("Open Church TV OS") { openWindow(id: "main"); NSApp.activate(ignoringOtherApps: true) }
             }
         }
     }
@@ -143,35 +136,5 @@ struct SettingsView: View {
             alertsOn = on
             if let e = await model.setOfflineAlerts(on) { alertsError = e; alertsOn = previous }
         }
-    }
-}
-
-/// Fallback sign-in (email and password) when the website bridge is not used.
-struct NativeSignInSheet: View {
-    @Environment(MenuModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
-    @State private var email = ""
-    @State private var password = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Sign in to the menu bar").font(.title3.weight(.semibold))
-            Text("Use the same email and password as the website. This signs in the menu bar only; the website window keeps its own sign-in.")
-                .font(.callout).foregroundStyle(.secondary)
-            TextField("Email", text: $email).textContentType(.username)
-            SecureField("Password", text: $password).textContentType(.password)
-            if let e = model.signInError { Text(e).font(.caption).foregroundStyle(.red) }
-            HStack {
-                Spacer()
-                Button("Cancel") { dismiss() }
-                Button("Sign in") {
-                    Task { await model.signIn(email: email, password: password); if model.isSignedIn { dismiss() } }
-                }
-                .keyboardShortcut(.defaultAction).disabled(model.isSigningIn)
-            }
-        }
-        .textFieldStyle(.roundedBorder)
-        .padding(20).frame(width: 380)
-        .onAppear { model.signInError = nil }
     }
 }

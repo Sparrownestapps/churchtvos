@@ -85,10 +85,10 @@ struct MenuBarView: View {
         VStack(spacing: 10) {
             Image(systemName: "person.crop.circle.badge.questionmark").font(.system(size: 34)).foregroundStyle(.secondary)
             Text("Not signed in").font(.headline)
-            Text(model.bridgeNote ?? "Sign in once on the website in the app window. The menu bar connects by itself.")
+            Text("Sign in in the app window to see your TVs here.")
                 .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
             HStack {
-                Button("Open dashboard") { openMain() }.buttonStyle(.borderedProminent)
+                Button("Open Church TV OS") { openMain() }.buttonStyle(.borderedProminent)
                 Button("Use demo data") { Task { await model.setDemo(true) } }
             }
         }

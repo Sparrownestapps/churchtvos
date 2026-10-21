@@ -20,6 +20,19 @@
 		B47FE0FB1256234431B70676 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 053D85A72B85D43172560E3F /* SettingsView.swift */; };
 		BBE956E3B6E7A418684A95A6 /* AppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA658F451DC3EAF46B5C186D /* AppLinks.swift */; };
 		FDC30ADB91F90BB54068C118 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26C21B71FCA86E493EB54491 /* MenuBarView.swift */; };
+		F63D267B1BAED152918E6D7B /* ChurchTVEditors in Frameworks */ = {isa = PBXBuildFile; productRef = B3DAF695EC886C61576D3DE7 /* ChurchTVEditors */; };
+		4391AEE785549A30ED566A62 /* ChurchTVCalendar in Frameworks */ = {isa = PBXBuildFile; productRef = 41F7574481F0F011B7B9A3B6 /* ChurchTVCalendar */; };
+		BDDA07ABCA7DE50C82D23E40 /* AdminSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52C4C8CE134CF924899EE2D5 /* AdminSection.swift */; };
+		958496E685814A3175D79078 /* AppSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13FDF9B75B56C5B4DF1E858 /* AppSection.swift */; };
+		124D176223D280F15DFDB6F7 /* ChurchSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 396F4A6F6B20A273D5D76099 /* ChurchSettingsSection.swift */; };
+		595D28F28C7922CB793CAEC6 /* ContentSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 041D5A76019F43F9B1AFEDCD /* ContentSections.swift */; };
+		06DBDB463F58505D6252EB1C /* MediaSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 498E63C5A44FFAABA3D93400 /* MediaSection.swift */; };
+		F249D7FFF9FAF8C96ED097B8 /* NativeRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 195F431297C2567A7336C7CE /* NativeRootView.swift */; };
+		F7DF2E34D899622525D7FB76 /* NativeSignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA6680FF090815D7D01C5EF3 /* NativeSignInView.swift */; };
+		201E97FAED9214F62CDA9C04 /* PeopleSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F59CEB28EADC4D9E488688D2 /* PeopleSection.swift */; };
+		CA1CC0E560D11242026934EC /* RemoteSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E89F06E98B561930B22FAFE0 /* RemoteSection.swift */; };
+		BB84AAE46D690C7129528E57 /* ScreensSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBFF467D2350ABF475B7114 /* ScreensSection.swift */; };
+		E9939E50751C3E4C5862C087 /* SongsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AC9DB8F8C11DE2FE441531C /* SongsSection.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +51,19 @@
 		E9FF56D5B96E8FA5A52E443C /* MenuModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuModel.swift; sourceTree = "<group>"; };
 		EA3D714FE00E04FA5D00D57A /* MenuBarIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarIcon.swift; sourceTree = "<group>"; };
 		FA658F451DC3EAF46B5C186D /* AppLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLinks.swift; sourceTree = "<group>"; };
+		D1374C3616A2288C19E1D623 /* ChurchTVEditors */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ChurchTVEditors; path = ../ChurchTVEditors; sourceTree = SOURCE_ROOT; };
+		64D21CC30D5CF3031220F62E /* ChurchTVCalendar */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ChurchTVCalendar; path = ../ChurchTVCalendar; sourceTree = SOURCE_ROOT; };
+		52C4C8CE134CF924899EE2D5 /* AdminSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSection.swift; sourceTree = "<group>"; };
+		E13FDF9B75B56C5B4DF1E858 /* AppSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSection.swift; sourceTree = "<group>"; };
+		396F4A6F6B20A273D5D76099 /* ChurchSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChurchSettingsSection.swift; sourceTree = "<group>"; };
+		041D5A76019F43F9B1AFEDCD /* ContentSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentSections.swift; sourceTree = "<group>"; };
+		498E63C5A44FFAABA3D93400 /* MediaSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaSection.swift; sourceTree = "<group>"; };
+		195F431297C2567A7336C7CE /* NativeRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRootView.swift; sourceTree = "<group>"; };
+		CA6680FF090815D7D01C5EF3 /* NativeSignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSignInView.swift; sourceTree = "<group>"; };
+		F59CEB28EADC4D9E488688D2 /* PeopleSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeopleSection.swift; sourceTree = "<group>"; };
+		E89F06E98B561930B22FAFE0 /* RemoteSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteSection.swift; sourceTree = "<group>"; };
+		DDBFF467D2350ABF475B7114 /* ScreensSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreensSection.swift; sourceTree = "<group>"; };
+		0AC9DB8F8C11DE2FE441531C /* SongsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongsSection.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +71,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4391AEE785549A30ED566A62 /* ChurchTVCalendar in Frameworks */,
+				F63D267B1BAED152918E6D7B /* ChurchTVEditors in Frameworks */,
 				10F4846660559A6A03EF424F /* ChurchTVCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -72,6 +100,7 @@
 				EA3D714FE00E04FA5D00D57A /* MenuBarIcon.swift */,
 				26C21B71FCA86E493EB54491 /* MenuBarView.swift */,
 				E9FF56D5B96E8FA5A52E443C /* MenuModel.swift */,
+				C43A64E57CCBF41277C5FB75 /* Native */,
 				80C4A33A862337FA888821AE /* PushManager.swift */,
 				053D85A72B85D43172560E3F /* SettingsView.swift */,
 				B9868BFAD385C71FD57274FD /* WebContainer.swift */,
@@ -100,9 +129,29 @@
 		CE8E98022122BFA8F1EBAF6A /* Packages */ = {
 			isa = PBXGroup;
 			children = (
+				64D21CC30D5CF3031220F62E /* ChurchTVCalendar */,
+				D1374C3616A2288C19E1D623 /* ChurchTVEditors */,
 				3DDEFA4BD314F2BF1BCF1A1A /* ChurchTVCore */,
 			);
 			name = Packages;
+			sourceTree = "<group>";
+		};
+		C43A64E57CCBF41277C5FB75 /* Native */ = {
+			isa = PBXGroup;
+			children = (
+				52C4C8CE134CF924899EE2D5 /* AdminSection.swift */,
+				E13FDF9B75B56C5B4DF1E858 /* AppSection.swift */,
+				396F4A6F6B20A273D5D76099 /* ChurchSettingsSection.swift */,
+				041D5A76019F43F9B1AFEDCD /* ContentSections.swift */,
+				498E63C5A44FFAABA3D93400 /* MediaSection.swift */,
+				195F431297C2567A7336C7CE /* NativeRootView.swift */,
+				CA6680FF090815D7D01C5EF3 /* NativeSignInView.swift */,
+				F59CEB28EADC4D9E488688D2 /* PeopleSection.swift */,
+				E89F06E98B561930B22FAFE0 /* RemoteSection.swift */,
+				DDBFF467D2350ABF475B7114 /* ScreensSection.swift */,
+				0AC9DB8F8C11DE2FE441531C /* SongsSection.swift */,
+			);
+			path = Native;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -122,6 +171,8 @@
 			);
 			name = ChurchTVMac;
 			packageProductDependencies = (
+				41F7574481F0F011B7B9A3B6 /* ChurchTVCalendar */,
+				B3DAF695EC886C61576D3DE7 /* ChurchTVEditors */,
 				6E11A49278449F7BB791F1F8 /* ChurchTVCore */,
 			);
 			productName = ChurchTVMac;
@@ -138,7 +189,7 @@
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					7A8211E395EDF247A163633C = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = 4K3495W2H2;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -153,6 +204,8 @@
 			mainGroup = 612629AB0F3B9D18F3F277DF;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				241AA247D0320132324401CD /* XCLocalSwiftPackageReference "../ChurchTVCalendar" */,
+				7CD25C9CD1B211EFE42FB675 /* XCLocalSwiftPackageReference "../ChurchTVEditors" */,
 				DF3A9E902D4F11F70D7A7348 /* XCLocalSwiftPackageReference "../ChurchTVCore" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -192,6 +245,17 @@
 				B47FE0FB1256234431B70676 /* SettingsView.swift in Sources */,
 				84878EEFBB5ADBDDC3BA4D19 /* WebContainer.swift in Sources */,
 				A736894C7AC8E5FA7A9583F4 /* WebModel.swift in Sources */,
+				BDDA07ABCA7DE50C82D23E40 /* AdminSection.swift in Sources */,
+				958496E685814A3175D79078 /* AppSection.swift in Sources */,
+				124D176223D280F15DFDB6F7 /* ChurchSettingsSection.swift in Sources */,
+				595D28F28C7922CB793CAEC6 /* ContentSections.swift in Sources */,
+				06DBDB463F58505D6252EB1C /* MediaSection.swift in Sources */,
+				F249D7FFF9FAF8C96ED097B8 /* NativeRootView.swift in Sources */,
+				F7DF2E34D899622525D7FB76 /* NativeSignInView.swift in Sources */,
+				201E97FAED9214F62CDA9C04 /* PeopleSection.swift in Sources */,
+				CA1CC0E560D11242026934EC /* RemoteSection.swift in Sources */,
+				BB84AAE46D690C7129528E57 /* ScreensSection.swift in Sources */,
+				E9939E50751C3E4C5862C087 /* SongsSection.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -257,7 +321,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 4K3495W2H2;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -346,7 +410,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 4K3495W2H2;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -397,12 +461,28 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../ChurchTVCore;
 		};
+		7CD25C9CD1B211EFE42FB675 /* XCLocalSwiftPackageReference "../ChurchTVEditors" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../ChurchTVEditors;
+		};
+		241AA247D0320132324401CD /* XCLocalSwiftPackageReference "../ChurchTVCalendar" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../ChurchTVCalendar;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		6E11A49278449F7BB791F1F8 /* ChurchTVCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ChurchTVCore;
+		};
+		B3DAF695EC886C61576D3DE7 /* ChurchTVEditors */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChurchTVEditors;
+		};
+		41F7574481F0F011B7B9A3B6 /* ChurchTVCalendar */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChurchTVCalendar;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

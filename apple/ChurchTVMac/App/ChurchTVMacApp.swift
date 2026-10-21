@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import ChurchTVCore
+import ChurchTVEditors
 
 @main
 struct ChurchTVMacApp: App {
@@ -10,9 +11,11 @@ struct ChurchTVMacApp: App {
 
     var body: some Scene {
         Window("Church TV OS", id: "main") {
-            MainWindowView().environment(model)
+            NativeRootView()
+                .environment(model)
+                .environment(model.content)
         }
-        .defaultSize(width: 1240, height: 820)
+        .defaultSize(width: 1280, height: 820)
         .commands { AppCommands(model: model) }
 
         Window("TV Status", id: "status") {

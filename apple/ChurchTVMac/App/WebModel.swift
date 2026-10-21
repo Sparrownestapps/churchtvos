@@ -100,6 +100,15 @@ final class WebModel: NSObject {
         }
     }
 
+    /// Opens any hash route of the website ("sites", "songs", ...).
+    func openRoute(_ route: String) {
+        if LinkRouter.isInternal(webView.url), errorMessage == nil {
+            webView.evaluateJavaScript("location.hash = '\(route.filter { $0.isLetter || $0.isNumber || $0 == "-" })'", completionHandler: nil)
+        } else {
+            load(URL(string: AppLinks.dashboard.absoluteString + "#" + route)!)
+        }
+    }
+
     func reload() {
         if errorMessage != nil || webView.url == nil { loadHome() } else { webView.reload() }
     }

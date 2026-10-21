@@ -2,17 +2,18 @@ import Foundation
 import Observation
 import SwiftUI
 import ChurchTVCore
+import ChurchTVEditors
 
-/// App-wide state for the menu bar item and Settings: session (shared with the website through the bridge), church, screens, commands.
+/// App-wide state for the native app, the menu bar item and Preferences: the native session (Supabase, tokens in the Keychain), churches,
+/// screens, remote commands, and the editors' host (`ContentHost`). The website web view is only a fallback and has its own sign-in.
 @MainActor
 @Observable
 final class MenuModel {
     static let shared = MenuModel()
 
-    enum Source: String { case none, web, native }
-
     let web = WebModel()
-    @ObservationIgnored private let supabase = SupabaseService(pushPlatform: "macos", autoRefreshToken: false)
+    /// The app owns its session, so the SDK refreshes the token itself (the website in the fallback pane keeps a separate session).
+    @ObservationIgnored private let supabase = SupabaseService(pushPlatform: "macos", autoRefreshToken: true)
     private(set) var service: any ChurchService
 
     private(set) var user: SessionUser?
@@ -21,7 +22,13 @@ final class MenuModel {
     private(set) var screens: [ScreenInfo] = []
     private(set) var lastRefresh: Date?
     private(set) var loadError: String?
-    private(set) var bridgeNote: String?
+    /// True until the saved session (Keychain) has been checked at launch, so the window does not flash the sign-in screen.
+    private(set) var launching = true
+    private(set) var isPlatformAdmin = false
+    /// Released applications (the `modules` registry), for People and names.
+    private(set) var moduleRegistry: [ModuleDef] = []
+    /// Bumped after screens were edited, paired or unpaired, so views reload their own details.
+    private(set) var screensRevision = 0
     var commandError: String?
     var selectedScreenId: UUID?
     var signInError: String?
@@ -35,22 +42,20 @@ final class MenuModel {
     func viewDisappeared() { openViews = max(0, openViews - 1) }
 
     private(set) var useDemo: Bool
-    @ObservationIgnored private var source: Source
-    @ObservationIgnored private var adoptedAccessToken: String?
-    @ObservationIgnored private var failedAccessToken: String?
+    /// The editors' state (Create section, pickers, media). Created on first use.
+    @ObservationIgnored private(set) lazy var content = ContentModel(host: self)
     @ObservationIgnored private var loop: Task<Void, Never>?
     @ObservationIgnored private var busy = false
     let push = PushManager.shared
 
     private enum Keys {
-        static let demo = "useDemoData", source = "sessionSource", church = "lastChurchId"
+        static let demo = "useDemoData", church = "lastChurchId"
     }
 
     private init() {
         let d = UserDefaults.standard
         let demo = d.bool(forKey: Keys.demo) || CommandLine.arguments.contains("-demo")
         useDemo = demo
-        source = Source(rawValue: d.string(forKey: Keys.source) ?? "") ?? .none
         service = demo ? MockService() : supabase
         push.onToken = { [weak self] token in Task { @MainActor in await self?.storePushToken(token) } }
     }
@@ -62,6 +67,11 @@ final class MenuModel {
     var selectedScreen: ScreenInfo? { screens.first { $0.id == selectedScreenId } ?? screens.first }
     var canControl: Bool { church?.role.canControl ?? false }
     var roleText: String { church?.role.displayName ?? "" }
+    var ops: (any OperationsService)? { service as? any OperationsService }
+    var library: (any LibraryService)? { service as? any LibraryService }
+    var admin: (any AdminService)? { service as? any AdminService }
+    var offlineCount: Int { screens.filter { !$0.isOnline() }.count }
+    func moduleName(_ id: String) -> String { moduleRegistry.first { $0.id == id }?.name ?? AppModule(rawValue: id)?.displayName ?? id.capitalized }
 
     // MARK: Lifecycle
 
@@ -71,6 +81,7 @@ final class MenuModel {
         loop = Task { [weak self] in
             // Fast path: a session the SDK kept in the Keychain from last time.
             await self?.restoreAtLaunch()
+            self?.launching = false
             while !Task.isCancelled {
                 await self?.tick()
                 var waited = 0
@@ -98,61 +109,15 @@ final class MenuModel {
             if user == nil { await enterDemo() }
             await refreshScreens(); return
         }
-        await syncSession()
         if user != nil {
             if church == nil && churches.isEmpty { await loadChurches() }
             await refreshScreens()
         }
     }
 
-    // MARK: Session bridge
-
-    /// Compares the website's session with ours. The website owns the refresh token; we only ever adopt tokens that are still valid
-    /// (so the SDK never refreshes and never rotates the website's refresh token).
-    private func syncSession() async {
-        switch await web.readSession() {
-        case .session(let s):
-            if s.isFresh() {
-                bridgeNote = nil
-                if user == nil || s.accessToken != adoptedAccessToken { await adopt(s) }
-            } else if user == nil {
-                bridgeNote = "The website sign-in needs a refresh. Open the dashboard window and this will connect automatically."
-            }
-        case .signedOut:
-            bridgeNote = nil
-            if source == .web, user != nil {
-                // Signed out on the website: clear ours too.
-                await clearLocalSession(removeWebSession: false)
-            }
-        case .unavailable:
-            break
-        }
-    }
-
-    private func adopt(_ s: WebSession) async {
-        guard s.accessToken != failedAccessToken else { return }
-        do {
-            let u = try await supabase.setSession(accessToken: s.accessToken, refreshToken: s.refreshToken)
-            adoptedAccessToken = s.accessToken
-            failedAccessToken = nil
-            let firstTime = user == nil
-            user = u
-            setSource(.web)
-            if firstTime || churches.isEmpty { await loadChurches() }
-        } catch {
-            failedAccessToken = s.accessToken
-            bridgeNote = "Could not connect the menu bar to your website sign-in: \(Formatting.message(for: error))"
-        }
-    }
-
-    private func setSource(_ s: Source) {
-        source = s
-        UserDefaults.standard.set(s.rawValue, forKey: Keys.source)
-    }
-
     // MARK: Sign in / out
 
-    /// Fallback: sign in natively (Settings) when the bridge is not wanted. The menu bar then works without the website session.
+    /// Native sign-in with the same account as the website. The SDK keeps the session in the Keychain and refreshes it.
     func signIn(email: String, password: String) async {
         signInError = nil
         guard !email.trimmingCharacters(in: .whitespaces).isEmpty, !password.isEmpty else { signInError = "Enter your email and password."; return }
@@ -161,14 +126,13 @@ final class MenuModel {
             useDemoFlag(false)
             service = supabase
             user = try await supabase.signIn(email: email, password: password)
-            setSource(.native)
             await loadChurches()
         } catch {
             signInError = Formatting.message(for: error)
         }
     }
 
-    /// Signs out of the menu bar and the website.
+    /// Signs out of the app (and clears the fallback web view's sign-in).
     func signOut() async {
         if useDemo { await setDemo(false); return }
         await clearLocalSession(removeWebSession: true)
@@ -178,14 +142,15 @@ final class MenuModel {
         if let token = push.token { try? await service.removePushToken(token) }   // needs the session: do it first
         push.forgetToken()
         await supabase.signOut()
-        adoptedAccessToken = nil; failedAccessToken = nil
-        setSource(.none)
         resetData()
         if removeWebSession { await web.clearSessionAndReload() }
     }
 
     private func resetData() {
         user = nil; churches = []; church = nil; screens = []; selectedScreenId = nil; lastRefresh = nil; loadError = nil
+        isPlatformAdmin = false; moduleRegistry = []
+        content.reset()
+        updateDockBadge()
     }
 
     private func useDemoFlag(_ on: Bool) {
@@ -224,15 +189,21 @@ final class MenuModel {
         } catch {
             loadError = Formatting.message(for: error); churches = []
         }
+        isPlatformAdmin = (try? await ops?.isPlatformAdmin()) ?? false
+        moduleRegistry = (try? await ops?.listModules(availableOnly: true)) ?? []
         guard !churches.isEmpty else { church = nil; return }
         if let current = church, let again = churches.first(where: { $0.id == current.id }) { church = again; return }
         let last = UserDefaults.standard.string(forKey: Keys.church).flatMap(UUID.init(uuidString:))
         await choose(churches.first(where: { $0.id == last }) ?? churches[0])
     }
 
+    /// Re-reads the churches (after the name or branding changed).
+    func reloadChurches() async { await loadChurches() }
+
     func choose(_ access: ChurchAccess) async {
         church = access
         if !useDemo { UserDefaults.standard.set(access.id.uuidString, forKey: Keys.church) }
+        content.reset()
         screens = []; selectedScreenId = nil
         await refreshScreens()
         if !useDemo { await push.refreshRegistrationIfAllowed() }
@@ -241,14 +212,25 @@ final class MenuModel {
     func refreshScreens() async {
         guard let church else { return }
         do {
-            let list = try await service.listScreens(organizationId: church.id)
+            var list = try await service.listScreens(organizationId: church.id)
+            if let ops { list = await ops.overlayScreens(list) }
             screens = list
+            updateDockBadge()
             lastRefresh = Date()
             loadError = nil
             if selectedScreenId == nil || !list.contains(where: { $0.id == selectedScreenId }) { selectedScreenId = list.first?.id }
         } catch {
             if !(error is CancellationError) { loadError = Formatting.message(for: error) }
         }
+    }
+
+    /// Edits, pairing and unpairing change the list: read it again right away.
+    func screensChanged() async { screensRevision += 1; await refreshScreens() }
+
+    /// Dock badge = number of TVs that are offline (none = no badge).
+    private func updateDockBadge() {
+        let n = isSignedIn ? offlineCount : 0
+        NSApp?.dockTile.badgeLabel = n > 0 ? "\(n)" : nil
     }
 
     // MARK: Commands

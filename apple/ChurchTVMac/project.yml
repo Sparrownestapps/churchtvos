@@ -12,12 +12,15 @@ settings:
     SWIFT_VERSION: "5.0"
     MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
-    # Set your Apple Developer team here (or pick it in Xcode: target > Signing & Capabilities). Left empty on purpose.
-    DEVELOPMENT_TEAM: ""
+    DEVELOPMENT_TEAM: "4K3495W2H2"
     CODE_SIGN_STYLE: Automatic
 packages:
   ChurchTVCore:
     path: ../ChurchTVCore
+  ChurchTVEditors:
+    path: ../ChurchTVEditors
+  ChurchTVCalendar:
+    path: ../ChurchTVCalendar
 targets:
   ChurchTVMac:
     type: application
@@ -30,6 +33,8 @@ targets:
           - "*.entitlements"
     dependencies:
       - package: ChurchTVCore
+      - package: ChurchTVEditors
+      - package: ChurchTVCalendar
     info:
       path: Resources/Info.plist
       properties:
