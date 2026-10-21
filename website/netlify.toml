@@ -1,0 +1,19 @@
+# Church TV OS marketing site (churchtvos.com). Static; the build only assembles HTML from src/pages.
+[build]
+  command = "python3 tools/build.py"
+  publish = "dist"
+
+[[redirects]]
+  from = "/help/*"
+  to = "https://app.churchtvos.com/help/:splat"
+  status = 301
+
+[[redirects]]
+  from = "/privacy"
+  to = "https://app.churchtvos.com/privacy.html"
+  status = 301
+
+[[redirects]]
+  from = "/terms"
+  to = "https://app.churchtvos.com/terms.html"
+  status = 301
