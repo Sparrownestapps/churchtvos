@@ -8,12 +8,28 @@ public final class SupabaseService: ChurchService, @unchecked Sendable {
 
     public var isDemo: Bool { false }
 
-    public init() {
+    /// Value written to `push_devices.platform` ('ios' for the iPhone/iPad app, 'macos' for the Mac app).
+    private let pushPlatform: String
+
+    /// - Parameters:
+    ///   - pushPlatform: `push_devices.platform` value for this app.
+    ///   - autoRefreshToken: leave `true` for apps that own their sign-in. The Mac app turns it off because the website in its
+    ///     web view owns the refresh token (two clients refreshing the same rotating token would sign the website out).
+    public init(pushPlatform: String = "ios", autoRefreshToken: Bool = true) {
+        self.pushPlatform = pushPlatform
         client = SupabaseClient(
             supabaseURL: Config.supabaseURL,
             supabaseKey: Config.supabasePublishableKey,
-            options: SupabaseClientOptions(auth: .init(emitLocalSessionAsInitialSession: true))
+            options: SupabaseClientOptions(auth: .init(autoRefreshToken: autoRefreshToken, emitLocalSessionAsInitialSession: true))
         )
+    }
+
+    /// Adopts a session created elsewhere (the Mac app reads it from the website). The SDK stores it in the Keychain.
+    public func setSession(accessToken: String, refreshToken: String) async throws -> SessionUser {
+        try await guarded {
+            let session = try await client.auth.setSession(accessToken: accessToken, refreshToken: refreshToken)
+            return SessionUser(id: session.user.id, email: session.user.email ?? "")
+        }
     }
 
     // MARK: Helpers
@@ -270,14 +286,14 @@ public final class SupabaseService: ChurchService, @unchecked Sendable {
     // MARK: Push
 
     private struct PushDeviceRow: Encodable {
-        let userId: UUID; let platform = "ios"; let token: String; let environment: String; let lastSeenAt: String
+        let userId: UUID; let platform: String; let token: String; let environment: String; let lastSeenAt: String
         enum CodingKeys: String, CodingKey { case userId = "user_id", platform, token, environment, lastSeenAt = "last_seen_at" }
     }
 
     public func registerPushToken(_ token: String, environment: PushEnvironment) async throws {
         try await guarded {
             let uid = try await currentUserId()
-            let row = PushDeviceRow(userId: uid, token: token, environment: environment.rawValue, lastSeenAt: ChurchJSON.formatTimestamp(Date()))
+            let row = PushDeviceRow(userId: uid, platform: pushPlatform, token: token, environment: environment.rawValue, lastSeenAt: ChurchJSON.formatTimestamp(Date()))
             _ = try await client.from("push_devices").upsert(row, onConflict: "user_id,token").execute()
         }
     }

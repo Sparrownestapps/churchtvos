@@ -1,0 +1,66 @@
+# XcodeGen spec for the Mac app. Regenerate the Xcode project with:  xcodegen generate
+# (see ../README.md). The generated ChurchTVMac.xcodeproj is checked in too, so XcodeGen is optional.
+name: ChurchTVMac
+options:
+  bundleIdPrefix: com.churchtvos
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # Set your Apple Developer team here (or pick it in Xcode: target > Signing & Capabilities). Left empty on purpose.
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+packages:
+  ChurchTVCore:
+    path: ../ChurchTVCore
+targets:
+  ChurchTVMac:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: App
+      - path: Resources
+        excludes:
+          - "*.entitlements"
+    dependencies:
+      - package: ChurchTVCore
+    info:
+      path: Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Church TV OS
+        CFBundleName: Church TV OS
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: "14.0"
+        LSApplicationCategoryType: public.app-category.productivity
+        NSHumanReadableCopyright: Church TV OS
+        ITSAppUsesNonExemptEncryption: false
+    entitlements:
+      path: Resources/ChurchTVMac.entitlements
+      properties:
+        aps-environment: development
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.files.downloads.read-write: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.churchtvos.mac
+        PRODUCT_NAME: Church TV OS
+        PRODUCT_MODULE_NAME: ChurchTVMac
+        ENABLE_HARDENED_RUNTIME: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: NO
+        COMBINE_HIDPI_IMAGES: YES
+schemes:
+  ChurchTVMac:
+    build:
+      targets:
+        ChurchTVMac: all
