@@ -29,6 +29,9 @@
 		705B430E16FBB1B8F05BCABD /* ChurchTVCalendar in Frameworks */ = {isa = PBXBuildFile; productRef = D3029B10D6C60C6B5380C1D7 /* ChurchTVCalendar */; };
 		7ECF09D7F80CBEB3272A63D7 /* CalendarQuickAdd.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06FE67BBA6696F26B0FF4B51 /* CalendarQuickAdd.swift */; };
 		263224BC7B42EAC7709E4A37 /* CalendarTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D034D9FFA9F0C2F8B204443 /* CalendarTab.swift */; };
+		5AB4014D812F0240E668A3D9 /* PairTVSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AD24CF1E52214C87D330F4E /* PairTVSheet.swift */; };
+		CF7CC7533E5DCAAB1BFA1C25 /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0F7092CBB82DB5B5302B5B /* QRScannerView.swift */; };
+		B820E4015F46DB0E4D9FAAF1 /* PairingFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE952D645CC61282589908B /* PairingFlowTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -68,6 +71,9 @@
 		4B87E15B237989A364313E47 /* ChurchTVCalendar */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ChurchTVCalendar; path = ../ChurchTVCalendar; sourceTree = SOURCE_ROOT; };
 		06FE67BBA6696F26B0FF4B51 /* CalendarQuickAdd.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarQuickAdd.swift; sourceTree = "<group>"; };
 		2D034D9FFA9F0C2F8B204443 /* CalendarTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarTab.swift; sourceTree = "<group>"; };
+		2AD24CF1E52214C87D330F4E /* PairTVSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairTVSheet.swift; sourceTree = "<group>"; };
+		BA0F7092CBB82DB5B5302B5B /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
+		DFE952D645CC61282589908B /* PairingFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingFlowTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -100,6 +106,7 @@
 			children = (
 				901A7ECD71D0B33D7719B35A /* AppModelTests.swift */,
 				21D27607D1EC3635C7DC1754 /* CreateSectionTests.swift */,
+				DFE952D645CC61282589908B /* PairingFlowTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -133,6 +140,7 @@
 				401E31F7A9D7138929A70184 /* Components.swift */,
 				CBDBE5BA006D6AA51EDB6351 /* Create */,
 				D683FBF4AB145CDDA06F2DFF /* EditorsBridge.swift */,
+				1A7A768AD7269030D39A4347 /* Pairing */,
 				5CFFC6281C9D42F429A37FBF /* PushManager.swift */,
 				F698CC3AFECD0D001902B665 /* RemoteView.swift */,
 				4A1AB31A79D081C496388220 /* RootView.swift */,
@@ -178,6 +186,15 @@
 				2D034D9FFA9F0C2F8B204443 /* CalendarTab.swift */,
 			);
 			path = Calendar;
+			sourceTree = "<group>";
+		};
+		1A7A768AD7269030D39A4347 /* Pairing */ = {
+			isa = PBXGroup;
+			children = (
+				2AD24CF1E52214C87D330F4E /* PairTVSheet.swift */,
+				BA0F7092CBB82DB5B5302B5B /* QRScannerView.swift */,
+			);
+			path = Pairing;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -285,6 +302,7 @@
 			files = (
 				68A9EE716DC7BD5A5F69993D /* AppModelTests.swift in Sources */,
 				985ABCA78A433BE5DF69DF7A /* CreateSectionTests.swift in Sources */,
+				B820E4015F46DB0E4D9FAAF1 /* PairingFlowTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -308,6 +326,8 @@
 				95F8D01F725F33FEE18E162A /* EditorsBridge.swift in Sources */,
 				7ECF09D7F80CBEB3272A63D7 /* CalendarQuickAdd.swift in Sources */,
 				263224BC7B42EAC7709E4A37 /* CalendarTab.swift in Sources */,
+				5AB4014D812F0240E668A3D9 /* PairTVSheet.swift in Sources */,
+				CF7CC7533E5DCAAB1BFA1C25 /* QRScannerView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -277,7 +277,7 @@ struct PairScreenSheet: View {
             Text("Open the Church TV OS app on the TV. It shows a 6-character code; enter it here and choose where the TV is.").foregroundStyle(.secondary)
             if model.useDemo { Text("Demo: the sample TV shows the code \(DemoPairing.code).").font(.callout).foregroundStyle(.orange) }
             Form {
-                TextField("Code on the TV", text: Binding(get: { code }, set: { code = PairingCode.display($0) }), prompt: Text("ABC 123"))
+                TextField("Code on the TV", text: Binding(get: { code }, set: { code = PairingCode.display(PairingCode.parse($0) ?? $0) }), prompt: Text("ABC 123"))
                     .font(.system(.title3, design: .monospaced))
                 Picker("Location", selection: $locationId) {
                     Text("Choose…").tag(UUID?.none)
@@ -294,7 +294,7 @@ struct PairScreenSheet: View {
                 Spacer()
                 Button(done == nil ? "Cancel" : "Done") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Pair TV") { pair() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
-                    .disabled(busy || !PairingCode.isComplete(code) || locationId == nil || done != nil)
+                    .disabled(busy || !PairingCode.isValid(code) || locationId == nil || done != nil)
             }
         }
         .padding(22).frame(width: 440)
@@ -315,4 +315,4 @@ struct PairScreenSheet: View {
     }
 }
 
-enum DemoPairing { static let code = "DEM 123" }
+enum DemoPairing { static let code = "DEM 723" }

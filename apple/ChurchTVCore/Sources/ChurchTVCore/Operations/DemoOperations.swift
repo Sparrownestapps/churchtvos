@@ -7,7 +7,7 @@ import Foundation
 actor DemoOpsStore {
     static let shared = DemoOpsStore()
 
-    static let pairCode = "DEM123"
+    static let pairCode = "DEM723"
     static let tvLimit = 6
 
     var screenEdits: [UUID: ScreenSettings] = [:]

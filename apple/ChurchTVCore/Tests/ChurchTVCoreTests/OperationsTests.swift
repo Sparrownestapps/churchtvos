@@ -12,6 +12,45 @@ final class OperationsTests: XCTestCase {
         XCTAssertEqual(PairingCode.display("abc1234567"), "ABC 123")
     }
 
+    func testPairingCodeParsing() {
+        XCTAssertEqual(PairingCode.parse("TFWK5H"), "TFWK5H")
+        XCTAssertEqual(PairingCode.parse("TFW K5H"), "TFWK5H")
+        XCTAssertEqual(PairingCode.parse(" tfw-k5h\n"), "TFWK5H")
+        XCTAssertEqual(PairingCode.parse("https://app.churchtvos.com/pair?code=TFWK5H"), "TFWK5H")
+        XCTAssertEqual(PairingCode.parse("http://app.churchtvos.com/pair?code=tfwk5h"), "TFWK5H")
+        XCTAssertEqual(PairingCode.parse("HTTPS://APP.CHURCHTVOS.COM/PAIR?CODE=TFWK5H&utm=x"), "TFWK5H")
+        XCTAssertEqual(PairingCode.parse("https://app.churchtvos.com/pair/?utm=x&code=TFW%20K5H#top"), "TFWK5H")
+        XCTAssertEqual(PairingCode.parse("app.churchtvos.com/pair?code=TFWK5H"), "TFWK5H")
+        XCTAssertNil(PairingCode.parse(""))
+        XCTAssertNil(PairingCode.parse("TFWK5"))          // too short
+        XCTAssertNil(PairingCode.parse("TFWK5HX"))        // too long
+        XCTAssertNil(PairingCode.parse("TFWK50"))         // 0 is not in the alphabet
+        XCTAssertNil(PairingCode.parse("TFWKIL"))         // I and L are not either
+        XCTAssertNil(PairingCode.parse("https://example.com/pair?code=TFWK5H"))
+        XCTAssertNil(PairingCode.parse("https://evilchurchtvos.com/pair?code=TFWK5H"))
+        XCTAssertNil(PairingCode.parse("https://app.churchtvos.com/login?code=TFWK5H"))
+        XCTAssertNil(PairingCode.parse("https://app.churchtvos.com/pair"))
+        XCTAssertNil(PairingCode.parse("https://app.churchtvos.com/pair?code=BAD"))
+        XCTAssertNil(PairingCode.parse("ftp://app.churchtvos.com/pair?code=TFWK5H"))
+        XCTAssertNil(PairingCode.parse("WIFI:T:WPA;S:home;P:secret;;"))
+        XCTAssertTrue(PairingCode.isValid("dem 723"))
+        XCTAssertFalse(PairingCode.isValid("DEM 123"))
+        XCTAssertEqual(PairingCode.parseTyped("dem-723"), "DEM723")
+    }
+
+    func testPairingPermissionsAndMessages() {
+        XCTAssertTrue(ScreenRules.canPair(.owner)); XCTAssertTrue(ScreenRules.canPair(.admin))
+        XCTAssertFalse(ScreenRules.canPair(.operator)); XCTAssertFalse(ScreenRules.canPair(.editor))
+        let a = Site(id: UUID(), name: "A"), b = Site(id: UUID(), name: "B")
+        let locs = [Location(id: UUID(), name: "Zed", siteId: a.id), Location(id: UUID(), name: "Alpha", siteId: b.id), Location(id: UUID(), name: "None", siteId: nil)]
+        XCTAssertEqual(ScreenRules.pairableLocations(role: .admin, siteIds: [a.id], locations: locs).map(\.name), ["Alpha", "None", "Zed"])
+        XCTAssertEqual(ScreenRules.pairableLocations(role: .editor, siteIds: nil, locations: locs).count, 3)
+        XCTAssertEqual(ScreenRules.pairableLocations(role: .editor, siteIds: [a.id], locations: locs).map(\.name), ["Zed"])
+        XCTAssertTrue(ScreenRules.pairableLocations(role: .editor, siteIds: [], locations: locs).isEmpty)
+        XCTAssertTrue(ScreenRules.pairingMessage(for: ChurchError("No TV is showing code ABC123")).hasPrefix("No TV is showing that code"))
+        XCTAssertEqual(ScreenRules.pairingMessage(for: ChurchError("Your plan allows 2 TV(s). Remove a TV or upgrade to add more.")), "Your plan allows 2 TV(s). Remove a TV or upgrade to add more.")
+    }
+
     func testScreenRules() {
         XCTAssertTrue(ScreenRules.canManage(.owner)); XCTAssertTrue(ScreenRules.canManage(.admin))
         XCTAssertFalse(ScreenRules.canManage(.editor)); XCTAssertFalse(ScreenRules.canManage(.operator))
@@ -149,7 +188,7 @@ final class OperationsTests: XCTestCase {
         let loc = try await demo.listLocations(organizationId: org)[0]
         do { try await demo.claimScreen(code: "ZZZ999", locationId: loc.id, name: nil); XCTFail("should refuse") }
         catch { XCTAssertEqual((error as? ChurchError)?.message, "No TV is showing code ZZZ999") }
-        try await demo.claimScreen(code: "dem 123", locationId: loc.id, name: "Atrium")
+        try await demo.claimScreen(code: "dem 723", locationId: loc.id, name: "Atrium")
         settings = try await demo.loadScreenSettings(organizationId: org)
         XCTAssertEqual(settings.count, 5)
         XCTAssertTrue(settings.values.contains { $0.name == "Atrium" })

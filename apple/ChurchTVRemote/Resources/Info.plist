@@ -22,6 +22,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>Church TV OS Remote uses the camera only to scan the QR code on a TV so you can pair it to your church.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Church TV OS Remote does not save to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

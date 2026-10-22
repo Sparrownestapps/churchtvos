@@ -52,6 +52,7 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+        NSCameraUsageDescription: Church TV OS Remote uses the camera only to scan the QR code on a TV so you can pair it to your church.
         NSPhotoLibraryUsageDescription: Church TV OS Remote reads the photos and videos you choose so it can add them to your church's media library.
         NSPhotoLibraryAddUsageDescription: Church TV OS Remote does not save to your photo library.
         ITSAppUsesNonExemptEncryption: false

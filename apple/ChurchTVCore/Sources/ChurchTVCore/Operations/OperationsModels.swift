@@ -85,6 +85,43 @@ public enum PairingCode {
         guard n.count > 3 else { return n }
         return n.prefix(3) + " " + n.dropFirst(3)
     }
+
+    // MARK: Validation and scanned strings
+
+    /// The characters the database generates codes from (`new_pairing_code()`): no 0/O and no 1/I/L.
+    public static let alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+    public static let length = 6
+    /// The host (and its subdomains) the TV's QR code points at: `https://app.churchtvos.com/pair?code=TFWK5H`.
+    public static let scanHost = "churchtvos.com"
+
+    /// True for exactly 6 characters from `alphabet` (after `normalize`).
+    public static func isValid(_ text: String) -> Bool {
+        let n = normalize(text)
+        return n.count == length && n.allSatisfy { alphabet.contains($0) }
+    }
+
+    /// A typed code ("tfw k5h", "TFW-K5H") as the 6 uppercase characters, or nil when it is not a possible code.
+    public static func parseTyped(_ text: String) -> String? {
+        let n = normalize(text)
+        return isValid(n) ? n : nil
+    }
+
+    /// Reads a code out of a scanned QR string or pasted text: the pairing URL (http or https, any case, extra parameters allowed,
+    /// host `churchtvos.com` or a subdomain, path `/pair`), or a bare code. Returns the normalised 6-character code, nil for anything else.
+    public static func parse(_ text: String) -> String? {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return nil }
+        if t.contains("://") || t.lowercased().hasPrefix("app.") || t.contains("/") || t.contains("?") {
+            let withScheme = t.contains("://") ? t : "https://" + t
+            guard let comps = URLComponents(string: withScheme), let scheme = comps.scheme?.lowercased(), scheme == "https" || scheme == "http",
+                  let host = comps.host?.lowercased(), host == scanHost || host.hasSuffix("." + scanHost) else { return nil }
+            let path = comps.path.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            guard path == "pair" else { return nil }
+            guard let value = comps.queryItems?.first(where: { $0.name.lowercased() == "code" })?.value else { return nil }
+            return parseTyped(value)
+        }
+        return parseTyped(t)
+    }
 }
 
 public enum ScreenRules {
@@ -100,6 +137,28 @@ public enum ScreenRules {
 
     /// True when pairing another TV would be refused by `claim_screen`.
     public static func atLimit(screens: Int, limit: Int?) -> Bool { limit.map { screens >= $0 } ?? false }
+
+    /// Who may pair a TV: the same people as `canManage` (`claim_screen` refuses anyone who is not an owner or admin, and operators never).
+    public static func canPair(_ role: Role) -> Bool { canManage(role) }
+
+    /// The locations a member may pair a TV into: every location for "all sites" members (and owners/admins), otherwise only
+    /// locations of the member's sites. Sorted by name.
+    public static func pairableLocations(role: Role, siteIds: [UUID]?, locations: [Location]) -> [Location] {
+        let list = ContentPermissions.hasAllSites(role: role, siteIds: siteIds)
+            ? locations
+            : locations.filter { l in l.siteId.map { siteIds?.contains($0) ?? false } ?? false }
+        return list.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// Turns the server's refusal from `claim_screen` into a message for the pairing sheet. Plan-limit and permission messages
+    /// from the server are kept as they are.
+    public static func pairingMessage(for error: Error) -> String {
+        let m = Formatting.message(for: error)
+        if m.hasPrefix("No TV is showing code") {
+            return "No TV is showing that code. Check the code on the TV screen. Codes change, so it may have expired, or the TV may already be paired."
+        }
+        return m
+    }
 
     public static let portraitNote = "Portrait screen: use portrait media (1080 x 1920). YouTube items do not rotate on portrait screens."
 }

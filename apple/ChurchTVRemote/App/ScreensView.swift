@@ -17,7 +17,7 @@ struct ScreensView: View {
                         ProgressView().padding(.top, 60)
                     } else {
                         ContentUnavailableView("No screens yet", systemImage: "tv",
-                                               description: Text("Pair a TV from the website, then it will show up here."))
+                                               description: Text(model.canPair ? "Tap + to pair a TV with the code or QR code it shows." : "Ask a church admin to pair a TV, then it will show up here."))
                     }
                 } else {
                     LazyVGrid(columns: columns, spacing: 14) {
@@ -38,6 +38,16 @@ struct ScreensView: View {
         .navigationTitle(model.church?.organization.name ?? "Screens")
         .navigationBarTitleDisplayMode(.large)
         .refreshable { await model.refreshScreens() }
+        .toolbar { if model.canPair { ToolbarItem(placement: .topBarTrailing) { PairTVButton() } } }
+    }
+}
+
+/// "+" that opens the Pair a TV sheet. Only shown to people who may pair (see `ScreenRules.canPair`).
+struct PairTVButton: View {
+    @Environment(AppModel.self) private var model
+    var body: some View {
+        Button { model.showPairSheet = true } label: { Label("Pair a TV", systemImage: "plus") }
+            .accessibilityLabel("Pair a TV")
     }
 }
 

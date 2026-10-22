@@ -37,6 +37,13 @@ final class AppModel {
     /// Launch-argument helpers for screenshots: `-create kids|signage|slides|themes` picks the Create list, `-kitgallery` shows the UI kit.
     var initialCreateSection: String?
     var showKitGallery = false
+    /// The "Pair a TV" sheet (opened from the Screens tab or the iPad sidebar).
+    var showPairSheet = false
+    /// DEBUG launch arguments for screenshots: `-pair` opens the sheet, `-pairscan <text>` simulates a scanned QR string,
+    /// `-pairsubmit` also presses Pair, `-pairfake none|denied|camera` forces the camera state.
+    var debugPairScan: String?
+    var debugPairSubmit = false
+    var debugPairCamera: String?
 
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private let lastChurchKey = "lastChurchId"
@@ -59,6 +66,9 @@ final class AppModel {
     var canAddMedia: Bool { (church?.role.canEditContent ?? false) && !(church?.modules.isEmpty ?? true) }
     /// The Create section is for owners, admins and editors of a church with Kids, Signage or Slides live. Everyone else does not see it.
     var canCreate: Bool { church?.showsCreateSection ?? false }
+    /// Owners and admins (the people `claim_screen` accepts); never operators.
+    var canPair: Bool { church.map { ScreenRules.canPair($0.role) } ?? false }
+    var ops: (any OperationsService)? { service as? any OperationsService }
 
     // MARK: Launch and sign-in
 
@@ -80,6 +90,12 @@ final class AppModel {
             if let i = args.firstIndex(of: "-create"), i + 1 < args.count { initialCreateSection = args[i + 1] }
             #if DEBUG
             showKitGallery = args.contains("-kitgallery")
+            if args.contains("-pair") {
+                showPairSheet = canPair
+                if let i = args.firstIndex(of: "-pairscan"), i + 1 < args.count { debugPairScan = args[i + 1] }
+                if let i = args.firstIndex(of: "-pairfake"), i + 1 < args.count { debugPairCamera = args[i + 1] }
+                debugPairSubmit = args.contains("-pairsubmit")
+            }
             #endif
             return
         }
@@ -173,7 +189,8 @@ final class AppModel {
         isLoading = screens.isEmpty
         defer { isLoading = false }
         do {
-            let list = try await service.listScreens(organizationId: church.id)
+            var list = try await service.listScreens(organizationId: church.id)
+            if let ops { list = await ops.overlayScreens(list) }   // demo mode: TVs paired in this session
             screens = list
             lastRefresh = Date()
             loadError = nil

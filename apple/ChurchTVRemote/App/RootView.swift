@@ -40,10 +40,13 @@ struct RootView: View {
 
 /// Tab bar on iPhone, sidebar + detail on iPad.
 struct MainView: View {
+    @Environment(AppModel.self) private var model
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
-        if sizeClass == .regular { PadView() } else { PhoneView() }
+        @Bindable var model = model
+        Group { if sizeClass == .regular { PadView() } else { PhoneView() } }
+            .sheet(isPresented: $model.showPairSheet) { PairTVSheet() }
     }
 }
 
@@ -147,6 +150,7 @@ struct PadView: View {
             }
             .navigationTitle(model.church?.organization.name ?? "Church TV OS")
             .refreshable { await model.refreshScreens() }
+            .toolbar { if model.canPair { ToolbarItem(placement: .topBarTrailing) { PairTVButton() } } }
             .overlay(alignment: .bottom) {
                 if let e = model.loadError { Banner(text: e, style: .error).padding() }
             }
