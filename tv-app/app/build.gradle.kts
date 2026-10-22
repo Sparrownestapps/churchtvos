@@ -14,8 +14,8 @@ android {
         applicationId = "com.churchtvos.tv"
         minSdk = 25 // Fire OS 6 and newer
         targetSdk = 36
-        versionCode = 7
-        versionName = "1.6.0"
+        versionCode = 8
+        versionName = "1.7.0"
     }
 
     // Two products from one code base. "store" is what goes to Amazon and Google Play: NO NDI code or libraries.
@@ -103,6 +103,9 @@ dependencies {
     // Without a network module Coil cannot load https images (church logos).
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+
+    // Draws the pairing QR code on the TV (encoder only, no camera/scanner code). Apache-2.0.
+    implementation("com.google.zxing:core:3.5.3")
 
     testImplementation("junit:junit:4.13.2")
 

@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -26,21 +27,54 @@ import androidx.tv.material3.Text
 
 @Composable
 fun PairingScreen(code: String, offline: Boolean, onSettings: () -> Unit = {}) {
+    val rotated = LocalRotated.current
+    val hasQr = pairingQrPayload(code) != null
     BrandedScreen {
         Text("Pair this TV", style = TextStyle(fontFamily = JuliusSansOne, fontSize = 40.sp, color = BrandPrimary))
         Spacer(Modifier.height(12.dp))
-        Text(
-            code.chunked(3).joinToString("  "),
-            style = TextStyle(fontFamily = Lato, fontWeight = FontWeight.Black, fontSize = 72.sp, letterSpacing = 8.sp, color = Color.White),
-            modifier = Modifier
-                .background(BrandPrimary, RoundedCornerShape(16.dp))
-                .padding(horizontal = 40.dp, vertical = 8.dp),
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "In the Church TV OS dashboard ($DASHBOARD_HOST),\ngo to Screens → Pair a TV, enter this code and choose the location.",
-            style = TextStyle(fontFamily = Lato, fontSize = 18.sp, lineHeight = 28.sp, color = Greyscale, textAlign = TextAlign.Center),
-        )
+        val codeBox: @Composable () -> Unit = {
+            Text(
+                code.chunked(3).joinToString("  "),
+                style = TextStyle(fontFamily = Lato, fontWeight = FontWeight.Black, fontSize = 72.sp, letterSpacing = 8.sp, color = Color.White),
+                modifier = Modifier
+                    .background(BrandPrimary, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 40.dp, vertical = 8.dp),
+            )
+        }
+        val steps: @Composable (TextAlign) -> Unit = { align ->
+            Text(
+                "In the Church TV OS dashboard ($DASHBOARD_HOST),\ngo to Screens → Pair a TV, enter this code and choose the location.",
+                style = TextStyle(fontFamily = Lato, fontSize = 18.sp, lineHeight = 28.sp, color = Greyscale, textAlign = align),
+            )
+        }
+        val qrCaption: @Composable () -> Unit = {
+            Text(
+                "Scan with the Church TV OS app,\nor enter the code at $DASHBOARD_HOST",
+                style = TextStyle(fontFamily = Lato, fontSize = 18.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, color = Greyscale, textAlign = TextAlign.Center),
+            )
+        }
+        if (!hasQr) {
+            codeBox()
+            Spacer(Modifier.height(16.dp))
+            steps(TextAlign.Center)
+        } else if (rotated) {
+            // Portrait: code on top, QR below (the rotated canvas is narrow, so keep it a single column).
+            codeBox()
+            Spacer(Modifier.height(16.dp))
+            PairingQr(code, 260.dp)
+            Spacer(Modifier.height(8.dp))
+            qrCaption()
+        } else {
+            // Landscape: code and steps on the left, QR on the right. 260dp is 520px on a 1080p TV, about 15 modules per cm of screen at 40in: easy from across a room.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(48.dp)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    codeBox()
+                    Spacer(Modifier.height(16.dp))
+                    qrCaption()
+                }
+                PairingQr(code, 200.dp)
+            }
+        }
         Spacer(Modifier.height(16.dp))
         // Google TV remotes have no Menu button, so Settings and demo mode are also reachable from here (or hold OK anywhere).
         val focus = remember { FocusRequester() }
