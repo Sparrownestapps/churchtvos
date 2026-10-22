@@ -1,15 +1,15 @@
 import { useState, type FormEvent } from 'react'
 import { useApp } from '../context'
 import { supabase } from '../supabase'
-import { locationLabel } from '../lib'
-import { LocationOptions } from '../ui'
 import { friendlyPairError } from '../pairLink'
+import { claimFailedAfterCreate } from '../pairRoom'
+import { PairLocationField, usePairTarget } from '../PairRoomFields'
 
 /** Opened from the QR code on a TV (/pair?code=...): confirm the code, choose a location, claim it, then go to Screens. */
 export default function PairPage({ initialCode, onDone }: { initialCode: string | null; onDone: () => void }) {
-  const { isAdmin, locations, sites, org } = useApp()
+  const { isAdmin, org } = useApp()
+  const target = usePairTarget()
   const [code, setCode] = useState(initialCode ?? '')
-  const [locationId, setLocationId] = useState(locations.length === 1 ? locations[0].id : '')
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -28,14 +28,22 @@ export default function PairPage({ initialCode, onDone }: { initialCode: string 
     e.preventDefault()
     setBusy(true)
     setError(null)
+    const room = await target.resolve()
+    if (!room.ok) {
+      setBusy(false)
+      return setError(room.error)
+    }
     const { error } = await supabase.rpc('claim_screen', {
       p_code: code.replace(/\s/g, ''),
-      p_location_id: locationId,
+      p_location_id: room.locationId,
       p_name: name.trim() || null,
     })
     setBusy(false)
-    if (error) return setError(friendlyPairError(error.message))
-    setPaired(locationLabel(locations.find((l) => l.id === locationId), sites))
+    if (error) {
+      const why = friendlyPairError(error.message)
+      return setError(room.created ? claimFailedAfterCreate(room.label, why) : why)
+    }
+    setPaired(room.label)
     setTimeout(onDone, 1500)
   }
 
@@ -56,19 +64,12 @@ export default function PairPage({ initialCode, onDone }: { initialCode: string 
           <span>Code on the TV</span>
           <input className="code-input" value={code} maxLength={7} onChange={(e) => setCode(e.target.value.toUpperCase())} autoCapitalize="characters" autoComplete="off" required />
         </label>
-        <label className="field grow">
-          <span>Location</span>
-          <select value={locationId} onChange={(e) => setLocationId(e.target.value)} required>
-            <option value="">Choose…</option>
-            <LocationOptions />
-          </select>
-        </label>
+        <PairLocationField target={target} />
         <label className="field grow">
           <span>Name (optional)</span>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Lobby left" />
         </label>
       </div>
-      {locations.length === 0 && <p className="muted">Add a location under Sites & Locations first.</p>}
       {error && <p className="error">{error}</p>}
       <div className="row">
         <button className="btn primary" disabled={busy}>{busy ? 'Pairing…' : 'Pair TV'}</button>

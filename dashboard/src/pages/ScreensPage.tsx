@@ -5,6 +5,9 @@ import type { Orientation, Screen, ScreenGroup, ScreenModule, ScreenSchedule, Si
 import { MODULE_NAME, attempt, locationLabel, must, summarizeRules, timeAgo, useLoad } from '../lib'
 import { EmptyState, LocationOptions } from '../ui'
 import ScheduleRules from '../ScheduleRules'
+import { friendlyPairError } from '../pairLink'
+import { claimFailedAfterCreate } from '../pairRoom'
+import { PairLocationField, usePairTarget } from '../PairRoomFields'
 
 const ORIENTATION: Record<Orientation, string> = {
   landscape: 'Landscape',
@@ -74,9 +77,9 @@ type Data = {
 type TabProps = { data: Data; reload: () => void; isAdmin: boolean }
 
 function ScreensTab({ data, reload, isAdmin }: TabProps) {
-  const { sites, locations, mySites } = useApp()
+  const target = usePairTarget()
   const [code, setCode] = useState('')
-  const [locationId, setLocationId] = useState('')
+  const [busy, setBusy] = useState(false)
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -86,13 +89,23 @@ function ScreensTab({ data, reload, isAdmin }: TabProps) {
     e.preventDefault()
     setError(null)
     setMessage(null)
+    setBusy(true)
+    const room = await target.resolve()
+    if (!room.ok) {
+      setBusy(false)
+      return setError(room.error)
+    }
     const { error } = await supabase.rpc('claim_screen', {
       p_code: code.replace(/\s/g, ''),
-      p_location_id: locationId,
+      p_location_id: room.locationId,
       p_name: name.trim() || null,
     })
-    if (error) return setError(error.message)
-    setMessage(`Paired with ${locationLabel(locations.find((l) => l.id === locationId), sites)}. The TV will update in a few seconds.`)
+    setBusy(false)
+    if (error) {
+      const why = friendlyPairError(error.message)
+      return setError(room.created ? claimFailedAfterCreate(room.label, why) : why)
+    }
+    setMessage(`Paired with ${room.label}. The TV will update in a few seconds.`)
     setCode('')
     setName('')
     reload()
@@ -124,20 +137,13 @@ function ScreensTab({ data, reload, isAdmin }: TabProps) {
                 required
               />
             </label>
-            <label className="field grow">
-              <span>Location</span>
-              <select value={locationId} onChange={(e) => setLocationId(e.target.value)} required>
-                <option value="">Choose…</option>
-                <LocationOptions />
-              </select>
-            </label>
+            <PairLocationField target={target} />
             <label className="field grow">
               <span>Name (optional)</span>
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Lobby left" />
             </label>
-            <button className="btn primary align-end">Pair TV</button>
+            <button className="btn primary align-end" disabled={busy}>{busy ? 'Pairing…' : 'Pair TV'}</button>
           </div>
-          {mySites.length > 0 && locations.length === 0 && <p className="muted">Add a location under Sites & Locations first.</p>}
           {error && <p className="error">{error}</p>}
           {message && <p className="notice">{message}</p>}
         </form>
