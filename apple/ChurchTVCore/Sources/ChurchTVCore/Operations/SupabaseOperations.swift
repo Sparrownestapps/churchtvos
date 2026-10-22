@@ -83,6 +83,26 @@ extension SupabaseService: OperationsService {
         }
     }
 
+    public func createSite(organizationId: UUID, name: String, timezone: String) async throws -> Site {
+        try await friendly {
+            let response = try await client.from("sites").insert(RoomRules.siteRow(organizationId: organizationId, name: name, timezone: timezone)).select("id,name,timezone").execute()
+            guard let site = (try? ChurchJSON.decoder().decode([Site].self, from: response.data))?.first else {
+                throw ChurchError("The site was created but the server did not return it. Refresh and try again.")
+            }
+            return site
+        }
+    }
+
+    public func createLocation(organizationId: UUID, siteId: UUID, name: String, modules: [String]) async throws -> Location {
+        try await friendly {
+            let response = try await client.from("locations").insert(RoomRules.locationRow(organizationId: organizationId, siteId: siteId, name: name, modules: Set(modules))).select("id,name,site_id,modules").execute()
+            guard let location = (try? ChurchJSON.decoder().decode([Location].self, from: response.data))?.first else {
+                throw ChurchError("The room was created but the server did not return it. Refresh and try again.")
+            }
+            return location
+        }
+    }
+
     public func releaseScreen(id: UUID) async throws {
         try await guarded { _ = try await client.rpc("release_screen", params: ["p_screen_id": lower(id)]).execute() }
     }

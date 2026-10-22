@@ -19,9 +19,36 @@ final class PairingFlow {
     var scannedCode = false             // the code came from the camera
     var pairedName: String?
     var pairedLocation: String?
+    /// "+ New room…" chosen: the form for a new room (and site) is showing.
+    var creatingRoom = false
+    var draft = NewRoomDraft()
+    private var allLocations: [Location] = []
 
     var normalizedCode: String? { PairingCode.parseTyped(code) }
-    var canSubmit: Bool { normalizedCode != nil && locationId != nil && !busy && pairedName == nil }
+    var canSubmit: Bool {
+        normalizedCode != nil && !busy && pairedName == nil && (creatingRoom ? roomProblem == nil : locationId != nil)
+    }
+    var roomProblem: String? { roomProblem(role: role) }
+    private var role: Role = .admin
+    private func roomProblem(role: Role) -> String? { RoomRules.problem(draft, role: role, sites: sites, locations: allLocations) }
+    /// The message to show under the room form once the user has typed something (not while it is still blank).
+    var roomHint: String? { draft.name.isEmpty && draft.newSiteName.isEmpty ? nil : roomProblem }
+
+    /// Tag for the location picker: the "+ New room…" row while creating.
+    var pickerSelection: UUID? { creatingRoom ? RoomRules.newRoomTag : locationId }
+    func pick(_ id: UUID?) {
+        if id == RoomRules.newRoomTag { creatingRoom = true; error = nil } else { creatingRoom = false; locationId = id }
+    }
+    func beginNewRoom(church: ChurchAccess) {
+        if !creatingRoom || draft.modules.isEmpty && draft.name.isEmpty {
+            draft = RoomRules.initialDraft(churchModules: church.modules, sites: sites)
+        }
+        creatingRoom = true
+    }
+    var siteSelection: UUID? { draft.creatingSite ? RoomRules.newSiteTag : draft.siteId }
+    func pickSite(_ id: UUID?) {
+        if id == RoomRules.newSiteTag { draft.creatingSite = true; draft.siteId = nil } else { draft.creatingSite = false; draft.siteId = id }
+    }
 
     func locationLabel(_ l: Location) -> String {
         let site = l.siteId.flatMap { id in sites.first { $0.id == id }?.name }
@@ -52,29 +79,53 @@ final class PairingFlow {
         async let t = try? model.ops?.tvLimit(organizationId: church.id)
         let (locs, sites, limit) = await (l, s, t)
         self.sites = sites ?? []
+        allLocations = locs ?? []
+        role = church.role
         locations = ScreenRules.pairableLocations(role: church.role, siteIds: church.siteIds, locations: locs ?? [])
         self.limit = limit ?? nil
         if locationId == nil || !locations.contains(where: { $0.id == locationId }) { locationId = locations.count == 1 ? locations.first?.id : nil }
     }
 
     func submit(model: AppModel) async {
-        guard let code = normalizedCode, let locationId, let ops = model.ops else {
+        guard let code = normalizedCode, let ops = model.ops else {
             if model.ops == nil { error = "Pairing is not available here." }
             return
         }
+        guard creatingRoom || locationId != nil else { return }
         busy = true; error = nil
         defer { busy = false }
         let before = Set(model.screens.map(\.id))
+        let tvName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        var pairedInto = locationId
+        if creatingRoom, let church = model.church {
+            if let p = roomProblem { error = p; return }
+            let result = await RoomPairing.run(ops: ops, organizationId: church.id, code: code, tvName: tvName.isEmpty ? nil : tvName, draft: draft, existingSite: nil)
+            // Keep whatever was created, and select it, so a retry does not duplicate it.
+            if let site = result.site { sites.append(site); draft.siteId = site.id; draft.creatingSite = false }
+            if let loc = result.location {
+                allLocations.append(loc); locations.append(loc)
+                locations.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+                locationId = loc.id; creatingRoom = false; pairedInto = loc.id
+            }
+            if !result.paired { error = result.message; return }
+            await finishPairing(model: model, before: before, locationId: pairedInto, tvName: tvName)
+            return
+        }
+        guard let locationId else { return }
         do {
-            try await ops.claimScreen(code: code, locationId: locationId, name: name.trimmingCharacters(in: .whitespacesAndNewlines))
-            await model.refreshScreens()
-            let new = model.screens.first { !before.contains($0.id) }
-            pairedName = new?.screen.displayName ?? (name.isEmpty ? "Your TV" : name)
-            pairedLocation = locations.first { $0.id == locationId }.map(locationLabel)
-            if let new { model.selectedScreenId = new.id }
+            try await ops.claimScreen(code: code, locationId: locationId, name: tvName)
+            await finishPairing(model: model, before: before, locationId: locationId, tvName: tvName)
         } catch {
             self.error = ScreenRules.pairingMessage(for: error)
         }
+    }
+
+    private func finishPairing(model: AppModel, before: Set<UUID>, locationId: UUID?, tvName: String) async {
+        await model.refreshScreens()
+        let new = model.screens.first { !before.contains($0.id) }
+        pairedName = new?.screen.displayName ?? (tvName.isEmpty ? "Your TV" : tvName)
+        pairedLocation = locations.first { $0.id == locationId }.map(locationLabel)
+        if let new { model.selectedScreenId = new.id }
     }
 }
 
@@ -87,6 +138,15 @@ struct PairTVSheet: View {
     @State private var scanning = false
     @State private var torch = false
     @FocusState private var codeFocused: Bool
+
+    /// DEBUG screenshots of the new-room form hide the intro and camera rows so the form fits on screen.
+    private var debugCompact: Bool {
+        #if DEBUG
+        return model.debugNewRoom != nil
+        #else
+        return false
+        #endif
+    }
 
     private var atLimit: Bool { ScreenRules.atLimit(screens: model.screens.count, limit: flow.limit) }
 
@@ -107,7 +167,11 @@ struct PairTVSheet: View {
             if let fake = model.debugPairCamera { camera = fake == "denied" ? .denied : fake == "camera" ? .ready : .unavailable }
             else { camera = await CameraAccess.resolve() }
             if let text = model.debugPairScan { _ = flow.handleScan(text) }
-            if model.debugPairSubmit { if flow.locationId == nil { flow.locationId = flow.locations.first?.id } }
+            if let room = model.debugNewRoom, let church = model.church {
+                flow.pick(RoomRules.newRoomTag); flow.beginNewRoom(church: church); flow.draft.name = room
+                if let site = model.debugNewSite { flow.pickSite(RoomRules.newSiteTag); flow.draft.newSiteName = site }
+            }
+            if model.debugPairSubmit, !flow.creatingRoom { if flow.locationId == nil { flow.locationId = flow.locations.first?.id } }
             if model.debugPairSubmit, flow.canSubmit { await flow.submit(model: model) }
             #else
             camera = await CameraAccess.resolve()
@@ -122,14 +186,14 @@ struct PairTVSheet: View {
     private var form: some View {
         Form {
             if let e = flow.error { Section { Banner(text: e, style: .error) } }
-            Section {
+            if !debugCompact { Section {
                 Text("Open the Church TV OS app on the TV. It shows a QR code and a 6-character code. Scan the QR code or type the code.")
                     .font(.subheadline).foregroundStyle(.secondary)
                 if model.isDemo {
                     Button { flow.setTyped("DEM 723") } label: { Label("Demo: use the sample TV's code (DEM 723)", systemImage: "sparkles") }
                 }
-            }
-            scanSection
+            } }
+            if !debugCompact { scanSection }
             Section("Code") {
                 TextField("TFW K5H", text: Binding(get: { flow.code }, set: { flow.setTyped($0) }))
                     .font(.system(.title2, design: .monospaced).weight(.semibold))
@@ -144,13 +208,15 @@ struct PairTVSheet: View {
             }
             Section {
                 TextField("Name (optional), e.g. Lobby left", text: Binding(get: { flow.name }, set: { flow.name = $0 }))
-                Picker("Location", selection: Binding(get: { flow.locationId }, set: { flow.locationId = $0 })) {
+                Picker("Location", selection: Binding(get: { flow.pickerSelection }, set: { flow.pick($0); if $0 == RoomRules.newRoomTag, let c = model.church { flow.beginNewRoom(church: c) } })) {
                     Text("Choose…").tag(UUID?.none)
                     ForEach(flow.locations) { Text(flow.locationLabel($0)).tag(Optional($0.id)) }
+                    if model.canPair { Text("+ New room…").tag(Optional(RoomRules.newRoomTag)) }
                 }
             } footer: {
-                if flow.locations.isEmpty { Text("There is no location you can pair into yet. Add a location in Sites & Locations on the website first.") }
+                if flow.locations.isEmpty && !model.canPair { Text("There is no location you can pair into yet. Ask a church admin to add one.") }
             }
+            if flow.creatingRoom { newRoomSection }
             Section {
                 if atLimit {
                     Banner(text: "Your plan allows \(flow.limit ?? 0) TV(s). Remove a TV or upgrade to add more.", style: .warning)
@@ -168,6 +234,41 @@ struct PairTVSheet: View {
             }
         }
         .scrollDismissesKeyboard(.interactively)
+    }
+
+    /// Fields for a new room (and a new site when needed). Shown under the location picker after "+ New room…".
+    @ViewBuilder private var newRoomSection: some View {
+        Section {
+            TextField("Room name, e.g. Nursery", text: Binding(get: { flow.draft.name }, set: { flow.draft.name = $0 }))
+                .accessibilityLabel("Room name")
+            Picker("Site", selection: Binding(get: { flow.siteSelection }, set: { flow.pickSite($0) })) {
+                if flow.sites.count != 1 && !flow.draft.creatingSite { Text("Choose…").tag(UUID?.none) }
+                ForEach(flow.sites) { Text($0.name).tag(Optional($0.id)) }
+                Text("+ New site…").tag(Optional(RoomRules.newSiteTag))
+            }
+            if flow.draft.creatingSite {
+                TextField("Site name, e.g. East Campus", text: Binding(get: { flow.draft.newSiteName }, set: { flow.draft.newSiteName = $0 }))
+                    .accessibilityLabel("Site name")
+                Picker("Time zone", selection: Binding(get: { flow.draft.newSiteTimeZone }, set: { flow.draft.newSiteTimeZone = $0 })) {
+                    ForEach(timeZoneChoices, id: \.self) { Text($0.replacingOccurrences(of: "_", with: " ")).tag($0) }
+                }
+            }
+            ForEach(AppModule.allCases) { m in
+                Toggle(m.displayName, isOn: Binding(get: { flow.draft.modules.contains(m.rawValue) }, set: { on in
+                    if on { flow.draft.modules.insert(m.rawValue) } else { flow.draft.modules.remove(m.rawValue) }
+                }))
+            }
+        } header: { Text("New room")
+        } footer: {
+            if let hint = flow.roomHint { Text(hint).foregroundStyle(.orange) }
+            else { Text("The room is created first, then the TV is paired into it. Tags choose which applications use this room.") }
+        }
+    }
+
+    private var timeZoneChoices: [String] {
+        var ids = TimeZone.knownTimeZoneIdentifiers
+        if !ids.contains(flow.draft.newSiteTimeZone) { ids.append(flow.draft.newSiteTimeZone) }
+        return ids.sorted()
     }
 
     @ViewBuilder private var scanSection: some View {

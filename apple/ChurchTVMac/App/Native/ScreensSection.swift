@@ -66,6 +66,11 @@ struct ScreensSection: View {
         }
         .sheet(isPresented: $nav.showPairSheet) { PairScreenSheet(support: support) }
         .task(id: model.screensRevision) { await support.load(model) }
+        .onAppear {
+            #if DEBUG
+            if CommandLine.arguments.contains("-pair") { nav.showPairSheet = true }
+            #endif
+        }
     }
 
     private var list: some View {
@@ -268,8 +273,38 @@ struct PairScreenSheet: View {
     @State private var busy = false
     @State private var error: String?
     @State private var done: String?
+    /// "+ New room…" chosen: the new room form (and a new site when needed) is showing.
+    @State private var creatingRoom = false
+    @State private var draft = NewRoomDraft()
 
     private var atLimit: Bool { ScreenRules.atLimit(screens: model.screens.count, limit: support.limit) }
+    private var role: Role { model.church?.role ?? .operator }
+    private var roomProblem: String? { RoomRules.problem(draft, role: role, sites: support.sites, locations: support.locations) }
+    private var roomHint: String? { draft.name.isEmpty && draft.newSiteName.isEmpty ? nil : roomProblem }
+    private var canPair: Bool {
+        !busy && PairingCode.isValid(code) && done == nil && (creatingRoom ? roomProblem == nil : locationId != nil)
+    }
+
+    private var pickerSelection: Binding<UUID?> {
+        Binding(get: { creatingRoom ? RoomRules.newRoomTag : locationId }, set: { id in
+            if id == RoomRules.newRoomTag {
+                if draft.name.isEmpty && draft.newSiteName.isEmpty, let c = model.church { draft = RoomRules.initialDraft(churchModules: c.modules, sites: support.sites) }
+                creatingRoom = true; error = nil
+            } else { creatingRoom = false; locationId = id }
+        })
+    }
+
+    private var siteSelection: Binding<UUID?> {
+        Binding(get: { draft.creatingSite ? RoomRules.newSiteTag : draft.siteId }, set: { id in
+            if id == RoomRules.newSiteTag { draft.creatingSite = true; draft.siteId = nil } else { draft.creatingSite = false; draft.siteId = id }
+        })
+    }
+
+    private var timeZoneChoices: [String] {
+        var ids = TimeZone.knownTimeZoneIdentifiers
+        if !ids.contains(draft.newSiteTimeZone) { ids.append(draft.newSiteTimeZone) }
+        return ids.sorted()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -279,39 +314,105 @@ struct PairScreenSheet: View {
             Form {
                 TextField("Code on the TV", text: Binding(get: { code }, set: { code = PairingCode.display(PairingCode.parse($0) ?? $0) }), prompt: Text("ABC 123"))
                     .font(.system(.title3, design: .monospaced))
-                Picker("Location", selection: $locationId) {
+                Picker("Location", selection: pickerSelection) {
                     Text("Choose…").tag(UUID?.none)
                     ForEach(support.locations) { Text(support.locationLabel($0.id)).tag(Optional($0.id)) }
+                    if RoomRules.canCreate(role) { Text("+ New room…").tag(Optional(RoomRules.newRoomTag)) }
                 }
+                if creatingRoom { newRoomFields }
                 TextField("Name (optional)", text: $name, prompt: Text("e.g. Lobby left"))
             }
             .formStyle(.columns)
-            if support.locations.isEmpty { Text("Add a location under Sites & Locations first.").font(.callout).foregroundStyle(.secondary) }
+            if support.locations.isEmpty && !creatingRoom { Text("There are no rooms yet. Choose \"+ New room…\" to add one.").font(.callout).foregroundStyle(.secondary) }
             if atLimit { Text("Your plan allows \(support.limit ?? 0) TV(s). Remove a TV or upgrade to add more.").font(.callout).foregroundStyle(.orange) }
-            if let error { Text(error).foregroundStyle(.red) }
+            if let error { Text(error).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
             if let done { Label(done, systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
             HStack {
                 Spacer()
                 Button(done == nil ? "Cancel" : "Done") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Pair TV") { pair() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
-                    .disabled(busy || !PairingCode.isValid(code) || locationId == nil || done != nil)
+                Button(busy ? "Pairing…" : "Pair TV") { pair() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                    .disabled(!canPair)
             }
         }
-        .padding(22).frame(width: 440)
+        .padding(22).frame(width: 460)
+        .onAppear { debugOpen() }
+    }
+
+    @ViewBuilder private var newRoomFields: some View {
+        TextField("Room name", text: $draft.name, prompt: Text("e.g. Nursery"))
+        Picker("Site", selection: siteSelection) {
+            if support.sites.count != 1 && !draft.creatingSite { Text("Choose…").tag(UUID?.none) }
+            ForEach(support.sites) { Text($0.name).tag(Optional($0.id)) }
+            Text("+ New site…").tag(Optional(RoomRules.newSiteTag))
+        }
+        if draft.creatingSite {
+            TextField("Site name", text: $draft.newSiteName, prompt: Text("e.g. East Campus"))
+            Picker("Time zone", selection: $draft.newSiteTimeZone) {
+                ForEach(timeZoneChoices, id: \.self) { Text($0.replacingOccurrences(of: "_", with: " ")).tag($0) }
+            }
+        }
+        LabeledContent("Used by") {
+            HStack(spacing: 12) {
+                ForEach(AppModule.allCases) { m in
+                    Toggle(model.moduleName(m.rawValue), isOn: Binding(get: { draft.modules.contains(m.rawValue) }, set: { on in
+                        if on { draft.modules.insert(m.rawValue) } else { draft.modules.remove(m.rawValue) }
+                    }))
+                }
+            }
+        }
+        if let roomHint { Text(roomHint).font(.callout).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true) }
     }
 
     private func pair() {
-        guard let locationId else { return }
         busy = true; error = nil
         Task {
             defer { busy = false }
+            if creatingRoom { await pairIntoNewRoom(); return }
+            guard let locationId else { return }
             do {
                 try await model.ops?.claimScreen(code: code, locationId: locationId, name: name)
-                done = "Paired with \(support.locationLabel(locationId)). The TV will update in a few seconds."
-                code = ""; name = ""
+                finish(locationId: locationId)
                 await model.screensChanged()
-            } catch { self.error = Formatting.message(for: error) }
+            } catch { self.error = ScreenRules.pairingMessage(for: error) }
         }
+    }
+
+    private func pairIntoNewRoom() async {
+        guard let ops = model.ops, let church = model.church else { return }
+        if let p = roomProblem { error = p; return }
+        let tv = RoomRules.trimmed(name)
+        let result = await RoomPairing.run(ops: ops, organizationId: church.id, code: code, tvName: tv.isEmpty ? nil : tv, draft: draft, existingSite: nil)
+        // Keep whatever was created, and select it, so a retry does not duplicate it.
+        if let site = result.site { support.sites.append(site); draft.siteId = site.id; draft.creatingSite = false }
+        if let loc = result.location {
+            support.locations.append(loc)
+            support.locations.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            locationId = loc.id; creatingRoom = false
+        }
+        if result.paired, let loc = result.location { finish(locationId: loc.id) } else { error = result.message }
+        if result.site != nil || result.location != nil { await model.screensChanged() }
+    }
+
+    private func finish(locationId: UUID) {
+        done = "Paired with \(support.locationLabel(locationId)). The TV will update in a few seconds."
+        code = ""; name = ""
+    }
+
+    /// DEBUG launch arguments for screenshots: `-pairnewroom <name>` opens the new room form, `-pairnewsite <name>` also a new site.
+    private func debugOpen() {
+        #if DEBUG
+        let a = CommandLine.arguments
+        func arg(_ k: String) -> String? { a.firstIndex(of: k).flatMap { $0 + 1 < a.count ? a[$0 + 1] : nil } }
+        guard let room = arg("-pairnewroom"), let c = model.church else { return }
+        Task {
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            draft = RoomRules.initialDraft(churchModules: c.modules, sites: support.sites)
+            draft.name = room; creatingRoom = true
+            if let site = arg("-pairnewsite") { draft.creatingSite = true; draft.siteId = nil; draft.newSiteName = site }
+            if a.contains("-pairfill") { code = "DEM 723" }
+            if a.contains("-pairsubmit") { code = "DEM 723"; pair() }
+        }
+        #endif
     }
 }
 

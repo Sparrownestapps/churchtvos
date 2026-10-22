@@ -44,6 +44,9 @@ final class AppModel {
     var debugPairScan: String?
     var debugPairSubmit = false
     var debugPairCamera: String?
+    /// `-pairnewroom <name>` opens the new-room form with that name; `-pairnewsite <name>` also creates a new site.
+    var debugNewRoom: String?
+    var debugNewSite: String?
 
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private let lastChurchKey = "lastChurchId"
@@ -95,6 +98,8 @@ final class AppModel {
                 if let i = args.firstIndex(of: "-pairscan"), i + 1 < args.count { debugPairScan = args[i + 1] }
                 if let i = args.firstIndex(of: "-pairfake"), i + 1 < args.count { debugPairCamera = args[i + 1] }
                 debugPairSubmit = args.contains("-pairsubmit")
+                if let i = args.firstIndex(of: "-pairnewroom"), i + 1 < args.count { debugNewRoom = args[i + 1] }
+                if let i = args.firstIndex(of: "-pairnewsite"), i + 1 < args.count { debugNewSite = args[i + 1] }
             }
             #endif
             return

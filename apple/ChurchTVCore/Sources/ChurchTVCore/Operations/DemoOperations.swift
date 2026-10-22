@@ -118,7 +118,12 @@ actor DemoOpsStore {
     func edit(_ s: ScreenSettings) { screenEdits[s.screenId] = s }
     func release(_ id: UUID) { released.insert(id); claimed.removeAll { $0.id == id } }
 
-    func claim(code: String, location: Location?, name: String?, currentCount: Int) throws {
+    func resetPairing() {
+        claimed = []
+        screenEdits = screenEdits.filter { $0.key != Self.uuid(900) }
+    }
+
+    func claim(code: String, location: Location?, siteName: String?, name: String?, currentCount: Int) throws {
         let n = PairingCode.normalize(code)
         if currentCount >= Self.tvLimit { throw ChurchError("Your plan allows \(Self.tvLimit) TV(s). Remove a TV or upgrade to add more.") }
         guard n == Self.pairCode else { throw ChurchError("No TV is showing code \(n)") }
@@ -126,7 +131,7 @@ actor DemoOpsStore {
         let id = Self.uuid(900)
         let screen = Screen(id: id, organizationId: MockService.churchId, locationId: location?.id, name: name?.blankToNil ?? "New TV", orientation: "landscape",
                             defaultModule: "kids", model: "Fire TV Stick 4K", appVersion: "1.6.0", lastSeenAt: Date())
-        claimed.append(ScreenInfo(screen: screen, locationName: location?.name, siteName: "Downtown Campus", timeZoneId: TimeZone.current.identifier, status: nil))
+        claimed.append(ScreenInfo(screen: screen, locationName: location?.name, siteName: siteName ?? "Downtown Campus", timeZoneId: TimeZone.current.identifier, status: nil))
         screenEdits[id] = ScreenSettings(screenId: id, name: screen.name, locationId: location?.id)
     }
 
@@ -197,6 +202,11 @@ actor DemoOpsStore {
 
 // MARK: - Operations
 
+public extension MockService {
+    /// Makes the sample TV's code (DEM 723) usable again. For tests; demo mode lets the sample TV be paired once per launch.
+    static func resetDemoPairing() async { await DemoOpsStore.shared.resetPairing() }
+}
+
 extension MockService: OperationsService {
     private static var platformAdminFlag: Bool {
         ProcessInfo.processInfo.arguments.contains("-demoadmin") || UserDefaults.standard.bool(forKey: "demoPlatformAdmin")
@@ -223,7 +233,28 @@ extension MockService: OperationsService {
     public func claimScreen(code: String, locationId: UUID, name: String?) async throws {
         try await Task.sleep(nanoseconds: 300_000_000)
         let count = await DemoOpsStore.shared.overlay(try await listScreens(organizationId: Self.churchId)).count
-        try await DemoOpsStore.shared.claim(code: code, location: store.locations.first { $0.id == locationId }, name: name, currentCount: count)
+        let loc = store.locations.first { $0.id == locationId }
+        let siteName = loc?.siteId.flatMap { sid in store.sites.first { $0.id == sid }?.name }
+        try await DemoOpsStore.shared.claim(code: code, location: loc, siteName: siteName, name: name, currentCount: count)
+    }
+
+    public func createSite(organizationId: UUID, name: String, timezone: String) async throws -> Site {
+        try await Task.sleep(nanoseconds: 150_000_000)
+        let n = RoomRules.trimmed(name)
+        if store.sites.contains(where: { RoomRules.same($0.name, n) }) { throw ChurchError("A site with that name already exists.") }
+        let site = Site(id: UUID(), name: n, timezone: RoomRules.trimmed(timezone))
+        store.sites.append(site)
+        return site
+    }
+
+    public func createLocation(organizationId: UUID, siteId: UUID, name: String, modules: [String]) async throws -> Location {
+        try await Task.sleep(nanoseconds: 150_000_000)
+        let n = RoomRules.trimmed(name)
+        guard store.sites.contains(where: { $0.id == siteId }) else { throw ChurchError("That site no longer exists.") }
+        if store.locations.contains(where: { $0.siteId == siteId && RoomRules.same($0.name, n) }) { throw ChurchError("A room with that name already exists.") }
+        let loc = Location(id: UUID(), name: n, siteId: siteId, modules: RoomRules.orderedModules(Set(modules)))
+        store.locations.append(loc)
+        return loc
     }
 
     public func releaseScreen(id: UUID) async throws { await DemoOpsStore.shared.release(id) }

@@ -14,6 +14,10 @@ public protocol OperationsService: Sendable {
     func updateScreen(_ settings: ScreenSettings) async throws
     /// `rpc('claim_screen')`: pairs the TV showing `code` at a location. Refused above the plan's TV limit.
     func claimScreen(code: String, locationId: UUID, name: String?) async throws
+    /// `sites.insert`: a new site (owners and admins only, name unique within the church).
+    func createSite(organizationId: UUID, name: String, timezone: String) async throws -> Site
+    /// `locations.insert`: a new room inside a site, tagged with the applications that use it.
+    func createLocation(organizationId: UUID, siteId: UUID, name: String, modules: [String]) async throws -> Location
     /// `rpc('release_screen')`: the TV forgets the church and shows a new code.
     func releaseScreen(id: UUID) async throws
     /// `rpc('tv_limit')`; nil when the server did not answer.
@@ -43,6 +47,8 @@ public extension OperationsService {
     func updateScreen(_ settings: ScreenSettings) async throws { throw unavailable }
     func claimScreen(code: String, locationId: UUID, name: String?) async throws { throw unavailable }
     func releaseScreen(id: UUID) async throws { throw unavailable }
+    func createSite(organizationId: UUID, name: String, timezone: String) async throws -> Site { throw unavailable }
+    func createLocation(organizationId: UUID, siteId: UUID, name: String, modules: [String]) async throws -> Location { throw unavailable }
     func tvLimit(organizationId: UUID) async throws -> Int? { nil }
     func overlayScreens(_ screens: [ScreenInfo]) async -> [ScreenInfo] { screens }
     func listMembers(organizationId: UUID) async throws -> [Member] { throw unavailable }
