@@ -16,6 +16,8 @@ import SitesPage from './pages/SitesPage'
 import PeoplePage from './pages/PeoplePage'
 import SettingsPage from './pages/SettingsPage'
 import GetStartedPage from './pages/GetStartedPage'
+import PairPage from './pages/PairPage'
+import { isPairPath, pairCodeFromSearch } from './pairLink'
 import { helpUrl } from './links'
 import { canControlNav } from './control/logic'
 import TrialBanner from './admin/TrialBanner'
@@ -275,6 +277,15 @@ function OrgApp(props: OrgAppProps) {
 
   const [page, setPage] = useState(() => location.hash.slice(1))
   const [menuOpen, setMenuOpen] = useState(false)
+  // Opened from a TV's QR code (/pair?code=...): show the pairing form until it is finished or cancelled.
+  const [pairing, setPairing] = useState<{ code: string | null } | null>(() =>
+    isPairPath(location.pathname) ? { code: pairCodeFromSearch(location.search) } : null,
+  )
+  const finishPairing = useCallback(() => {
+    history.replaceState(null, '', '/#screens')
+    setPairing(null)
+    setPage('screens')
+  }, [])
 
   // Pages can link to each other by setting location.hash (e.g. the Get started checklist).
   useEffect(() => {
@@ -436,10 +447,16 @@ function OrgApp(props: OrgAppProps) {
           <main className="content">
             <TrialBanner />
             <div className="topbar">
-              <h1>{def.title ?? def.label}</h1>
+              <h1>{pairing ? 'Pair a TV' : (def.title ?? def.label)}</h1>
               {logo && <img className="org-logo" src={logo} alt={org.name} />}
             </div>
-            {notEnabled && def.module ? <ModuleOff module={def.module} /> : def.render()}
+            {pairing ? (
+              <PairPage initialCode={pairing.code} onDone={finishPairing} />
+            ) : notEnabled && def.module ? (
+              <ModuleOff module={def.module} />
+            ) : (
+              def.render()
+            )}
           </main>
         </div>
       </div>
