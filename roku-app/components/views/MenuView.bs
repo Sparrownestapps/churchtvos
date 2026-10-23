@@ -1,0 +1,96 @@
+import "pkg:/source/lib/Util.bs"
+import "pkg:/components/lib/Ui.bs"
+
+sub init()
+    m.top.focusable = true
+    m.sel = 0
+    m.buttons = []
+    m.items = []
+    m.armed = -1
+end sub
+
+sub build()
+    cfg = m.top.config
+    if not Util.isAA(cfg) then return
+    Ui.clear(m.top)
+    W = Util.getNum(cfg, "w", 1920)
+    H = Util.getNum(cfg, "h", 1080)
+    brand = cfg.brand
+    m.brand = brand
+    m.items = Util.getArr(cfg, "items")
+    m.armed = -1
+    Ui.rect(m.top, 0, 0, W, H, "0xFFFFFFFF")
+    primary = Util.rokuColor(brand.primary, "0x1B2A4AFF")
+    grey = "0x58595BFF"
+    lines = Util.getArr(cfg, "lines")
+    footer = Util.getStr(cfg, "footer", "")
+
+    btnW = 760
+    btnH = 84
+    gap = 24
+    textH = 0
+    lineH = 44
+    for each l in lines
+        textH = textH + lineH
+    end for
+    total = 96 + 32 + textH + 32 + m.items.count() * (btnH + gap)
+    if footer <> "" then total = total + 70
+    y = (H - total) / 2
+    if y < 40 then y = 40
+    Ui.label(m.top, { text: Util.getStr(cfg, "title", ""), x: 0, y: y, w: W, h: 96, font: "julius", size: 80, color: primary, align: "center", vAlign: "center" })
+    y = y + 96 + 32
+    for each l in lines
+        Ui.label(m.top, { text: l, x: 96, y: y, w: W - 192, h: lineH, size: 32, color: grey, align: "center", vAlign: "center" })
+        y = y + lineH
+    end for
+    y = y + 32
+    m.buttons = []
+    for each it in m.items
+        m.buttons.push(Ui.button(m.top, Util.getStr(it, "text", ""), (W - btnW) / 2, y, btnW, btnH, 36))
+        y = y + btnH + gap
+    end for
+    if footer <> "" then
+        Ui.label(m.top, { text: footer, x: 96, y: y + 8, w: W - 192, h: 50, size: 24, color: grey, align: "center", vAlign: "center" })
+    end if
+    m.sel = 0
+    Ui.paintButtons(m.buttons, m.sel, brand.primary, brand.accent)
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+    n = m.buttons.count()
+    if key = "back" then
+        m.top.action = "back"
+        return true
+    else if key = "down" and n > 0 then
+        m.sel = (m.sel + 1) mod n
+        m.armed = -1
+        refresh()
+        return true
+    else if key = "up" and n > 0 then
+        m.sel = (m.sel + n - 1) mod n
+        m.armed = -1
+        refresh()
+        return true
+    else if (key = "OK" or key = "play") and n > 0 then
+        it = m.items[m.sel]
+        ' A destructive item (Unpair) asks for a second OK.
+        if Util.getBool(it, "confirm", false) and m.armed <> m.sel then
+            m.armed = m.sel
+            refresh()
+        else
+            m.top.action = Util.getStr(it, "id", "")
+        end if
+        return true
+    end if
+    return false
+end function
+
+sub refresh()
+    for i = 0 to m.buttons.count() - 1
+        text = Util.getStr(m.items[i], "text", "")
+        if i = m.armed then text = Util.getStr(m.items[i], "confirmText", "Press OK again to confirm")
+        m.buttons[i].label.text = text
+    end for
+    Ui.paintButtons(m.buttons, m.sel, m.brand.primary, m.brand.accent)
+end sub

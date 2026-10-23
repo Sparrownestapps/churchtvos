@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Downloads playlist and deck media to cachefs:/ so Sunday playback never depends on the building's Wi-Fi. -->
+<component name="MediaTask" extends="Task">
+    <interface>
+        <!-- every URL the TV may need, in priority order -->
+        <field id="urls" type="array" />
+        <!-- { active, done, total, failed, full } -->
+        <field id="progress" type="assocarray" />
+    </interface>
+    <script type="text/brightscript" uri="MediaTask.bs" />
+</component>

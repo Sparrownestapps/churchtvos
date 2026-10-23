@@ -1,0 +1,26 @@
+' Off-device unit tests. Run with `npm test` (compiles with bsc, then executes under the brs-node interpreter).
+' Pure-logic modules only: nothing here touches a Roku device, SceneGraph or the network.
+import "pkg:/source/lib/Util.bs"
+import "pkg:/source/lib/TimeUtil.bs"
+import "pkg:/source/lib/Qr.bs"
+import "pkg:/source/tests/TestKit.bs"
+import "pkg:/source/tests/Test_Core.bs"
+import "pkg:/source/tests/Test_Model.bs"
+import "pkg:/source/lib/Config.bs"
+import "pkg:/source/lib/Model.bs"
+import "pkg:/source/lib/Countdown.bs"
+import "pkg:/source/lib/Remote.bs"
+import "pkg:/source/lib/CacheLogic.bs"
+
+sub main()
+    t = TestKit.create()
+    vectors = ParseJson(ReadAsciiFile("pkg:/tests/fixtures/vectors.json"))
+    if vectors = invalid then
+        print "FAIL: tests/fixtures/vectors.json is missing or invalid (run: node tools/gen_vectors.mjs)"
+        t.fail++
+    else
+        Test_Core.runAll(t, vectors)
+        Test_Model.runAll(t)
+    end if
+    TestKit.finish(t)
+end sub

@@ -1,0 +1,93 @@
+' The media cache on cachefs:/ (mirrors MediaCache.kt). Files are named by the SHA-1 of their URL plus the URL's extension so the
+' same URL always maps to the same file. cachefs:/ is persistent across launches but the system may clear it when storage is short,
+' so every use falls back to streaming the original URL when the file is gone.
+import "pkg:/source/lib/Config.bs"
+import "pkg:/source/lib/CacheLogic.bs"
+
+namespace Media
+
+    function sha1Hex(text as string) as string
+        ba = CreateObject("roByteArray")
+        ba.FromAsciiString(text)
+        digest = CreateObject("roEVPDigest")
+        digest.Setup("sha1")
+        return digest.Process(ba)
+    end function
+
+    function fileName(url as string) as string
+        if m.mediaNames = invalid then m.mediaNames = {}
+        known = m.mediaNames[url]
+        if known <> invalid then return known
+        name = CacheLogic.fileName(sha1Hex(url), url)
+        if m.mediaNames.count() > 500 then m.mediaNames = {}
+        m.mediaNames[url] = name
+        return name
+    end function
+
+    function localPath(url as string) as string
+        return Config.MEDIA_DIR + "/" + fileName(url)
+    end function
+
+    function isCached(url as string) as boolean
+        fs = CreateObject("roFileSystem")
+        return fs.Exists(localPath(url))
+    end function
+
+    ' Where to read a remote file from: the cached copy when present, else the URL itself (streamed or fetched on demand).
+    function uri(url as dynamic) as string
+        if url = invalid or url = "" then return ""
+        if CacheLogic.isRemote(url) then
+            if isCached(url) then return localPath(url)
+        end if
+        return url
+    end function
+
+    sub ensureDir()
+        fs = CreateObject("roFileSystem")
+        if not fs.Exists(Config.MEDIA_DIR) then fs.CreateDirectory(Config.MEDIA_DIR)
+    end sub
+
+    ' [{ name, size }] for everything in the cache directory.
+    function listFiles() as object
+        fs = CreateObject("roFileSystem")
+        out = []
+        names = fs.GetDirectoryListing(Config.MEDIA_DIR)
+        if names = invalid then return out
+        for each n in names
+            st = fs.Stat(Config.MEDIA_DIR + "/" + n)
+            size = 0
+            if st <> invalid then size = st.size
+            out.push({ name: n, size: size })
+        end for
+        return out
+    end function
+
+    function usedBytes() as longinteger
+        total = 0&
+        for each f in listFiles()
+            total = total + f.size
+        end for
+        return total
+    end function
+
+    function freeBytes() as longinteger
+        fs = CreateObject("roFileSystem")
+        info = fs.GetVolumeInfo("cachefs:/")
+        if info = invalid then return -1&
+        if info.blocksize = invalid or info.blocksize <= 0 then return -1& ' unknown: do not block downloads on it
+        return (info.freeblocks * 1&) * info.blocksize
+    end function
+
+    ' Deletes cached files no scheduled playlist or deck uses any more, and leftover partial downloads.
+    sub prune(keepUrls as object)
+        keep = {}
+        for each u in keepUrls
+            keep[fileName(u)] = true
+        end for
+        fs = CreateObject("roFileSystem")
+        for each name in CacheLogic.stale(listFiles(), keep)
+            fs.Delete(Config.MEDIA_DIR + "/" + name)
+        end for
+    end sub
+
+end namespace

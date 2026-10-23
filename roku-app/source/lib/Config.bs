@@ -1,0 +1,33 @@
+' Build-time constants. The publishable key is safe to ship in the app: database rules decide what it can do (same as the Android app).
+namespace Config
+
+    const SUPABASE_URL = "https://gqkefjngblgomuovaivj.supabase.co"
+    const SUPABASE_KEY = "sb_publishable_NdKbJRGxQykmJuV9OTLdXg_qkKSwlQy"
+    const DASHBOARD_HOST = "app.churchtvos.com"
+
+    ' The Roku channel's own version (manifest major.minor.build).
+    const CHANNEL_VERSION = "1.0.0"
+
+    ' The version string sent to the server as register_device's p_app_version.
+    ' The server gates features by app version (lyrics v1.3.0+, the Slides module v1.4.0+), and compares only the leading numeric
+    ' part ("1.7.0-roku" is read as 1.7.0, see public.version_ge). This channel implements the protocol of Android app 1.7.0, so it
+    ' reports that version with a "-roku" suffix: the dashboard's screen list then shows the platform too. Bump with the parity level.
+    const REPORTED_APP_VERSION = "1.7.0-roku"
+
+    ' Polling cadences, the same as the Android app (TvSync.kt).
+    const STATE_POLL_PAIRED_MS = 30000
+    const STATE_POLL_UNPAIRED_MS = 5000
+    const REMOTE_POLL_PLAYING_MS = 2000
+    const REMOTE_POLL_IDLE_MS = 5000
+    const REMOTE_RESEND_MS = 15000
+
+    ' Media cache on cachefs:/ (the system may also clear it under storage pressure).
+    const MEDIA_DIR = "cachefs:/media"
+    const STATE_FILE = "cachefs:/state.json"
+    const MAX_CACHE_BYTES = 1500000000
+
+    ' Roku's UI is laid out for 1920 x 1080 (manifest ui_resolutions=fhd).
+    const SCREEN_W = 1920
+    const SCREEN_H = 1080
+
+end namespace

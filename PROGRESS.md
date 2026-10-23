@@ -32,3 +32,7 @@
 - Import button on Decks, the deck editor, Playlists and the playlist editor. PDF pages are drawn in the browser (pdf.js 6.4.299, lazy chunk, worker bundled; fonts and cmaps copied to `dashboard/public/pdfjs/`) as 1920px JPEGs and become full-screen picture slides / Kids image items. .pptx (jszip 3.10.2, lazy chunk) becomes editable text slides with notes, picture slides, and optional video. PNG/JPG multi-select works too. No exact-look pptx render exists: the dialog tells users to export to PDF.
 - Contract for the Apple agent: PPTX-IMPORT-CONTRACT.md. Code: `dashboard/src/importer/`. Tests: `npm test` in dashboard (vitest + jsdom).
 - Not verified against live Supabase (no login in the build session): the upload + insert path reuses the Media page logic but was not run end to end.
+
+## Update (2026-10-23): first Roku build (roku-app/)
+- `roku-app/`: BrightScript + SceneGraph (BrighterScript) port of the TV player: pairing with QR, Kids/Signage/Slides, countdowns, remote control, offline cache, settings and demo. Reports app version `1.7.0-roku`, so no server change is needed. See roku-app/README.md for build, sideload, known gaps.
+- Verified off-device only (bsc zero errors/warnings, 247 unit checks, QR matches the `qrcode` package, time zones match Node Intl, headless brs-node run against a mock API). NEVER run on a real Roku yet: video/audio, text measurement, rotation direction, HTTPS, memory.

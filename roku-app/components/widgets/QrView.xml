@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- A QR code drawn as rectangles (black modules on a white tile with the 4-module quiet zone the spec requires).
+     The encoder runs in a Task so the render thread never blocks. -->
+<component name="QrView" extends="Group">
+    <interface>
+        <field id="payload" type="string" alwaysNotify="true" />
+        <!-- width and height of the white tile, in pixels -->
+        <field id="size" type="float" value="400" />
+    </interface>
+    <script type="text/brightscript" uri="QrView.bs" />
+</component>

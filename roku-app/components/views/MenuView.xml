@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- A simple centred screen: title, some lines of text and a vertical list of buttons (Settings, Demo mode, confirmations). -->
+<component name="MenuView" extends="Group">
+    <interface>
+        <!-- { title, lines: [string], items: [{ id, text, confirm }], brand, portrait, w, h, footer } -->
+        <field id="config" type="assocarray" onChange="build" />
+        <!-- id of the chosen item; "back" when Back is pressed -->
+        <field id="action" type="string" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="MenuView.bs" />
+</component>

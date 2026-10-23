@@ -1,0 +1,69 @@
+import "pkg:/source/lib/Config.bs"
+import "pkg:/source/lib/Util.bs"
+import "pkg:/source/lib/Remote.bs"
+import "pkg:/components/lib/Device.bs"
+import "pkg:/components/lib/Http.bs"
+
+sub init()
+    m.top.functionName = "execute"
+end sub
+
+sub execute()
+    port = CreateObject("roMessagePort")
+    m.top.observeField("status", port)
+    m.top.observeField("paired", port)
+    clock = CreateObject("roTimespan")
+    lastKey = ""
+    lastOutline = invalid
+    lastSentMs = -1000000
+    seq = 0
+    clock.Mark()
+
+    while true
+        if m.top.paired then
+            id = Device.deviceId()
+            secret = Device.secret()
+            ident = { p_device_id: id, p_secret: secret }
+            r = Http.rpc("device_poll_commands", ident, 10000)
+            if r.ok then
+                raw = ParseJson(r.body)
+                if Util.isArr(raw) then
+                    batch = []
+                    for each c in raw
+                        cmd = Remote.parse(c)
+                        if cmd <> invalid then
+                            seq++
+                            cmd.seq = seq
+                            batch.push(cmd)
+                        end if
+                    end for
+                    if batch.count() > 0 then m.top.commands = batch
+                end if
+            end if
+            st = m.top.status
+            if not Util.isAA(st) then st = Remote.idleStatus()
+            key = Remote.statusKey(st)
+            nowMs = clock.TotalMilliseconds()
+            if key <> lastKey or nowMs - lastSentMs > Config.REMOTE_RESEND_MS then
+                includeOutline = not Remote.sameOutline(st.outline, lastOutline) or st.state = "idle"
+                params = Remote.reportParams(st, includeOutline)
+                params["p_device_id"] = id
+                params["p_secret"] = secret
+                rr = Http.rpc("device_report_status", params, 10000)
+                if rr.ok then
+                    lastKey = key
+                    lastSentMs = nowMs
+                    lastOutline = st.outline
+                end if
+            end if
+        end if
+        interval = Config.REMOTE_POLL_IDLE_MS
+        cur = m.top.status
+        if Util.isAA(cur) and cur.state <> "idle" then interval = Config.REMOTE_POLL_PLAYING_MS
+        ' A change of what is on screen wakes the loop at once, so remotes see slide changes within a moment.
+        msg = wait(interval, port)
+        while msg <> invalid
+            msg = wait(1, port)
+        end while
+    end while
+end sub

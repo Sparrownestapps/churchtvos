@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Text that shrinks to fit a box, like the Android app's auto-size text. Set `config` once:
+     { text, w, h, minSize, maxSize, maxLines, font ("lato"/"julius"), weight ("regular"/"bold"/"black"), color (Roku colour),
+       align ("left"/"center"/"right"), vAlign ("top"/"center"/"bottom"), shadow ("none"/"shadow"/"outline"), lineSpacing }
+     Measures real text with Label.boundingRect(); falls back to a character-count estimate if the device reports no size. -->
+<component name="FitLabel" extends="Group">
+    <interface>
+        <field id="config" type="assocarray" onChange="layoutText" />
+        <!-- the font size that was chosen (read only) -->
+        <field id="chosenSize" type="integer" />
+    </interface>
+    <script type="text/brightscript" uri="FitLabel.bs" />
+</component>

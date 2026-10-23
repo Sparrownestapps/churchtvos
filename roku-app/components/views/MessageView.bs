@@ -1,0 +1,22 @@
+import "pkg:/source/lib/Util.bs"
+import "pkg:/components/lib/Ui.bs"
+
+sub init()
+    m.top.focusable = true
+end sub
+
+sub build()
+    cfg = m.top.config
+    if not Util.isAA(cfg) then return
+    Ui.clear(m.top)
+    W = Util.getNum(cfg, "w", 1920)
+    H = Util.getNum(cfg, "h", 1080)
+    brand = cfg.brand
+    Ui.rect(m.top, 0, 0, W, H, "0xFFFFFFFF")
+    Ui.orgLogo(m.top, brand, "#FFFFFF", 96, 54, 600, 144)
+    detail = Util.getStr(cfg, "detail", "")
+    Ui.label(m.top, { text: Util.getStr(cfg, "title", ""), x: 96, y: H / 2 - 140, w: W - 192, h: 200, font: "julius", size: 80, color: Util.rokuColor(brand.primary, "0x1B2A4AFF"), align: "center", vAlign: "bottom", wrap: true })
+    if detail <> "" then
+        Ui.label(m.top, { text: detail, x: 160, y: H / 2 + 80, w: W - 320, h: 260, size: 32, color: "0x58595BFF", align: "center", wrap: true, lineSpacing: 8 })
+    end if
+end sub

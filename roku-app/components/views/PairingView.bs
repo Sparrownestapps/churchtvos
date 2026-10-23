@@ -1,0 +1,104 @@
+import "pkg:/source/lib/Config.bs"
+import "pkg:/source/lib/Util.bs"
+import "pkg:/source/lib/Model.bs"
+import "pkg:/components/lib/Ui.bs"
+
+sub init()
+    m.top.focusable = true
+end sub
+
+sub build()
+    cfg = m.top.config
+    if not Util.isAA(cfg) then return
+    Ui.clear(m.top)
+    W = Util.getNum(cfg, "w", 1920)
+    H = Util.getNum(cfg, "h", 1080)
+    portrait = Util.getBool(cfg, "portrait", false)
+    brand = cfg.brand
+    primary = Util.rokuColor(brand.primary, "0x1B2A4AFF")
+    accent = Util.rokuColor(brand.accent, "0xF2A33AFF")
+    grey = "0x58595BFF"
+    code = Util.getStr(cfg, "code", "")
+    payload = Model.pairingQrPayload(code)
+
+    Ui.rect(m.top, 0, 0, W, H, "0xFFFFFFFF")
+    Ui.orgLogo(m.top, brand, "#FFFFFF", 96, 54, 600, 144)
+
+    codeW = 900
+    codeH = 190
+    qrSize = 400
+    if portrait then qrSize = 520
+    caption = "Scan with the Church TV OS app," + Chr(10) + "or enter the code at " + Config.DASHBOARD_HOST
+    steps = "In the Church TV OS dashboard (" + Config.DASHBOARD_HOST + ")," + Chr(10) + "go to Screens > Pair a TV, enter this code and choose the location."
+
+    buttonW = 620
+    buttonH = 84
+    if payload = invalid then
+        ' No QR yet (the code has not arrived): code box and written steps only.
+        total = 96 + 24 + codeH + 32 + 120 + 32 + buttonH
+        y = (H - total) / 2
+        drawTitle(y, W, primary)
+        y = y + 96 + 24
+        codeBox(y, (W - codeW) / 2, codeW, codeH, code, primary)
+        y = y + codeH + 32
+        Ui.label(m.top, { text: steps, x: 96, y: y, w: W - 192, h: 120, size: 36, color: grey, align: "center", lineSpacing: 12, wrap: true, maxLines: 3 })
+        y = y + 120 + 32
+    else if portrait then
+        ' Portrait: code on top, QR below (the rotated canvas is narrow, so a single column).
+        total = 96 + 24 + codeH + 32 + qrSize + 16 + 100 + 32 + buttonH
+        y = (H - total) / 2
+        drawTitle(y, W, primary)
+        y = y + 96 + 24
+        codeBox(y, (W - codeW) / 2, codeW, codeH, code, primary)
+        y = y + codeH + 32
+        addQr(payload, (W - qrSize) / 2, y, qrSize)
+        y = y + qrSize + 16
+        Ui.label(m.top, { text: caption, x: 40, y: y, w: W - 80, h: 100, size: 36, weight: "bold", color: grey, align: "center", lineSpacing: 6, wrap: true, maxLines: 3 })
+        y = y + 100 + 32
+    else
+        ' Landscape: code and caption on the left, QR on the right.
+        gap = 96
+        rowW = codeW + gap + qrSize
+        total = 96 + 24 + qrSize + 32 + buttonH
+        y = (H - total) / 2
+        drawTitle(y, W, primary)
+        y = y + 96 + 24
+        x0 = (W - rowW) / 2
+        codeBox(y + 40, x0, codeW, codeH, code, primary)
+        Ui.label(m.top, { text: caption, x: x0, y: y + 40 + codeH + 32, w: codeW, h: 100, size: 36, weight: "bold", color: grey, align: "center", lineSpacing: 6, wrap: true, maxLines: 3 })
+        addQr(payload, x0 + codeW + gap, y, qrSize)
+        y = y + qrSize + 32
+    end if
+
+    m.button = Ui.button(m.top, "Settings and demo mode", (W - buttonW) / 2, y, buttonW, buttonH, 36)
+    Ui.paintButtons([m.button], 0, brand.primary, brand.accent)
+    m.top.focusable = true
+    if Util.getBool(cfg, "offline", false) then
+        Ui.label(m.top, { text: "Can't reach the internet. Check this TV's Wi-Fi.", x: 96, y: y + buttonH + 24, w: W - 192, h: 50, size: 28, weight: "bold", color: accent, align: "center" })
+    end if
+end sub
+
+sub drawTitle(y as float, W as float, primary as string)
+    Ui.label(m.top, { text: "Pair this TV", x: 0, y: y, w: W, h: 96, font: "julius", size: 80, color: primary, align: "center", vAlign: "center" })
+end sub
+
+sub codeBox(y as float, x as float, w as float, h as float, code as string, primary as string)
+    Ui.rect(m.top, x, y, w, h, primary)
+    Ui.label(m.top, { text: Model.codeDisplay(code), x: x, y: y, w: w, h: h, font: "lato", weight: "black", size: 144, color: "0xFFFFFFFF", align: "center", vAlign: "center" })
+end sub
+
+sub addQr(payload as string, x as float, y as float, size as float)
+    qr = m.top.createChild("QrView")
+    qr.translation = [x, y]
+    qr.size = size
+    qr.payload = payload
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+    if key = "OK" or key = "play" or key = "down" then
+        m.top.action = "settings"
+        return true
+    end if
+    return false
+end function

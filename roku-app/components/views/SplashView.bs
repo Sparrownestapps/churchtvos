@@ -1,0 +1,22 @@
+import "pkg:/source/lib/Util.bs"
+import "pkg:/source/lib/Model.bs"
+import "pkg:/components/lib/Ui.bs"
+import "pkg:/components/lib/Media.bs"
+
+sub build()
+    cfg = m.top.config
+    if not Util.isAA(cfg) then return
+    Ui.clear(m.top)
+    W = Util.getNum(cfg, "w", 1920)
+    H = Util.getNum(cfg, "h", 1080)
+    brand = cfg.brand
+    primary = Util.parseColor(brand.primary)
+    if primary = invalid then primary = { r: 27, g: 42, b: 74, a: 255 }
+    Ui.rect(m.top, 0, 0, W, H, Util.toRoku(primary))
+    logo = Model.logoOn(brand, primary)
+    if logo <> invalid then
+        Ui.poster(m.top, W * 0.225, H * 0.25, W * 0.55, H * 0.5, Media.uri(logo), "scaleToFit")
+    else
+        Ui.label(m.top, { text: UCase(brand.orgName), x: 96, y: 0, w: W - 192, h: H, font: "julius", size: 112, color: "0xFFFFFFFF", align: "center", vAlign: "center", wrap: true })
+    end if
+end sub

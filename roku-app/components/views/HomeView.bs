@@ -1,0 +1,91 @@
+import "pkg:/source/lib/Util.bs"
+import "pkg:/components/lib/Ui.bs"
+
+sub init()
+    m.top.focusable = true
+    m.canPlay = false
+end sub
+
+sub build()
+    cfg = m.top.config
+    if not Util.isAA(cfg) then return
+    Ui.clear(m.top)
+    W = Util.getNum(cfg, "w", 1920)
+    H = Util.getNum(cfg, "h", 1080)
+    portrait = Util.getBool(cfg, "portrait", false)
+    brand = cfg.brand
+    primary = Util.rokuColor(brand.primary, "0x1B2A4AFF")
+    accent = Util.rokuColor(brand.accent, "0xF2A33AFF")
+    grey = "0x58595BFF"
+    m.canPlay = Util.getBool(cfg, "canPlay", false)
+    Ui.rect(m.top, 0, 0, W, H, "0xFFFFFFFF")
+
+    ' 96 x 54 px keeps everything inside the TV-safe area (5% overscan).
+    if portrait then
+        x = 80
+        y = 96
+        Ui.orgLogo(m.top, brand, "#FFFFFF", x, y, 600, 144)
+        y = y + 144 + 56
+        identity(x, y, W - 160, true, accent, primary, cfg)
+        y = y + 40 + 120 + 56
+        hintH = 60
+        cardH = H - y - 96 - hintH - 56
+        card(x, y, W - 160, cardH, cfg, primary, accent, grey, brand)
+        Ui.label(m.top, { text: Util.getStr(cfg, "hint", ""), x: x, y: H - 96 - hintH, w: W - 160, h: hintH, size: 28, color: grey, wrap: true })
+    else
+        colW = (W - 192 - 80) / 2
+        x = 96
+        Ui.orgLogo(m.top, brand, "#FFFFFF", x, 54, 600, 144)
+        identity(x, (H - 108) / 2 - 40, colW, false, accent, primary, cfg)
+        Ui.label(m.top, { text: Util.getStr(cfg, "hint", ""), x: x, y: H - 54 - 120, w: colW, h: 120, size: 24, color: grey, wrap: true, vAlign: "bottom" })
+        card(96 + colW + 80, 54, colW, H - 108, cfg, primary, accent, grey, brand)
+    end if
+end sub
+
+sub identity(x as float, y as float, w as float, portrait as boolean, accent as string, primary as string, cfg as object)
+    siteSize = 28
+    locSize = 88
+    if portrait then
+        siteSize = 36
+        locSize = 112
+    end if
+    Ui.label(m.top, { text: UCase(Util.getStr(cfg, "site", "")), x: x, y: y, w: w, h: 44, size: siteSize, weight: "bold", color: accent })
+    Ui.label(m.top, { text: Util.getStr(cfg, "location", ""), x: x, y: y + 44, w: w, h: locSize + 20, font: "julius", size: locSize, color: primary, wrap: true, maxLines: 2 })
+end sub
+
+sub card(x as float, y as float, w as float, h as float, cfg as object, primary as string, accent as string, grey as string, brand as object)
+    Ui.rect(m.top, x, y, w, h, "0xF4F5F7FF")
+    px = x + 56
+    py = y + 56
+    iw = w - 112
+    Ui.label(m.top, { text: Util.getStr(cfg, "heading", ""), x: px, y: py, w: iw, h: 36, size: 24, weight: "bold", color: accent })
+    py = py + 36
+    Ui.label(m.top, { text: Util.getStr(cfg, "name", "-"), x: px, y: py, w: iw, h: 72, size: 56, weight: "black", color: primary })
+    py = py + 72 + 24
+    rows = Util.getArr(cfg, "rows")
+    rowH = 56
+    for each row in rows
+        Ui.label(m.top, { text: Util.getStr(row, "kind", ""), x: px, y: py, w: 230, h: rowH, size: 22, weight: "bold", color: accent, vAlign: "center" })
+        Ui.label(m.top, { text: Util.getStr(row, "label", ""), x: px + 230, y: py, w: iw - 230, h: rowH, size: 32, color: grey, vAlign: "center", maxLines: 1 })
+        py = py + rowH
+    end for
+    more = Util.getNum(cfg, "moreCount", 0)
+    if more > 0 then
+        Ui.label(m.top, { text: "+ " + more.toStr() + " more", x: px, y: py, w: iw, h: 44, size: 26, color: grey, vAlign: "center" })
+    end if
+    ' Status and the Play button sit at the bottom of the card.
+    btnH = 84
+    by = y + h - 56 - btnH
+    Ui.label(m.top, { text: Util.getStr(cfg, "status", ""), x: px, y: by - 24 - 120, w: iw, h: 120, size: 26, color: grey, vAlign: "bottom", wrap: true, maxLines: 3 })
+    m.play = Ui.button(m.top, "Play", px, by, 280, btnH, 36)
+    Ui.paintButtons([m.play], 0, brand.primary, brand.accent, [m.canPlay])
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+    if (key = "OK" or key = "play") then
+        if m.canPlay then m.top.action = "play"
+        return true
+    end if
+    return false
+end function

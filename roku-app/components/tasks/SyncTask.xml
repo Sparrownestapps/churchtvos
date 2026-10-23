@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Keeps the TV in step with the dashboard: registers the device, polls device_state, caches the last state for offline use. -->
+<component name="SyncTask" extends="Task">
+    <interface>
+        <!-- bump to poll now (a remote has just asked this TV to play something) -->
+        <field id="wake" type="integer" value="0" />
+        <!-- bump after the identity was reset (Unpair): register again with the new id -->
+        <field id="reidentify" type="integer" value="0" />
+        <!-- { seq, offline, error, state, mediaUrls, unknownDevice } published after every poll -->
+        <field id="result" type="assocarray" />
+    </interface>
+    <script type="text/brightscript" uri="SyncTask.bs" />
+</component>

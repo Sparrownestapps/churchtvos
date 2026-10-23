@@ -1,0 +1,21 @@
+{
+  "rootDir": ".",
+  "files": [
+    "manifest",
+    "source/**/*.*",
+    "components/**/*.*",
+    "fonts/*.ttf",
+    "images/**/*.png"
+  ],
+  "stagingDir": ".tmp/staging",
+  "outFile": "dist/church-tv-os-roku-1.0.0.zip",
+  "createPackage": true,
+  "sourceMap": false,
+  "diagnosticFilters": [
+    1013
+  ],
+  "plugins": [
+    "@rokucommunity/bslint"
+  ],
+  "retainStagingDir": true
+}

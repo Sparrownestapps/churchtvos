@@ -1,0 +1,73 @@
+' Remote control protocol (mirrors Remote.kt): commands in, status out.
+import "pkg:/source/lib/Util.bs"
+
+namespace Remote
+
+    ' A command from device_poll_commands ({id, command, payload}) to { type, ... }, or invalid.
+    ' Unknown or malformed commands are ignored, so a newer server never breaks an older TV.
+    function parse(raw as dynamic) as dynamic
+        if not Util.isAA(raw) then return invalid
+        c = Util.getStr(raw, "command", "")
+        payload = Util.getObj(raw, "payload")
+        if payload = invalid then payload = {}
+        if c = "next" then return { type: "next" }
+        if c = "previous" then return { type: "previous" }
+        if c = "jump" then
+            idx = Util.getIntOrInvalid(payload, "index")
+            if idx = invalid then return invalid
+            return { type: "jump", index: idx }
+        end if
+        if c = "blank" then
+            on = invalid
+            if Util.isBool(payload["on"]) then on = payload["on"]
+            return { type: "blank", on: on }
+        end if
+        if c = "stop" then return { type: "stop" }
+        if c = "start" then return { type: "start" }
+        if c = "message" then
+            text = Util.getStr(payload, "text", "")
+            if Util.isBlank(text) then return invalid
+            secs = Util.getIntOrInvalid(payload, "seconds")
+            if secs = invalid then secs = 30
+            return { type: "message", text: text, seconds: Util.clampI(secs, 5, 300), background: Util.getStr(payload, "background", "#1B2A4A") }
+        end if
+        if c = "clear_message" then return { type: "clear_message" }
+        return invalid
+    end function
+
+    ' An empty status (nothing playing).
+    function idleStatus() as object
+        return { module: "", state: "idle", title: "", label: "", index: 0, count: 0, outline: [], refKind: invalid, refId: invalid }
+    end function
+
+    ' Changes of this key are reported at once; otherwise the status is re-sent every REMOTE_RESEND_MS.
+    function statusKey(st as object) as string
+        return st.module + "|" + st.state + "|" + st.title + "|" + st.index.toStr() + "|" + st.count.toStr() + "|" + st.label
+    end function
+
+    function sameOutline(a as dynamic, b as dynamic) as boolean
+        if not Util.isArr(a) or not Util.isArr(b) then return false
+        if a.count() <> b.count() then return false
+        for i = 0 to a.count() - 1
+            if a[i] <> b[i] then return false
+        end for
+        return true
+    end function
+
+    ' The parameters of the device_report_status call (without the device id and secret).
+    function reportParams(st as object, includeOutline as boolean) as object
+        p = {
+            "p_module": st.module,
+            "p_state": st.state,
+            "p_title": st.title,
+            "p_item_label": st.label,
+            "p_slide_index": st.index,
+            "p_slide_count": st.count
+        }
+        if includeOutline then p["p_outline"] = st.outline
+        if st.refKind <> invalid then p["p_ref_kind"] = st.refKind
+        if st.refId <> invalid then p["p_ref_id"] = st.refId
+        return p
+    end function
+
+end namespace

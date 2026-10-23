@@ -1,0 +1,71 @@
+import "pkg:/source/lib/Util.bs"
+import "pkg:/source/lib/TimeUtil.bs"
+import "pkg:/source/lib/Qr.bs"
+import "pkg:/source/tests/TestKit.bs"
+
+namespace Test_Core
+
+    sub runAll(t as object, v as object)
+        testQr(t, v)
+        testTz(t, v)
+        testIso(t, v)
+        testUntil(t, v)
+    end sub
+
+    sub testQr(t as object, v as object)
+        TestKit.suite(t, "QR encoder vs the qrcode npm package")
+        for each ref in v.qr
+            r = Qr.encode(ref.text)
+            if not r.ok then
+                TestKit.check(t, ref.text, false, r.error)
+            else
+                same = r.version = ref.version and r.mask = ref.mask and r.size = ref.size and r.rows.count() = ref.rows.count()
+                bad = 0
+                if same then
+                    for i = 0 to r.rows.count() - 1
+                        if r.rows[i] <> ref.rows[i] then bad++
+                    end for
+                end if
+                TestKit.check(t, "modules " + ref.text, same and bad = 0, "version " + r.version.toStr() + "/" + ref.version.toStr() + " mask " + r.mask.toStr() + "/" + ref.mask.toStr() + " badRows " + bad.toStr())
+            end if
+        end for
+        r = Qr.encode(String(200, "x"))
+        TestKit.check(t, "too long text is refused", r.ok = false)
+    end sub
+
+    sub testTz(t as object, v as object)
+        TestKit.suite(t, "time zone offsets vs Node Intl (" + v.tz.count().toStr() + " instants)")
+        bad = 0
+        for each x in v.tz
+            got = TimeUtil.zoneOffsetMinutes(x[0], x[1])
+            if got <> x[2] then
+                bad++
+                if bad <= 8 then print "  mismatch " + x[0] + " @" + x[1].toStr() + " got " + got.toStr() + " expected " + x[2].toStr()
+            end if
+        end for
+        TestKit.check(t, "all offsets match", bad = 0, bad.toStr() + " mismatches")
+    end sub
+
+    sub testIso(t as object, v as object)
+        TestKit.suite(t, "ISO 8601 parsing")
+        for each x in v.iso
+            TestKit.eq(t, x[0], TimeUtil.parseIso(x[0]), x[1])
+        end for
+        TestKit.eq(t, "garbage", TimeUtil.parseIso("not a date"), invalid)
+        TestKit.eq(t, "invalid type", TimeUtil.parseIso(5), invalid)
+    end sub
+
+    sub testUntil(t as object, v as object)
+        TestKit.suite(t, "wall-clock 'until' in the site time zone (" + v.until.count().toStr() + " cases)")
+        bad = 0
+        for each x in v.until
+            got = TimeUtil.todayAtLocal(x[2], x[1], x[0], 0)
+            if got <> x[3] then
+                bad++
+                if bad <= 8 then print "  mismatch " + x[0] + " now=" + x[1].toStr() + " " + x[2] + " got " + FormatJson(got) + " expected " + x[3].toStr()
+            end if
+        end for
+        TestKit.check(t, "all wall-clock targets match", bad = 0, bad.toStr() + " mismatches")
+    end sub
+
+end namespace

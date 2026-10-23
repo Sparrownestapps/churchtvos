@@ -1,0 +1,53 @@
+' Countdown maths (mirrors Countdown.kt). All wall-clock decisions use the site's time zone.
+import "pkg:/source/lib/Util.bs"
+import "pkg:/source/lib/TimeUtil.bs"
+
+namespace Countdown
+
+    ' "5:00", "0:07", or "1:05:00" for an hour or more. Rounds up so 0:00 only shows at the end.
+    function format(remainingMs as integer) as string
+        if remainingMs < 0 then remainingMs = 0
+        total = Int((remainingMs + 999) / 1000)
+        h = total \ 3600
+        mi = (total mod 3600) \ 60
+        s = total mod 60
+        if h > 0 then return h.toStr() + ":" + Util.padLeft(mi.toStr(), 2, "0") + ":" + Util.padLeft(s.toStr(), 2, "0")
+        return mi.toStr() + ":" + Util.padLeft(s.toStr(), 2, "0")
+    end function
+
+    ' Volume multiplier: 1 until the last fadeSeconds, then ramps to 0 at zero.
+    function fadeFactor(remainingMs as integer, fadeSeconds as float) as float
+        if fadeSeconds <= 0 then return 1.0
+        return Util.clampF(remainingMs / 1000.0 / fadeSeconds, 0, 1)
+    end function
+
+    ' When does this countdown end, in epoch seconds, and what happens.
+    ' mode "until": today's clock time in the site zone; an unreadable time counts as already passed (like Android).
+    ' ifPassed "skip" leaves the slide out; "zero" shows 0:00 for a moment and then follows atZero.
+    function plan(spec as object, nowEpoch as integer, zone as dynamic, deviceOffset as integer) as object
+        endEpoch = nowEpoch + spec.seconds
+        passed = false
+        if spec.mode = "until" then
+            e = TimeUtil.todayAtLocal(spec.until, nowEpoch, zone, deviceOffset)
+            if e = invalid then e = nowEpoch
+            endEpoch = e
+            passed = endEpoch <= nowEpoch
+        end if
+        return {
+            endEpoch: endEpoch,
+            alreadyPassed: passed,
+            skip: passed and spec.ifPassed = "skip",
+            hold: spec.atZero = "hold"
+        }
+    end function
+
+    ' align_end: wait before starting the track (or seek into it) so it finishes exactly at zero.
+    ' Returns { delaySeconds, seekSeconds }.
+    function alignEnd(trackSeconds as float, untilZeroSeconds as float) as object
+        if trackSeconds <= 0 then return { delaySeconds: 0.0, seekSeconds: 0.0 }
+        if untilZeroSeconds > trackSeconds then return { delaySeconds: untilZeroSeconds - trackSeconds, seekSeconds: 0.0 }
+        if untilZeroSeconds < 0 then untilZeroSeconds = 0
+        return { delaySeconds: 0.0, seekSeconds: trackSeconds - untilZeroSeconds }
+    end function
+
+end namespace

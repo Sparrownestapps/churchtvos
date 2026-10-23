@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Encodes the pairing QR off the render thread (a few hundred ms of BrightScript on slow Rokus). -->
+<component name="QrTask" extends="Task">
+    <interface>
+        <field id="payload" type="string" />
+        <field id="result" type="assocarray" />
+    </interface>
+    <script type="text/brightscript" uri="QrTask.bs" />
+</component>

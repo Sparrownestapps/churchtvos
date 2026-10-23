@@ -1,0 +1,70 @@
+' Media cache naming and pruning rules (pure). Mirrors MediaCache.kt: files are named by the SHA-1 of their URL plus the URL's extension.
+namespace CacheLogic
+
+    ' "abc123.mp4" from a SHA-1 hex digest and the URL. The extension is kept only when it is 1 to 5 characters.
+    function fileName(sha1hex as string, url as string) as string
+        q = Instr(1, url, "?")
+        path = url
+        if q > 0 then path = Left(url, q - 1)
+        slash = 0
+        for i = Len(path) to 1 step -1
+            if Mid(path, i, 1) = "/" then
+                slash = i
+                exit for
+            end if
+        end for
+        last = Mid(path, slash + 1)
+        ext = ""
+        dot = 0
+        for i = Len(last) to 1 step -1
+            if Mid(last, i, 1) = "." then
+                dot = i
+                exit for
+            end if
+        end for
+        if dot > 0 then ext = Mid(last, dot + 1)
+        if Len(ext) >= 1 and Len(ext) <= 5 then return sha1hex + "." + ext
+        return sha1hex
+    end function
+
+    ' The streamFormat Roku needs for a media URL or path: "hls" for .m3u8, "mp4", "mkv", and so on, or "" to let the player decide.
+    function streamFormat(url as string) as string
+        q = Instr(1, url, "?")
+        path = url
+        if q > 0 then path = Left(url, q - 1)
+        path = LCase(path)
+        if Right(path, 5) = ".m3u8" then return "hls"
+        if Right(path, 4) = ".mpd" then return "dash"
+        if Right(path, 4) = ".mp4" or Right(path, 4) = ".m4v" or Right(path, 4) = ".mov" then return "mp4"
+        if Right(path, 4) = ".mkv" then return "mkv"
+        if Right(path, 4) = ".mp3" then return "mp3"
+        if Right(path, 4) = ".m4a" or Right(path, 4) = ".aac" then return "aac"
+        if Right(path, 4) = ".wav" then return "wav"
+        if Right(path, 5) = ".flac" then return "flac"
+        return ""
+    end function
+
+    ' Only http(s) URLs are cached; bundled pkg:/ files and local paths are used as they are.
+    function isRemote(url as string) as boolean
+        l = LCase(Left(url, 8))
+        return Left(l, 7) = "http://" or l = "https://"
+    end function
+
+    ' Which cached files to delete: everything no scheduled playlist or deck uses any more.
+    ' files: array of { name, size }. keepNames: associative array name -> true. Partial downloads (.part) always go.
+    function stale(files as object, keepNames as object) as object
+        out = []
+        for each f in files
+            if keepNames[f.name] = invalid then out.push(f.name)
+        end for
+        return out
+    end function
+
+    ' May a new file be stored? Keeps the cache under maxBytes and leaves a reserve of free space on the volume.
+    function canStore(usedBytes as longinteger, maxBytes as longinteger, freeBytes as longinteger, reserveBytes as longinteger) as boolean
+        if usedBytes >= maxBytes then return false
+        if freeBytes >= 0 and freeBytes < reserveBytes then return false
+        return true
+    end function
+
+end namespace

@@ -1,0 +1,928 @@
+import "pkg:/source/lib/Util.bs"
+import "pkg:/source/lib/TimeUtil.bs"
+import "pkg:/source/lib/Model.bs"
+import "pkg:/source/lib/Countdown.bs"
+import "pkg:/source/lib/CacheLogic.bs"
+import "pkg:/source/lib/Remote.bs"
+import "pkg:/components/lib/Ui.bs"
+import "pkg:/components/lib/Media.bs"
+import "pkg:/components/lib/Device.bs"
+
+' ---------------------------------------------------------------------------------------------------------------------
+' Layers, bottom to top: background (colour, gradient, picture) | Video node (the Roku video plane: one video at a time, so a
+' looping background video and a foreground video can never play together) | dimming | slide content | logo | black cover | slide list.
+' The Video node punches a hole through everything drawn BEFORE it, so everything that must show over video comes after it.
+' ---------------------------------------------------------------------------------------------------------------------
+
+sub init()
+    m.top.focusable = true
+    m.built = false
+    m.index = 0
+    m.blank = false
+    m.paused = false
+    m.showList = false
+    m.streamFailed = false
+    m.videoKind = "" ' "", "fg" or "bg"
+    m.loadedBgUrl = ""
+    m.skipRun = 0
+    m.cd = invalid
+    m.listSel = 0
+end sub
+
+' ---------- setup ----------
+
+sub setup()
+    cfg = m.top.config
+    if not Util.isAA(cfg) then return
+    m.W = Util.getNum(cfg, "w", 1920)
+    m.H = Util.getNum(cfg, "h", 1080)
+    m.isDeck = Util.getBool(cfg, "isDeck", false)
+    m.loop = Util.getBool(cfg, "loop", false)
+    m.portrait = Util.getBool(cfg, "portrait", false)
+    m.brand = cfg.brand
+    m.theme = Util.getObj(cfg, "theme")
+    m.zone = Util.getStr(cfg, "zone", "America/Toronto")
+    m.report = Util.getObj(cfg, "report")
+    primary = Util.parseColor(m.brand.primary)
+    if primary = invalid then primary = { r: 27, g: 42, b: 74, a: 255 }
+    m.primary = primary
+
+    ' Roku cannot rotate the video plane, so on portrait screens (the whole UI is turned with a node rotation) video and
+    ' live-stream slides are left out rather than shown sideways.
+    all = Util.getArr(cfg, "slides")
+    m.slides = []
+    for each s in all
+        if m.portrait and (s.kind = "video" or s.kind = "stream") then
+            ' skipped
+        else
+            m.slides.push(s)
+        end if
+    end for
+    m.outline = Model.outline(m.slides, m.isDeck)
+
+    if not m.built then buildLayers()
+    m.index = 0
+    m.blank = false
+    m.paused = false
+    m.showList = false
+    if m.slides.count() = 0 then
+        showEmpty()
+        return
+    end if
+    startSlide()
+end sub
+
+sub buildLayers()
+    m.built = true
+    m.bg = m.top.createChild("Group")
+    m.video = m.top.createChild("Video")
+    m.video.translation = [0, 0]
+    m.video.width = m.W
+    m.video.height = m.H
+    m.video.visible = false
+    ' no Roku playback UI or trick play: the slide logic owns the remote
+    m.video.enableUI = false
+    m.video.enableTrickPlay = false
+    m.video.setFields({ disableScreenSaver: true })
+    m.video.observeField("state", "onVideoState")
+    m.dim = Ui.rect(m.top, 0, 0, m.W, m.H, "0x00000000")
+    m.dim.visible = false
+    m.content = m.top.createChild("Group")
+    m.logo = m.top.createChild("Poster")
+    m.logo.visible = false
+    m.blankRect = Ui.rect(m.top, 0, 0, m.W, m.H, "0x000000FF")
+    m.blankRect.visible = false
+    m.list = m.top.createChild("Group")
+    m.list.visible = false
+
+    m.advance = m.top.createChild("Timer")
+    m.advance.repeat = false
+    m.advance.observeField("fire", "onAdvance")
+    m.tick = m.top.createChild("Timer")
+    m.tick.repeat = true
+    m.tick.duration = 0.25
+    m.tick.observeField("fire", "onTick")
+    m.hold = m.top.createChild("Timer")
+    m.hold.repeat = false
+    m.hold.duration = 10
+    m.hold.observeField("fire", "onHoldDone")
+    m.audioStart = m.top.createChild("Timer")
+    m.audioStart.repeat = false
+    m.audioStart.observeField("fire", "onAudioStart")
+    m.zeroTimer = m.top.createChild("Timer")
+    m.zeroTimer.repeat = false
+    m.zeroTimer.observeField("fire", "onAdvance")
+
+    m.audio = CreateObject("roSGNode", "Audio")
+    m.audio.observeField("state", "onAudioState")
+end sub
+
+sub showEmpty()
+    Ui.clear(m.content)
+    drawBackground(invalid, true)
+    Ui.label(m.content, { text: "This playlist has no slides yet.", x: 96, y: 0, w: m.W - 192, h: m.H, size: 48, weight: "bold", color: "0xFFFFFFFF", align: "center", vAlign: "center", wrap: true })
+    ' Nothing to play: tell the scene to carry on after a moment (Signage loops and Kids both move on).
+    m.advance.duration = 5
+    m.advance.control = "stop"
+    m.advance.control = "start"
+    m.emptyWait = true
+end sub
+
+' ---------- navigation ----------
+
+sub goNext()
+    if m.isDeck then m.blank = false
+    if m.index < m.slides.count() - 1 then
+        m.index = m.index + 1
+        startSlide()
+    else if m.isDeck and m.loop then
+        m.index = 0
+        startSlide()
+    else
+        finish("finished")
+    end if
+end sub
+
+sub goPrevious()
+    if m.isDeck then m.blank = false
+    if m.index > 0 then
+        m.index = m.index - 1
+        startSlide()
+    end if
+end sub
+
+sub jumpTo(i as integer)
+    m.blank = false
+    m.showList = false
+    m.list.visible = false
+    m.index = Util.clampI(i, 0, m.slides.count() - 1)
+    startSlide()
+end sub
+
+sub finish(reason as string)
+    stopEverything()
+    m.top.result = reason
+end sub
+
+sub stopEverything()
+    m.advance.control = "stop"
+    m.tick.control = "stop"
+    m.hold.control = "stop"
+    m.audioStart.control = "stop"
+    m.zeroTimer.control = "stop"
+    stopAudio()
+    if m.video <> invalid then m.video.control = "stop"
+end sub
+
+sub onClosing()
+    if m.top.closing and m.built then stopEverything()
+end sub
+
+sub onAdvance()
+    if m.emptyWait = true then
+        m.emptyWait = false
+        finish("finished")
+        return
+    end if
+    goNext()
+end sub
+
+' ---------- one slide ----------
+
+sub startSlide()
+    m.advance.control = "stop"
+    m.tick.control = "stop"
+    m.hold.control = "stop"
+    m.audioStart.control = "stop"
+    m.zeroTimer.control = "stop"
+    stopAudio()
+    m.streamFailed = false
+    m.cd = invalid
+    m.paused = false
+    slide = m.slides[m.index]
+    Ui.clear(m.content)
+    m.logo.visible = false
+
+    ' background
+    bg = invalid
+    if m.isDeck then bg = slide.bg
+    fgVideo = (slide.kind = "video" or slide.kind = "stream")
+    drawBackground(bg, m.isDeck)
+    style = Model.playlistStyle()
+    if m.isDeck then style = Model.themeStyle(m.theme, slide)
+    m.style = style
+
+    ' video plane: foreground video, else a looping background video, else off
+    if fgVideo then
+        m.videoKind = "fg"
+        muted = false
+        if slide.kind = "video" then muted = not Util.getBool(slide, "audio", true)
+        if slide.kind = "stream" then muted = not Util.getBool(slide, "audio", false)
+        playVideo(slide.url, slide.kind = "stream", muted)
+    else if bg <> invalid and Util.getStr(bg, "type", "") = "video" and not m.portrait then
+        m.videoKind = "bg"
+        if m.loadedBgUrl <> bg.url or m.video.state = "stopped" or m.video.state = "finished" or m.video.state = "none" or m.video.state = "error" then
+            playVideo(bg.url, false, true)
+            m.loadedBgUrl = bg.url
+        end if
+    else
+        m.videoKind = ""
+        m.video.control = "stop"
+        m.video.visible = false
+        m.loadedBgUrl = ""
+    end if
+
+    if m.blank and fgVideo then m.video.control = "pause"
+    renderContent(slide, style)
+    renderLogo(style)
+    m.blankRect.visible = m.blank
+    reportStatus()
+    startTimers(slide)
+end sub
+
+sub startTimers(slide as object)
+    seconds = invalid
+    k = slide.kind
+    if k = "text" or k = "stream" or k = "ndi" or k = "bundled" or k = "sign" then
+        seconds = slide.seconds
+    else if k = "image" then
+        seconds = slide.seconds
+    end if
+    if seconds <> invalid and seconds > 0 then
+        m.advance.duration = seconds
+        m.advance.control = "start"
+    end if
+end sub
+
+sub renderContent(slide as object, style as object)
+    k = slide.kind
+    if k = "text" then
+        buildText(slide, style)
+    else if k = "lyric" then
+        buildLyric(slide, style)
+    else if k = "songtitle" then
+        buildSongTitle(slide, style)
+    else if k = "countdown" then
+        buildCountdown(slide, style)
+    else if k = "sign" then
+        buildSign(slide)
+    else if k = "image" then
+        mode = "scaleToFit"
+        if Util.getStr(slide, "fit", "contain") = "cover" and m.isDeck then mode = "scaleToZoom"
+        addImage(Media.uri(slide.url), mode)
+    else if k = "bundled" then
+        addImage(slide.file, "scaleToFit")
+    else if k = "blank" then
+        c = Util.parseColor(Util.getStr(slide, "color", ""))
+        if c = invalid then c = { r: 0, g: 0, b: 0, a: 255 }
+        Ui.rect(m.content, 0, 0, m.W, m.H, Util.toRoku(c))
+    else if k = "ndi" then
+        notice(slide.message)
+    else if k = "stream" then
+        ' the Video node shows the picture; a notice appears only if the feed fails
+    end if
+end sub
+
+sub addImage(uri as string, mode as string)
+    p = Ui.poster(m.content, 0, 0, m.W, m.H, "", mode)
+    p.loadWidth = m.W
+    p.loadHeight = m.H
+    p.uri = uri
+end sub
+
+sub notice(text as string)
+    Ui.rect(m.content, 0, 0, m.W, m.H, "0x000000FF")
+    Ui.label(m.content, { text: text, x: 96, y: 0, w: m.W - 192, h: m.H, size: 56, weight: "bold", color: "0xFFFFFFFF", align: "center", vAlign: "center", wrap: true })
+end sub
+
+' ---------- backgrounds ----------
+
+' bg: a background AA ({type: color|gradient|image|video, ...}) or invalid. In decks the default is the church's primary colour;
+' playlists draw their own backing in each slide builder, so they get black here.
+sub drawBackground(bg as dynamic, isDeck as boolean)
+    Ui.clear(m.bg)
+    m.dim.visible = false
+    fallback = "0x000000FF"
+    if isDeck then fallback = Util.toRoku(m.primary)
+    if bg = invalid then
+        Ui.rect(m.bg, 0, 0, m.W, m.H, fallback)
+        return
+    end if
+    t = Util.getStr(bg, "type", "")
+    if t = "color" then
+        Ui.rect(m.bg, 0, 0, m.W, m.H, Util.rokuColor(Util.getStr(bg, "color", ""), "0x1B2A4AFF"))
+    else if t = "gradient" then
+        drawGradient(bg)
+    else if t = "image" then
+        Ui.rect(m.bg, 0, 0, m.W, m.H, Util.rokuColor(Util.getStr(bg, "color", ""), "0x000000FF"))
+        p = Ui.poster(m.bg, 0, 0, m.W, m.H, "", imageMode(bg))
+        p.loadWidth = m.W
+        p.loadHeight = m.H
+        p.uri = Media.uri(Util.getStr(bg, "url", ""))
+    else if t = "video" then
+        Ui.rect(m.bg, 0, 0, m.W, m.H, Util.rokuColor(Util.getStr(bg, "color", ""), "0x000000FF"))
+    else
+        Ui.rect(m.bg, 0, 0, m.W, m.H, fallback)
+    end if
+    dimAmount = Util.clampF(Util.getNum(bg, "dim", 0), 0, 0.8)
+    if dimAmount > 0 then
+        m.dim.color = Util.toRoku({ r: 0, g: 0, b: 0, a: 255 }, dimAmount)
+        m.dim.visible = true
+    end if
+end sub
+
+function imageMode(bg as object) as string
+    if Util.getStr(bg, "fit", "cover") = "contain" then return "scaleToFit"
+    return "scaleToZoom"
+end function
+
+' Roku has no gradient node: a solid colour A rectangle with a white alpha-ramp image on top, tinted with colour B (blendColor).
+' The ramps are shipped for every 15 degrees of the CSS angle (0 = to top, 90 = to right, 180 = to bottom), see tools/make_assets.py.
+sub drawGradient(bg as object)
+    a = Util.parseColor(Util.getStr(bg, "color", ""))
+    if a = invalid then a = { r: 27, g: 42, b: 74, a: 255 }
+    b = Util.parseColor(Util.getStr(bg, "color2", ""))
+    if b = invalid then b = { r: 0, g: 0, b: 0, a: 255 }
+    Ui.rect(m.bg, 0, 0, m.W, m.H, Util.toRoku(a))
+    p = m.bg.createChild("Poster")
+    p.translation = [0, 0]
+    p.width = m.W
+    p.height = m.H
+    p.loadDisplayMode = "scaleToFill"
+    p.blendColor = Util.toRoku(b)
+    p.uri = Model.rampFile(Util.getNum(bg, "angle", 180), m.portrait)
+end sub
+
+' ---------- video and audio ----------
+
+sub playVideo(url as string, isStream as boolean, muted as boolean)
+    c = CreateObject("roSGNode", "ContentNode")
+    path = Media.uri(url)
+    c.url = path
+    fmt = CacheLogic.streamFormat(path)
+    if fmt = "" and isStream then fmt = "hls"
+    if fmt <> "" then c.streamFormat = fmt
+    if isStream then c.live = true
+    m.video.control = "stop"
+    m.video.content = c
+    m.video.setFields({ mute: muted })
+    m.video.visible = true
+    m.video.control = "play"
+end sub
+
+sub onVideoState()
+    state = m.video.state
+    if m.slides = invalid or m.slides.count() = 0 then return
+    slide = m.slides[m.index]
+    if state = "finished" then
+        if m.videoKind = "bg" then
+            ' loop the background
+            m.video.control = "stop"
+            m.video.control = "play"
+        else if m.videoKind = "fg" then
+            goNext()
+        end if
+    else if state = "error" then
+        if m.videoKind = "fg" then
+            if slide.kind = "stream" and Util.getStr(slide, "fallback", "skip") = "hold" then
+                ' hold a notice for a few seconds, then move on (the feed may come back for the next try)
+                m.streamFailed = true
+                notice("Waiting for the live feed" + Chr(8230))
+                m.hold.control = "start"
+            else
+                goNext()
+            end if
+        end if
+    end if
+end sub
+
+sub onHoldDone()
+    m.streamFailed = false
+    goNext()
+end sub
+
+sub stopAudio()
+    if m.audio <> invalid then m.audio.control = "stop"
+    m.audioProbe = false
+end sub
+
+sub startCountdownAudio(spec as object)
+    a = spec.audio
+    if a = invalid then return
+    c = CreateObject("roSGNode", "ContentNode")
+    path = Media.uri(a.url)
+    c.url = path
+    fmt = CacheLogic.streamFormat(path)
+    if fmt <> "" then c.streamFormat = fmt
+    m.audio.content = c
+    m.audioSpec = a
+    if a.alignEnd then
+        ' find the track length first (playing muted), then wait or seek so it ends exactly at zero
+        m.audio.setFields({ mute: true })
+        m.audioProbe = true
+        m.audio.control = "play"
+    else
+        m.audio.setFields({ mute: false })
+        m.audio.control = "play"
+    end if
+end sub
+
+sub onAudioState()
+    state = m.audio.state
+    if m.cd = invalid then return
+    a = m.audioSpec
+    if a = invalid then return
+    if state = "playing" and m.audioProbe = true then
+        dur = m.audio.duration
+        if dur <> invalid and dur > 0 then
+            m.audioProbe = false
+            remaining = Device.msUntil(m.cd.plan.endEpoch) / 1000.0
+            p = Countdown.alignEnd(dur, remaining)
+            if p.delaySeconds > 0 then
+                m.audio.control = "stop"
+                m.audioStart.duration = p.delaySeconds
+                m.audioStart.control = "start"
+            else
+                if p.seekSeconds > 0 then m.audio.seek = p.seekSeconds
+                m.audio.setFields({ mute: false })
+            end if
+        end if
+    else if state = "finished" then
+        remaining = Device.msUntil(m.cd.plan.endEpoch) / 1000.0
+        if a.loop and not a.alignEnd and remaining > 0 and not m.blank then
+            m.audio.control = "stop"
+            m.audio.control = "play"
+        end if
+    end if
+end sub
+
+sub onAudioStart()
+    m.audio.setFields({ mute: false })
+    m.audio.control = "play"
+end sub
+
+' ---------- countdown ----------
+
+sub buildCountdown(slide as object, style as object)
+    spec = slide.spec
+    nowEpoch = Device.nowEpoch()
+    plan = Countdown.plan(spec, nowEpoch, m.zone, Device.deviceOffsetMinutes())
+    m.cd = { plan: plan, spec: spec, last: "", labels: [], done: false }
+    if plan.skip then
+        ' the time has passed and this countdown asked to be left out
+        m.skipRun = m.skipRun + 1
+        if m.skipRun < m.slides.count() then
+            m.zeroTimer.duration = 0.05
+            m.zeroTimer.control = "start"
+            return
+        end if
+    end if
+    m.skipRun = 0
+    if not m.isDeck then Ui.rect(m.content, 0, 0, m.W, m.H, Util.toRoku(m.primary))
+    accent = Util.rokuColor(m.brand.accent, "0xF2A33AFF")
+    textColor = Util.rokuColor(style.colorHex, "0xFFFFFFFF")
+    timeSize = Int(320 * style.titleScale)
+    hasTitle = not Util.isBlank(slide.title)
+    titleH = 0
+    if hasTitle then titleH = 64
+    timeH = Int(timeSize * 1.25)
+    y = (m.H - titleH - timeH) / 2
+    if hasTitle then
+        addShadowed({ text: UCase(slide.title), x: 96, y: y, w: m.W - 192, h: titleH, size: 44, weight: "bold", color: accent, align: "center", vAlign: "center" }, style.shadow)
+    end if
+    m.cd.labels = addShadowed({ text: Countdown.format(0), x: 96, y: y + titleH, w: m.W - 192, h: timeH, font: "julius", size: timeSize, color: textColor, align: "center", vAlign: "center" }, style.shadow)
+    updateCountdown()
+    m.tick.control = "start"
+    if spec.audio <> invalid and not plan.alreadyPassed then startCountdownAudio(spec)
+end sub
+
+' Text with an optional shadow or outline made of black copies underneath. Returns the labels that show the changing text.
+function addShadowed(props as object, shadow as string) as object
+    offsets = []
+    if shadow = "shadow" then
+        offsets = [[0, 4]]
+    else if shadow = "outline" then
+        offsets = [[-3, 0], [3, 0], [0, -3], [0, 3]]
+    end if
+    labels = []
+    for each o in offsets
+        p = {}
+        p.append(props)
+        p.x = props.x + o[0]
+        p.y = props.y + o[1]
+        p.color = "0x000000AA"
+        if shadow = "outline" then p.color = "0x000000FF"
+        labels.push(Ui.label(m.content, p))
+    end for
+    labels.push(Ui.label(m.content, props))
+    return labels
+end function
+
+sub updateCountdown()
+    if m.cd = invalid then return
+    remainingMs = Device.msUntil(m.cd.plan.endEpoch)
+    if remainingMs < 0 then remainingMs = 0
+    text = Countdown.format(remainingMs)
+    if text <> m.cd.last then
+        m.cd.last = text
+        for each l in m.cd.labels
+            l.text = text
+        end for
+    end if
+    if remainingMs <= 0 and m.cd.done = false then
+        m.cd.done = true
+        m.tick.control = "stop"
+        stopAudio()
+        ' At zero: move on, or hold on 0:00 until Next. (A time that had already passed shows 0:00 for a moment first.)
+        if not m.cd.plan.hold then
+            if m.cd.plan.alreadyPassed then
+                m.zeroTimer.duration = 2
+            else
+                m.zeroTimer.duration = 0.05
+            end if
+            m.zeroTimer.control = "start"
+        end if
+    end if
+end sub
+
+sub onTick()
+    if m.blank then return
+    updateCountdown()
+end sub
+
+' ---------- text slides ----------
+
+sub buildText(slide as object, style as object)
+    W = m.W
+    H = m.H
+    hasTitle = not Util.isBlank(slide.title) and slide.layout <> "body"
+    hasBody = not Util.isBlank(slide.body) and slide.layout <> "title"
+    padH = W * (style.marginPct / 100)
+    padV = H * (style.marginPct / 100)
+    color = Util.rokuColor(style.colorHex, "0xFFFFFFFF")
+    align = "left"
+    if style.center then align = "center"
+    if slide.layout = "lower_third" then
+        titleH = H * 0.14
+        bodyH = H * 0.12
+        inner = 0
+        if hasTitle then inner = inner + titleH
+        if hasBody then inner = inner + bodyH
+        barH = inner + 64
+        barPad = padH
+        if barPad < 48 then barPad = 48
+        y0 = H - barH
+        Ui.rect(m.content, 0, y0, W, barH, "0x00000073")
+        y = y0 + 32
+        if hasTitle then
+            fitText(slide.title, barPad, y, W - 2 * barPad, titleH, 40, Int(140 * style.titleScale), 1, style.titleFont, "black", color, align, "bottom", style.shadow)
+            y = y + titleH
+        end if
+        if hasBody then
+            fitText(slide.body, barPad, y, W - 2 * barPad, bodyH, 32, Int(80 * style.bodyScale), 2, "lato", "regular", color, align, "top", style.shadow)
+        end if
+        return
+    end if
+    scale = 1 - 2 * style.marginPct / 100
+    if scale < 0.6 then scale = 0.6
+    titleBox = 0
+    bodyBox = 0
+    if hasTitle then
+        f = 0.6
+        if hasBody then f = 0.34
+        titleBox = H * f * scale
+    end if
+    if hasBody then
+        f = 0.7
+        if hasTitle then f = 0.38
+        bodyBox = H * f * scale
+    end if
+    spacer = 0
+    if hasTitle and hasBody then spacer = H * 0.02
+    block = titleBox + spacer + bodyBox
+    y = (H - block) / 2
+    if style.position = "top" then
+        y = padV
+    else if style.position = "lower" then
+        y = H - padV - block
+    end if
+    innerW = W - 2 * padH
+    if hasTitle then
+        va = "bottom"
+        fitText(slide.title, padH, y, innerW, titleBox, 56, Int(300 * style.titleScale), 3, style.titleFont, "black", color, align, va, style.shadow)
+        y = y + titleBox + spacer
+    end if
+    if hasBody then
+        va = "center"
+        if hasTitle then va = "top"
+        fitText(slide.body, padH, y, innerW, bodyBox, 40, Int(144 * style.bodyScale), 12, "lato", "regular", color, align, va, style.shadow)
+    end if
+end sub
+
+sub fitText(text as string, x as float, y as float, w as float, h as float, minSize as integer, maxSize as integer, maxLines as integer, fontName as string, weight as string, color as string, align as string, vAlign as string, shadow as string)
+    f = m.content.createChild("FitLabel")
+    f.translation = [x, y]
+    f.config = { text: text, w: w, h: h, minSize: minSize, maxSize: maxSize, maxLines: maxLines, font: fontName, weight: weight, color: color, align: align, vAlign: vAlign, shadow: shadow, lineSpacing: 0 }
+end sub
+
+sub buildLyric(slide as object, style as object)
+    W = m.W
+    H = m.H
+    if not m.isDeck then Ui.rect(m.content, 0, 0, W, H, Util.toRoku(m.primary))
+    padH = W * (style.marginPct / 100)
+    padV = H * (style.marginPct / 100)
+    if not m.isDeck then
+        padH = 96
+        padV = 54
+    end if
+    color = Util.rokuColor(style.colorHex, "0xFFFFFFFF")
+    align = "left"
+    if style.center then align = "center"
+    boxH = H * 0.62
+    hasLabel = style.showLabels and not Util.isBlank(slide.label)
+    labelH = 0
+    if hasLabel then labelH = 36 + 24
+    block = labelH + boxH
+    y = (H - block) / 2
+    if style.position = "top" then
+        y = padV
+    else if style.position = "lower" then
+        y = H - padV - block
+    end if
+    if hasLabel then
+        Ui.label(m.content, { text: UCase(slide.label), x: padH, y: y, w: W - 2 * padH, h: 36, size: 36, weight: "bold", color: Util.rokuColor(style.colorHex, "0xFFFFFFFF", 0.7), align: align, vAlign: "center" })
+        y = y + labelH
+    end if
+    maxSize = Int(172 * style.bodyScale)
+    if not m.isDeck then maxSize = 96
+    fitText(slide.text, padH, y, W - 2 * padH, boxH, 48, maxSize, 8, "lato", "bold", color, align, "center", style.shadow)
+    Ui.label(m.content, { text: slide.song + "  " + Chr(183) + "  " + slide.number.toStr() + "/" + slide.count.toStr(), x: 96, y: H - 54 - 36, w: W - 192, h: 36, size: 24, color: Util.rokuColor(style.colorHex, "0xFFFFFFFF", 0.6), align: "right", vAlign: "bottom" })
+end sub
+
+sub buildSongTitle(slide as object, style as object)
+    W = m.W
+    H = m.H
+    if not m.isDeck then Ui.rect(m.content, 0, 0, W, H, Util.toRoku(m.primary))
+    color = Util.rokuColor(style.colorHex, "0xFFFFFFFF")
+    padH = W * 0.08
+    padV = H * 0.08
+    titleBox = H * 0.40
+    hasAuthors = not Util.isBlank(slide.authors)
+    footerParts = []
+    if not Util.isBlank(slide.ccli) then footerParts.push("CCLI Song # " + slide.ccli)
+    if not Util.isBlank(slide.copyright) then footerParts.push(slide.copyright)
+    footer = ""
+    for i = 0 to footerParts.count() - 1
+        if i > 0 then footer = footer + "  " + Chr(183) + "  "
+        footer = footer + footerParts[i]
+    end for
+    block = titleBox
+    if hasAuthors then block = block + 8 + 60
+    if footer <> "" then block = block + 48 + 60
+    y = (H - block) / 2
+    if y < padV then y = padV
+    fitText(slide.title, padH, y, W - 2 * padH, titleBox, 56, Int(280 * style.titleScale), 3, style.titleFont, "black", color, "center", "bottom", style.shadow)
+    y = y + titleBox
+    if hasAuthors then
+        Ui.label(m.content, { text: slide.authors, x: padH, y: y + 8, w: W - 2 * padH, h: 120, size: 52, color: Util.rokuColor(style.colorHex, "0xFFFFFFFF", 0.85), align: "center", wrap: true, maxLines: 2 })
+        y = y + 8 + 60
+    end if
+    if footer <> "" then
+        Ui.label(m.content, { text: footer, x: padH, y: y + 48, w: W - 2 * padH, h: 120, size: 28, color: Util.rokuColor(style.colorHex, "0xFFFFFFFF", 0.6), align: "center", wrap: true, maxLines: 2 })
+    end if
+end sub
+
+' A sign built in the dashboard: coloured background, title, optional subtext, optional church logo. Text scales to fit.
+sub buildSign(slide as object)
+    W = m.W
+    H = m.H
+    bgc = Util.parseColor(Util.getStr(slide, "background", ""))
+    if bgc = invalid then bgc = m.primary
+    fgc = Util.textColorOn(bgc)
+    Ui.rect(m.content, 0, 0, W, H, Util.toRoku(bgc))
+    center = Util.getStr(slide, "align", "center") <> "left"
+    align = "left"
+    if center then align = "center"
+    padX = W * 0.07
+    pad = H * 0.08
+    innerW = W - 2 * padX
+    y = pad
+    if Util.getBool(slide, "logo", false) then
+        logo = Model.logoOn(m.brand, bgc)
+        if logo <> invalid then
+            Ui.poster(m.content, padX, y, innerW, H * 0.14, Media.uri(logo), "scaleToFit")
+            y = y + H * 0.14
+        end if
+    end if
+    hasSub = not Util.isBlank(slide.subtext)
+    titleBox = H * 0.62
+    if hasSub then titleBox = H * 0.42
+    subBox = 0
+    if hasSub then subBox = H * 0.24 + 12
+    remaining = H - pad - y
+    block = titleBox + subBox
+    y = y + (remaining - block) / 2
+    fitText(slide.title, padX, y, innerW, titleBox, 56, 320, 3, "lato", "black", Util.toRoku(fgc), align, "center", "none")
+    if hasSub then
+        fitText(slide.subtext, padX, y + titleBox + 12, innerW, H * 0.24, 36, 144, 4, "lato", "regular", Util.toRoku(fgc, 0.9), align, "top", "none")
+    end if
+end sub
+
+sub renderLogo(style as object)
+    m.logo.visible = false
+    if not m.isDeck then return
+    logoCfg = Util.getObj(m.theme, "logo")
+    if logoCfg = invalid or not Util.getBool(logoCfg, "show", false) then return
+    textColor = Util.parseColor(style.colorHex)
+    if textColor = invalid then textColor = { r: 255, g: 255, b: 255, a: 255 }
+    ' light text means a dark background, so use the logo made for dark backgrounds
+    probe = { r: 255, g: 255, b: 255, a: 255 }
+    if Util.isLight(textColor) then probe = { r: 0, g: 0, b: 0, a: 255 }
+    url = Model.logoOn(m.brand, probe)
+    if url = invalid then return
+    w = m.W * 0.14
+    h = w / 2
+    where = Util.getStr(logoCfg, "position", "bottom_left")
+    x = 80
+    y = m.H - 48 - h
+    if where = "bottom_right" then
+        x = m.W - 80 - w
+    else if where = "top_left" then
+        y = 48
+    else if where = "top_right" then
+        x = m.W - 80 - w
+        y = 48
+    end if
+    m.logo.translation = [x, y]
+    m.logo.width = w
+    m.logo.height = h
+    m.logo.loadDisplayMode = "scaleToFit"
+    m.logo.uri = Media.uri(url)
+    m.logo.visible = true
+end sub
+
+' ---------- remote control ----------
+
+sub reportStatus()
+    if m.report = invalid then return
+    slide = m.slides[m.index]
+    label = Model.slideLabel(slide)
+    if m.isDeck then label = Model.deckListLabel(slide)
+    state = "playing"
+    if m.blank then state = "blank"
+    m.top.status = {
+        module: Util.getStr(m.report, "module", ""),
+        state: state,
+        title: Util.getStr(m.report, "title", ""),
+        label: label,
+        index: m.index,
+        count: m.slides.count(),
+        outline: m.outline,
+        refKind: Util.getStrOrInvalid(m.report, "refKind"),
+        refId: Util.getStrOrInvalid(m.report, "refId")
+    }
+end sub
+
+sub onCommands()
+    list = m.top.commands
+    if not Util.isArr(list) or not m.built or m.slides.count() = 0 then return
+    for each c in list
+        t = c.type
+        if t = "next" then
+            goNext()
+        else if t = "previous" then
+            goPrevious()
+        else if t = "jump" then
+            jumpTo(c.index)
+        else if t = "blank" then
+            if c.on = invalid then
+                setBlank(not m.blank)
+            else
+                setBlank(c.on)
+            end if
+        else if t = "stop" then
+            finish("exit")
+            return
+        end if
+    end for
+end sub
+
+sub setBlank(on as boolean)
+    m.blank = on
+    m.blankRect.visible = on
+    if on then
+        if m.videoKind = "fg" then m.video.control = "pause"
+        if m.audio.state = "playing" then m.audio.control = "pause"
+    else
+        if m.videoKind = "fg" and not m.paused then m.video.control = "resume"
+        if m.audio.state = "paused" then m.audio.control = "resume"
+    end if
+    reportStatus()
+end sub
+
+' ---------- slide list (decks) ----------
+
+sub openList()
+    m.showList = true
+    m.listSel = m.index
+    drawList()
+    m.list.visible = true
+end sub
+
+sub drawList()
+    Ui.clear(m.list)
+    W = m.W
+    H = m.H
+    Ui.rect(m.list, 0, 0, W, H, "0x000000D1")
+    boxW = W * 0.6
+    if boxW > 1280 then boxW = 1280
+    x = (W - boxW) / 2
+    rows = 9
+    rowH = 64
+    y = (H - (rows * rowH + 140)) / 2
+    Ui.label(m.list, { text: "Jump to a slide", x: x, y: y, w: boxW, h: 60, size: 44, weight: "bold", color: "0xFFFFFFFF", vAlign: "center" })
+    y = y + 72
+    first = m.listSel - 4
+    if first < 0 then first = 0
+    if first > m.slides.count() - rows then first = m.slides.count() - rows
+    if first < 0 then first = 0
+    accent = Util.rokuColor(m.brand.accent, "0xF2A33AFF")
+    primary = Util.toRoku(m.primary)
+    for i = first to first + rows - 1
+        if i < m.slides.count() then
+            text = (i + 1).toStr() + ".  " + m.outline[i]
+            if i = m.index then text = text + "     < now"
+            fill = primary
+            if i = m.listSel then fill = accent
+            Ui.rect(m.list, x, y, boxW, rowH - 8, fill)
+            Ui.label(m.list, { text: text, x: x + 24, y: y, w: boxW - 48, h: rowH - 8, size: 32, weight: "bold", color: "0xFFFFFFFF", vAlign: "center", maxLines: 1 })
+            y = y + rowH
+        end if
+    end for
+    Ui.label(m.list, { text: "OK to go  -  Back to close", x: x, y: y + 12, w: boxW, h: 44, size: 26, color: "0xFFFFFFB3" })
+end sub
+
+' ---------- keys ----------
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+    if m.slides = invalid or m.slides.count() = 0 then
+        if key = "back" then
+            finish("exit")
+            return true
+        end if
+        return false
+    end if
+    if m.showList then
+        if key = "up" then
+            if m.listSel > 0 then m.listSel = m.listSel - 1
+            drawList()
+        else if key = "down" then
+            if m.listSel < m.slides.count() - 1 then m.listSel = m.listSel + 1
+            drawList()
+        else if key = "OK" then
+            jumpTo(m.listSel)
+        else if key = "back" then
+            m.showList = false
+            m.list.visible = false
+        else
+            return false
+        end if
+        return true
+    end if
+    if key = "right" or key = "fwd" then
+        goNext()
+        return true
+    else if key = "left" or key = "rev" then
+        goPrevious()
+        return true
+    else if key = "back" then
+        finish("exit")
+        return true
+    else if key = "OK" then
+        if m.isDeck then
+            openList()
+        else
+            togglePause()
+        end if
+        return true
+    else if key = "play" then
+        if m.isDeck then
+            setBlank(not m.blank)
+        else
+            togglePause()
+        end if
+        return true
+    end if
+    return false
+end function
+
+sub togglePause()
+    if m.videoKind <> "fg" then return
+    m.paused = not m.paused
+    if m.paused then
+        m.video.control = "pause"
+    else
+        m.video.control = "resume"
+    end if
+end sub

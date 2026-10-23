@@ -1,0 +1,372 @@
+' Calendar maths and a compact IANA time zone table.
+'
+' BrightScript has no time zone database, so the site's zone ("America/Toronto", from device_state.timezone) is
+' resolved here from rules for the zones churches are likely to use. A zone that is not in the table falls back to the
+' Roku's own time zone setting (see offsetMinutes), which is correct when the TV's Roku setting matches the site.
+' All times are epoch SECONDS (Integer is safe on Roku until 2038) unless a name says otherwise.
+
+import "pkg:/source/lib/Util.bs"
+
+namespace TimeUtil
+
+    ' Days since 1970-01-01 for a civil date (Howard Hinnant's algorithm).
+    function daysFromCivil(y as integer, mo as integer, d as integer) as integer
+        if mo <= 2 then y = y - 1
+        if y >= 0 then
+            era = y \ 400
+        else
+            era = (y - 399) \ 400
+        end if
+        yoe = y - era * 400
+        if mo > 2 then
+            mp = mo - 3
+        else
+            mp = mo + 9
+        end if
+        doy = (153 * mp + 2) \ 5 + d - 1
+        doe = yoe * 365 + yoe \ 4 - yoe \ 100 + doy
+        return era * 146097 + doe - 719468
+    end function
+
+    ' {year, month, day} for a day count since 1970-01-01.
+    function civilFromDays(z as integer) as object
+        z = z + 719468
+        if z >= 0 then
+            era = z \ 146097
+        else
+            era = (z - 146096) \ 146097
+        end if
+        doe = z - era * 146097
+        yoe = (doe - doe \ 1460 + doe \ 36524 - doe \ 146096) \ 365
+        y = yoe + era * 400
+        doy = doe - (365 * yoe + yoe \ 4 - yoe \ 100)
+        mp = (5 * doy + 2) \ 153
+        d = doy - (153 * mp + 2) \ 5 + 1
+        if mp < 10 then
+            m = mp + 3
+        else
+            m = mp - 9
+        end if
+        if m <= 2 then y = y + 1
+        return { year: y, month: m, day: d }
+    end function
+
+    ' 0 = Sunday ... 6 = Saturday, for a day count since 1970-01-01 (a Thursday).
+    function weekdayFromDays(days as integer) as integer
+        w = (days + 4) mod 7
+        if w < 0 then w = w + 7
+        return w
+    end function
+
+    function floorDiv(a as integer, b as integer) as integer
+        q = a \ b
+        if (a mod b) <> 0 and ((a < 0) <> (b < 0)) then q = q - 1
+        return q
+    end function
+
+    ' Epoch seconds for a UTC civil date and time.
+    function epochFromParts(y as integer, mo as integer, d as integer, h as integer, mi as integer, s as integer) as integer
+        return daysFromCivil(y, mo, d) * 86400 + h * 3600 + mi * 60 + s
+    end function
+
+    function digitsAt(s as string, at as integer, count as integer) as integer
+        v = 0
+        for i = 0 to count - 1
+            c = Asc(Mid(s, at + i, 1))
+            if c < 48 or c > 57 then return -1
+            v = v * 10 + (c - 48)
+        end for
+        return v
+    end function
+
+    ' Parses an ISO 8601 timestamp as sent by Postgres/PostgREST ("2026-10-22T14:00:00+00:00", "...Z", with or
+    ' without fractional seconds) into epoch seconds, or invalid. A missing offset is read as UTC.
+    function parseIso(text as dynamic) as dynamic
+        if not Util.isStr(text) then return invalid
+        s = Util.trim(text)
+        if Len(s) < 19 then return invalid
+        y = digitsAt(s, 1, 4)
+        mo = digitsAt(s, 6, 2)
+        d = digitsAt(s, 9, 2)
+        h = digitsAt(s, 12, 2)
+        mi = digitsAt(s, 15, 2)
+        sec = digitsAt(s, 18, 2)
+        if y < 0 or mo < 1 or mo > 12 or d < 1 or d > 31 or h < 0 or h > 24 or mi < 0 or mi > 59 or sec < 0 or sec > 60 then return invalid
+        sep = Mid(s, 11, 1)
+        if sep <> "T" and sep <> " " and sep <> "t" then return invalid
+        p = 20
+        n = Len(s)
+        if p <= n and Mid(s, p, 1) = "." then
+            p++
+            while p <= n and Asc(Mid(s, p, 1)) >= 48 and Asc(Mid(s, p, 1)) <= 57
+                p++
+            end while
+        end if
+        offset = 0
+        if p <= n then
+            c = Mid(s, p, 1)
+            if c = "+" or c = "-" then
+                oh = digitsAt(s, p + 1, 2)
+                if oh < 0 then return invalid
+                om = 0
+                q = p + 3
+                if q <= n and Mid(s, q, 1) = ":" then q++
+                if q + 1 <= n then
+                    om = digitsAt(s, q, 2)
+                    if om < 0 then om = 0
+                end if
+                offset = (oh * 3600 + om * 60)
+                if c = "-" then offset = -offset
+            else if c <> "Z" and c <> "z" then
+                return invalid
+            end if
+        end if
+        return epochFromParts(y, mo, d, h, mi, sec) - offset
+    end function
+
+    ' Local parts of an instant for a UTC offset in minutes.
+    function localParts(epoch as integer, offsetMin as integer) as object
+        local = epoch + offsetMin * 60
+        days = floorDiv(local, 86400)
+        secs = local - days * 86400
+        civil = civilFromDays(days)
+        return {
+            year: civil.year, month: civil.month, day: civil.day,
+            hour: secs \ 3600, minute: (secs mod 3600) \ 60, second: secs mod 60,
+            weekday: weekdayFromDays(days),
+            days: days,
+            secondsOfDay: secs
+        }
+    end function
+
+    ' Day number (since 1970) of the n-th (1-based) given weekday of a month; n = 0 means the LAST one.
+    function nthWeekday(year as integer, month as integer, weekday as integer, n as integer) as integer
+        if n > 0 then
+            first = daysFromCivil(year, month, 1)
+            delta = (weekday - weekdayFromDays(first) + 7) mod 7
+            return first + delta + (n - 1) * 7
+        end if
+        if month = 12 then
+            nextFirst = daysFromCivil(year + 1, 1, 1)
+        else
+            nextFirst = daysFromCivil(year, month + 1, 1)
+        end if
+        last = nextFirst - 1
+        delta = (weekdayFromDays(last) - weekday + 7) mod 7
+        return last - delta
+    end function
+
+    ' Zone table: standard offset in minutes and the daylight saving rule family.
+    ' Rules: "none", "us" (2nd Sun Mar - 1st Sun Nov, 02:00 local), "eu" (last Sun Mar - last Sun Oct, 01:00 UTC),
+    ' "au" (1st Sun Oct - 1st Sun Apr, 02:00 standard), "nz" (last Sun Sep - 1st Sun Apr, 02:00 standard).
+    function zoneTable() as object
+        if m.tzTable <> invalid then return m.tzTable
+        m.tzTable = buildZoneTable()
+        return m.tzTable
+    end function
+
+    function zoneUs(std as integer) as object
+        return { std: std, rule: "us" }
+    end function
+
+    function zoneEu(std as integer) as object
+        return { std: std, rule: "eu" }
+    end function
+
+    function zoneNone(std as integer) as object
+        return { std: std, rule: "none" }
+    end function
+
+    function buildZoneTable() as object
+        t = {}
+        us = zoneUs
+        eu = zoneEu
+        no = zoneNone
+        ' North America
+        t["America/Toronto"] = us(-300)
+        t["America/Montreal"] = us(-300)
+        t["America/Nipigon"] = us(-300)
+        t["America/Detroit"] = us(-300)
+        t["America/New_York"] = us(-300)
+        t["America/Chicago"] = us(-360)
+        t["America/Winnipeg"] = us(-360)
+        t["America/Denver"] = us(-420)
+        t["America/Edmonton"] = us(-420)
+        t["America/Boise"] = us(-420)
+        t["America/Los_Angeles"] = us(-480)
+        t["America/Vancouver"] = us(-480)
+        t["America/Anchorage"] = us(-540)
+        t["America/Halifax"] = us(-240)
+        t["America/Moncton"] = us(-240)
+        t["America/St_Johns"] = us(-210)
+        t["America/Phoenix"] = no(-420)
+        t["America/Regina"] = no(-360)
+        t["America/Puerto_Rico"] = no(-240)
+        t["America/Mexico_City"] = no(-360)
+        t["America/Bogota"] = no(-300)
+        t["America/Lima"] = no(-300)
+        t["America/Sao_Paulo"] = no(-180)
+        t["America/Argentina/Buenos_Aires"] = no(-180)
+        t["America/Jamaica"] = no(-300)
+        t["America/Panama"] = no(-300)
+        t["Pacific/Honolulu"] = no(-600)
+        ' Europe
+        for each z in ["Europe/London", "Europe/Dublin", "Europe/Lisbon"]
+            t[z] = eu(0)
+        end for
+        for each z in ["Europe/Paris", "Europe/Berlin", "Europe/Madrid", "Europe/Rome", "Europe/Amsterdam", "Europe/Brussels", "Europe/Zurich", "Europe/Vienna", "Europe/Stockholm", "Europe/Oslo", "Europe/Copenhagen", "Europe/Warsaw", "Europe/Prague", "Europe/Budapest"]
+            t[z] = eu(60)
+        end for
+        for each z in ["Europe/Athens", "Europe/Helsinki", "Europe/Kiev", "Europe/Kyiv", "Europe/Bucharest", "Europe/Sofia"]
+            t[z] = eu(120)
+        end for
+        t["Europe/Moscow"] = no(180)
+        t["Europe/Istanbul"] = no(180)
+        ' Africa and Asia (no daylight saving)
+        t["Africa/Johannesburg"] = no(120)
+        t["Africa/Cairo"] = no(120)
+        t["Africa/Lagos"] = no(60)
+        t["Africa/Nairobi"] = no(180)
+        t["Africa/Accra"] = no(0)
+        t["Asia/Dubai"] = no(240)
+        t["Asia/Karachi"] = no(300)
+        t["Asia/Kolkata"] = no(330)
+        t["Asia/Calcutta"] = no(330)
+        t["Asia/Dhaka"] = no(360)
+        t["Asia/Bangkok"] = no(420)
+        t["Asia/Jakarta"] = no(420)
+        t["Asia/Singapore"] = no(480)
+        t["Asia/Hong_Kong"] = no(480)
+        t["Asia/Manila"] = no(480)
+        t["Asia/Shanghai"] = no(480)
+        t["Asia/Seoul"] = no(540)
+        t["Asia/Tokyo"] = no(540)
+        t["Australia/Perth"] = no(480)
+        t["Australia/Brisbane"] = no(600)
+        t["Australia/Darwin"] = no(570)
+        ' Oceania with daylight saving
+        t["Australia/Sydney"] = { std: 600, rule: "au" }
+        t["Australia/Melbourne"] = { std: 600, rule: "au" }
+        t["Australia/Hobart"] = { std: 600, rule: "au" }
+        t["Australia/Canberra"] = { std: 600, rule: "au" }
+        t["Australia/Adelaide"] = { std: 570, rule: "au" }
+        t["Pacific/Auckland"] = { std: 720, rule: "nz" }
+        t["UTC"] = no(0)
+        t["Etc/UTC"] = no(0)
+        t["GMT"] = no(0)
+        t["Etc/GMT"] = no(0)
+        return t
+    end function
+
+    function isKnownZone(zone as dynamic) as boolean
+        if not Util.isStr(zone) then return false
+        return zoneTable()[zone] <> invalid
+    end function
+
+    ' Is daylight saving in force at this UTC instant for a rule family?
+    function isDst(rule as string, std as integer, epoch as integer) as boolean
+        if rule = "none" then return false
+        year = localParts(epoch, std).year
+        if rule = "us" then
+            ' 02:00 local standard time on the second Sunday of March, until 02:00 local daylight time on the first Sunday of November
+            startUtc = nthWeekday(year, 3, 0, 2) * 86400 + 2 * 3600 - std * 60
+            endUtc = nthWeekday(year, 11, 0, 1) * 86400 + 2 * 3600 - (std + 60) * 60
+            return epoch >= startUtc and epoch < endUtc
+        else if rule = "eu" then
+            startUtc = nthWeekday(year, 3, 0, 0) * 86400 + 3600
+            endUtc = nthWeekday(year, 10, 0, 0) * 86400 + 3600
+            return epoch >= startUtc and epoch < endUtc
+        else if rule = "au" then
+            ' southern hemisphere: DST spans New Year. Ends 03:00 daylight (= 02:00 standard) first Sunday of April, starts 02:00 standard first Sunday of October.
+            endUtc = nthWeekday(year, 4, 0, 1) * 86400 + 2 * 3600 - std * 60
+            startUtc = nthWeekday(year, 10, 0, 1) * 86400 + 2 * 3600 - std * 60
+            return epoch < endUtc or epoch >= startUtc
+        else if rule = "nz" then
+            endUtc = nthWeekday(year, 4, 0, 1) * 86400 + 2 * 3600 - std * 60
+            startUtc = nthWeekday(year, 9, 0, 0) * 86400 + 2 * 3600 - std * 60
+            return epoch < endUtc or epoch >= startUtc
+        end if
+        return false
+    end function
+
+    ' UTC offset in minutes for a zone at an instant, or invalid when the zone is not in the table.
+    function zoneOffsetMinutes(zone as dynamic, epoch as integer) as dynamic
+        if not Util.isStr(zone) then return invalid
+        entry = zoneTable()[zone]
+        if entry = invalid then return invalid
+        ' British Columbia and Alberta stay on daylight time permanently from the 2026 spring change (tz database 2026c).
+        if zone = "America/Vancouver" and epoch >= 1772964000 then return -420
+        if zone = "America/Edmonton" and epoch >= 1772960400 then return -360
+        if isDst(entry.rule, entry.std, epoch) then return entry.std + 60
+        return entry.std
+    end function
+
+    ' Offset to use: the zone's rule when known, else [deviceOffset] (minutes, from the Roku's own time zone setting).
+    function offsetMinutes(zone as dynamic, epoch as integer, deviceOffset as integer) as integer
+        o = zoneOffsetMinutes(zone, epoch)
+        if o = invalid then return deviceOffset
+        return o
+    end function
+
+    ' Epoch seconds of a wall-clock time ("HH:MM", optional ":SS") on the same local day as [nowEpoch] in the zone.
+    ' Daylight-saving safe: a time that falls in the skipped hour moves forward, a repeated hour takes the earlier one
+    ' (what java.time does). Returns invalid when the text is not a time.
+    function todayAtLocal(clock as dynamic, nowEpoch as integer, zone as dynamic, deviceOffset as integer) as dynamic
+        if not Util.isStr(clock) then return invalid
+        c = Util.trim(clock)
+        if Len(c) < 4 then return invalid
+        colon = Instr(1, c, ":")
+        if colon < 2 then return invalid
+        hStr = Left(c, colon - 1)
+        rest = Mid(c, colon + 1)
+        mStr = Left(rest, 2)
+        if Len(mStr) < 1 then return invalid
+        if not allDigits(hStr) or not allDigits(mStr) then return invalid
+        h = digitsAt(hStr, 1, Len(hStr))
+        mi = digitsAt(mStr, 1, Len(mStr))
+        if h < 0 or h > 23 or mi < 0 or mi > 59 then return invalid
+        sec = 0
+        if Len(rest) >= 5 and Mid(rest, 3, 1) = ":" then
+            sStr = Mid(rest, 4, 2)
+            if allDigits(sStr) then sec = digitsAt(sStr, 1, Len(sStr))
+        end if
+        offNow = offsetMinutes(zone, nowEpoch, deviceOffset)
+        day = localParts(nowEpoch, offNow).days
+        target = day * 86400 + h * 3600 + mi * 60 + sec ' local wall clock, expressed as if it were UTC
+        oEarly = offsetMinutes(zone, target - 86400, deviceOffset)
+        oLate = offsetMinutes(zone, target + 86400, deviceOffset)
+        u1 = target - oEarly * 60
+        if oEarly = oLate then return u1
+        u2 = target - oLate * 60
+        ok1 = offsetMinutes(zone, u1, deviceOffset) = oEarly
+        ok2 = offsetMinutes(zone, u2, deviceOffset) = oLate
+        if ok1 and ok2 then
+            if u1 < u2 then return u1
+            return u2
+        end if
+        if ok2 then return u2
+        return u1
+    end function
+
+    ' "SUN OCT 25 " + middle dot + " 9:00 AM" style label for "UP NEXT" (shown in the site's local time).
+    function upcomingLabel(epoch as integer, offsetMin as integer) as string
+        p = localParts(epoch, offsetMin)
+        days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        h12 = p.hour mod 12
+        if h12 = 0 then h12 = 12
+        ampm = "AM"
+        if p.hour >= 12 then ampm = "PM"
+        return UCase(days[p.weekday] + " " + months[p.month - 1] + " " + p.day.toStr() + " " + Chr(183) + " " + h12.toStr() + ":" + Util.padLeft(p.minute.toStr(), 2, "0") + " " + ampm)
+    end function
+
+    function allDigits(s as string) as boolean
+        if Len(s) = 0 then return false
+        for i = 1 to Len(s)
+            c = Asc(Mid(s, i, 1))
+            if c < 48 or c > 57 then return false
+        end for
+        return true
+    end function
+
+end namespace

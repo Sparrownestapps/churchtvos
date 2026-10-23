@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Full-screen logo on the church's primary colour (shown briefly when the TV starts or switches module). -->
+<component name="SplashView" extends="Group">
+    <interface>
+        <field id="config" type="assocarray" onChange="build" />
+    </interface>
+    <script type="text/brightscript" uri="SplashView.bs" />
+</component>

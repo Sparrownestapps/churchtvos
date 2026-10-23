@@ -1,0 +1,77 @@
+' HTTP for Task threads only (never call these from the render thread: they block).
+' Certificates: every request sets Roku's CA bundle and initialises client certificates, or HTTPS fails on device.
+import "pkg:/source/lib/Config.bs"
+
+namespace Http
+
+    function newTransfer(url as string, port as object) as object
+        req = CreateObject("roUrlTransfer")
+        req.SetMessagePort(port)
+        req.SetUrl(url)
+        req.SetCertificatesFile("common:/certs/ca-bundle.crt")
+        req.InitClientCertificates()
+        req.EnableEncodings(true)
+        return req
+    end function
+
+    ' POST a JSON body to a Supabase RPC function. Returns { ok, code, body, error }; body is the response text.
+    ' Never blocks longer than timeoutMs.
+    function rpc(name as string, params as object, timeoutMs = 20000 as integer) as object
+        port = CreateObject("roMessagePort")
+        req = newTransfer(Config.SUPABASE_URL + "/rest/v1/rpc/" + name, port)
+        req.AddHeader("apikey", Config.SUPABASE_KEY)
+        req.AddHeader("Content-Type", "application/json")
+        req.RetainBodyOnError(true)
+        if not req.AsyncPostFromString(FormatJson(params)) then
+            return { ok: false, code: -1, body: "", error: "Could not start the request" }
+        end if
+        msg = wait(timeoutMs, port)
+        if msg = invalid then
+            req.AsyncCancel()
+            return { ok: false, code: -1, body: "", error: "Timed out" }
+        end if
+        if type(msg) <> "roUrlEvent" then
+            return { ok: false, code: -1, body: "", error: "Unexpected event" }
+        end if
+        code = msg.GetResponseCode()
+        body = msg.GetString()
+        if code >= 200 and code < 300 then return { ok: true, code: code, body: body, error: "" }
+        reason = msg.GetFailureReason()
+        err = "Server error " + code.toStr() + ": " + body
+        if code < 0 then err = "Network error: " + reason
+        return { ok: false, code: code, body: body, error: err }
+    end function
+
+    ' Downloads a URL to a local file. Cancels when no bytes arrive for stallMs. Returns { ok, error }.
+    function download(url as string, target as string, stallMs = 60000 as integer) as object
+        port = CreateObject("roMessagePort")
+        req = newTransfer(url, port)
+        fs = CreateObject("roFileSystem")
+        if fs.Exists(target) then fs.Delete(target)
+        if not req.AsyncGetToFile(target) then return { ok: false, error: "Could not start the download" }
+        clock = CreateObject("roTimespan")
+        lastSize = 0
+        while true
+            msg = wait(2000, port)
+            if type(msg) = "roUrlEvent" then
+                code = msg.GetResponseCode()
+                if code >= 200 and code < 300 then return { ok: true, error: "" }
+                if fs.Exists(target) then fs.Delete(target)
+                return { ok: false, error: "Download failed (HTTP " + code.toStr() + ")" }
+            end if
+            st = fs.Stat(target)
+            size = 0
+            if st <> invalid then size = st.size
+            if size > lastSize then
+                lastSize = size
+                clock.Mark()
+            else if clock.TotalMilliseconds() > stallMs then
+                req.AsyncCancel()
+                if fs.Exists(target) then fs.Delete(target)
+                return { ok: false, error: "Download stalled" }
+            end if
+        end while
+        return { ok: false, error: "Download failed" }
+    end function
+
+end namespace

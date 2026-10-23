@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- First-run screen: the 6-character code and a QR code that opens the dashboard's /pair page. -->
+<component name="PairingView" extends="Group">
+    <interface>
+        <!-- { code, offline, brand, portrait, w, h } -->
+        <field id="config" type="assocarray" onChange="build" />
+        <!-- "settings" -->
+        <field id="action" type="string" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="PairingView.bs" />
+</component>

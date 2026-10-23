@@ -1,0 +1,71 @@
+import "pkg:/source/lib/Config.bs"
+import "pkg:/source/lib/Util.bs"
+import "pkg:/source/lib/CacheLogic.bs"
+import "pkg:/components/lib/Media.bs"
+import "pkg:/components/lib/Http.bs"
+
+sub init()
+    m.top.functionName = "execute"
+end sub
+
+sub execute()
+    port = CreateObject("roMessagePort")
+    m.top.observeField("urls", port)
+    Media.ensureDir()
+    list = m.top.urls
+    if Util.isArr(list) and list.count() > 0 then
+        process(list)
+    end if
+    while true
+        msg = wait(0, port)
+        if type(msg) = "roSGNodeEvent" and msg.getField() = "urls" then
+            list = msg.getData()
+            ' Only the newest list matters: swallow any queued ones.
+            nxt = wait(1, port)
+            while nxt <> invalid
+                if type(nxt) = "roSGNodeEvent" and nxt.getField() = "urls" then list = nxt.getData()
+                nxt = wait(1, port)
+            end while
+            if Util.isArr(list) then process(list)
+        end if
+    end while
+end sub
+
+sub process(urls as object)
+    fs = CreateObject("roFileSystem")
+    missing = []
+    for each u in urls
+        if Util.isStr(u) and CacheLogic.isRemote(u) and not Media.isCached(u) then missing.push(u)
+    end for
+    failed = 0
+    full = false
+    total = missing.count()
+    for i = 0 to total - 1
+        m.top.progress = { active: true, done: i, total: total, failed: failed, full: full }
+        if not CacheLogic.canStore(Media.usedBytes(), Config.MAX_CACHE_BYTES, Media.freeBytes(), 150000000&) then
+            ' Make room by dropping files nothing uses any more, then look again.
+            Media.prune(urls)
+            if not CacheLogic.canStore(Media.usedBytes(), Config.MAX_CACHE_BYTES, Media.freeBytes(), 150000000&) then
+                full = true
+                failed = failed + (total - i)
+                exit for
+            end if
+        end if
+        target = Media.localPath(missing[i])
+        partial = target + ".part"
+        ' Write to a partial file first so a dropped connection never leaves half a video behind.
+        r = Http.download(missing[i], partial)
+        if r.ok then
+            if fs.Exists(target) then fs.Delete(target)
+            if not fs.Rename(partial, target) then
+                failed++
+                fs.Delete(partial)
+            end if
+        else
+            failed++
+            if fs.Exists(partial) then fs.Delete(partial)
+        end if
+    end for
+    m.top.progress = { active: false, done: total, total: total, failed: failed, full: full }
+    Media.prune(urls)
+end sub

@@ -1,0 +1,120 @@
+import "pkg:/source/lib/Util.bs"
+import "pkg:/source/lib/TextFit.bs"
+import "pkg:/components/lib/Ui.bs"
+
+sub init()
+    m.shadows = []
+    m.main = invalid
+end sub
+
+sub layoutText()
+    cfg = m.top.config
+    if not Util.isAA(cfg) then return
+    text = Util.getStr(cfg, "text", "")
+    boxW = Util.getNum(cfg, "w", 100)
+    boxH = Util.getNum(cfg, "h", 100)
+    minSize = Int(Util.getNum(cfg, "minSize", 24))
+    maxSize = Int(Util.getNum(cfg, "maxSize", 96))
+    maxLines = Int(Util.getNum(cfg, "maxLines", 0))
+    fontName = Util.getStr(cfg, "font", "lato")
+    weight = Util.getStr(cfg, "weight", "regular")
+    align = Util.getStr(cfg, "align", "center")
+    vAlign = Util.getStr(cfg, "vAlign", "center")
+    shadow = Util.getStr(cfg, "shadow", "none")
+    spacing = Util.getNum(cfg, "lineSpacing", 0)
+    color = Util.getStr(cfg, "color", "0xFFFFFFFF")
+    if maxSize < minSize then maxSize = minSize
+
+    if m.main = invalid then
+        m.main = m.top.createChild("Label")
+        m.main.wrap = true
+    end if
+    lbl = m.main
+    lbl.width = boxW
+    lbl.height = 0
+    lbl.horizAlign = align
+    lbl.vertAlign = "top"
+    lbl.lineSpacing = spacing
+    lbl.color = color
+    lbl.text = text
+
+    factor = TextFit.charFactor(fontName, weight)
+    ' Binary search over even sizes for the biggest text that fits.
+    lo = minSize
+    hi = maxSize
+    best = minSize
+    while lo <= hi
+        mid = (lo + hi) \ 2
+        if mid mod 2 = 1 then mid = mid - 1
+        if mid < lo then mid = lo
+        probe = measureHeight(lbl, text, fontName, weight, mid, boxW, factor, spacing)
+        lines = probe.height / (mid * 1.2 + spacing)
+        fits = probe.height <= boxH and (maxLines <= 0 or lines <= maxLines + 0.4)
+        if fits then
+            best = mid
+            lo = mid + 2
+        else
+            hi = mid - 2
+        end if
+    end while
+    ' Final state at the chosen size.
+    fin = measureHeight(lbl, text, fontName, weight, best, boxW, factor, spacing)
+    textH = fin.height
+    if textH > boxH then textH = boxH
+    y = 0.0
+    if vAlign = "center" then
+        y = (boxH - textH) / 2
+    else if vAlign = "bottom" then
+        y = boxH - textH
+    end if
+    lbl.translation = [0, y]
+    lbl.height = textH + 4
+    m.top.chosenSize = best
+
+    ' Shadow and outline: black copies of the text behind the main label.
+    offsets = []
+    if shadow = "shadow" then
+        offsets = [[0, 4]]
+    else if shadow = "outline" then
+        offsets = [[-3, 0], [3, 0], [0, -3], [0, 3], [-3, -3], [3, -3], [-3, 3], [3, 3]]
+    end if
+    while m.shadows.count() < offsets.count()
+        s = m.top.createChild("Label")
+        s.wrap = true
+        m.shadows.push(s)
+        ' draw it behind the main label
+        m.top.removeChild(s)
+        m.top.insertChild(s, 0)
+    end while
+    for i = 0 to m.shadows.count() - 1
+        s = m.shadows[i]
+        if i < offsets.count() then
+            s.visible = true
+            s.width = boxW
+            s.height = lbl.height
+            s.horizAlign = align
+            s.vertAlign = "top"
+            s.lineSpacing = spacing
+            s.font = lbl.font
+            if shadow = "shadow" then
+                s.color = "0x00000099"
+            else
+                s.color = "0x000000FF"
+            end if
+            s.text = text
+            s.translation = [offsets[i][0], y + offsets[i][1]]
+        else
+            s.visible = false
+        end if
+    end for
+end sub
+
+' Height of [text] at [size] px in a box [boxW] wide: the measured bounding rectangle, or an estimate if none is available.
+function measureHeight(lbl as object, text as string, fontName as string, weight as string, size as integer, boxW as float, factor as float, spacing as float) as object
+    lbl.font = Ui.font(fontName, weight, size)
+    info = lbl.boundingRect()
+    if Util.isAA(info) and info.height > 0 then
+        return { height: info.height, measured: true }
+    end if
+    return { height: TextFit.estimateHeight(text, boxW, size, factor, 1.2) + TextFit.estimateLines(text, boxW, size, factor) * spacing, measured: false }
+end function

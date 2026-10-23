@@ -1,0 +1,16 @@
+import "pkg:/source/lib/Util.bs"
+import "pkg:/components/lib/Ui.bs"
+
+sub build()
+    cfg = m.top.config
+    if not Util.isAA(cfg) then return
+    Ui.clear(m.top)
+    W = Util.getNum(cfg, "w", 1920)
+    H = Util.getNum(cfg, "h", 1080)
+    bg = Util.parseColor(Util.getStr(cfg, "background", ""))
+    if bg = invalid then bg = { r: 27, g: 42, b: 74, a: 255 }
+    Ui.rect(m.top, 0, 0, W, H, Util.toRoku(bg))
+    f = m.top.createChild("FitLabel")
+    f.translation = [128, 96]
+    f.config = { text: Util.getStr(cfg, "text", ""), w: W - 256, h: H - 192, minSize: 48, maxSize: 320, maxLines: 6, font: "lato", weight: "black", color: Util.toRoku(Util.textColorOn(bg)), align: "center", vAlign: "center", shadow: "none" }
+end sub

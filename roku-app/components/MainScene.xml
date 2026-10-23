@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="MainScene" extends="Scene">
+    <interface>
+        <!-- launch parameters and roInput deep links, for example demo=kids or demo=signage -->
+        <field id="launchArgs" type="assocarray" onChange="onLaunchArgs" />
+    </interface>
+    <script type="text/brightscript" uri="MainScene.bs" />
+</component>

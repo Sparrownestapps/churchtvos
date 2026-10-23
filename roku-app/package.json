@@ -1,0 +1,23 @@
+{
+  "name": "church-tv-os-roku",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Church TV OS player for Roku (BrightScript + SceneGraph)",
+  "scripts": {
+    "vectors": "node tools/gen_vectors.mjs",
+    "build": "bsc --project bsconfig.json",
+    "lint": "bsc --project bsconfig.json --noEmit",
+    "test": "node tools/test.mjs",
+    "package": "npm run lint && npm run build",
+    "deploy": "node tools/deploy.mjs"
+  },
+  "devDependencies": {
+    "@rokucommunity/bslint": "^0.8.47",
+    "brighterscript": "^0.73.8",
+    "brs-node": "^2.6.1",
+    "jsqr": "^1.4.0",
+    "pngjs": "^7.0.0",
+    "qrcode": "^1.5.4",
+    "roku-deploy": "^3.18.4"
+  }
+}

@@ -1,0 +1,367 @@
+import "pkg:/source/lib/Config.bs"
+import "pkg:/source/lib/Util.bs"
+import "pkg:/source/lib/TimeUtil.bs"
+import "pkg:/source/lib/Model.bs"
+import "pkg:/source/lib/Countdown.bs"
+import "pkg:/source/lib/Remote.bs"
+import "pkg:/source/lib/CacheLogic.bs"
+import "pkg:/source/lib/TextFit.bs"
+import "pkg:/source/tests/TestKit.bs"
+
+namespace Test_Model
+
+    function at(iso as string) as integer
+        return TimeUtil.parseIso(iso)
+    end function
+
+    sub runAll(t as object)
+        st = ParseJson(ReadAsciiFile("pkg:/tests/fixtures/state_sample.json"))
+        if st = invalid then
+            TestKit.check(t, "state_sample.json parses", false)
+            return
+        end if
+        testUtil(t)
+        testModules(t, st)
+        testSchedules(t, st)
+        testBrand(t, st)
+        testPlaylistSlides(t, st)
+        testDeckSlides(t, st)
+        testMedia(t, st)
+        testCountdown(t)
+        testRemote(t)
+        testCache(t)
+        testPairing(t)
+        testTextFit(t)
+        testRamps(t)
+        testGarbage(t)
+    end sub
+
+    sub testUtil(t as object)
+        TestKit.suite(t, "Util: colours and text")
+        TestKit.eq(t, "#RRGGBB", Util.parseColor("#1B2A4A"), { r: 27, g: 42, b: 74, a: 255 })
+        TestKit.eq(t, "#RGB", Util.parseColor("#fa0"), { r: 255, g: 170, b: 0, a: 255 })
+        TestKit.eq(t, "#AARRGGBB", Util.parseColor("#80FF0000"), { r: 255, g: 0, b: 0, a: 128 })
+        TestKit.eq(t, "name is not a hex colour", Util.parseColor("red"), invalid)
+        TestKit.eq(t, "bad digits", Util.parseColor("#GG0000"), invalid)
+        TestKit.eq(t, "wrong length", Util.parseColor("#12345"), invalid)
+        TestKit.eq(t, "non-string", Util.parseColor(12), invalid)
+        TestKit.eq(t, "toRoku", Util.toRoku(Util.parseColor("#1B2A4A")), "0x1B2A4AFF")
+        TestKit.eq(t, "toRoku alpha", Util.toRoku(Util.parseColor("#000000"), 0.5), "0x00000080")
+        TestKit.eq(t, "rokuColor fallback", Util.rokuColor("nope", "0xFFFFFFFF"), "0xFFFFFFFF")
+        TestKit.eq(t, "rokuColor fallback alpha", Util.rokuColor(invalid, "0x112233FF", 0.5), "0x11223380")
+        TestKit.eq(t, "luminance navy", Util.luminance(Util.parseColor("#1B2A4A")), 0.02383)
+        TestKit.eq(t, "luminance yellow", Util.luminance(Util.parseColor("#FFD700")), 0.69861)
+        TestKit.eq(t, "luminance white", Util.luminance(Util.parseColor("#FFFFFF")), 1.0)
+        TestKit.eq(t, "dark text on yellow", Util.textColorOn(Util.parseColor("#FFD700")), { r: 17, g: 17, b: 17, a: 255 })
+        TestKit.eq(t, "white text on navy", Util.textColorOn(Util.parseColor("#1B2A4A")), { r: 255, g: 255, b: 255, a: 255 })
+        TestKit.eq(t, "lerp mid", Util.lerpColor({ r: 0, g: 0, b: 0, a: 255 }, { r: 255, g: 255, b: 255, a: 255 }, 0.5), { r: 128, g: 128, b: 128, a: 255 })
+        TestKit.eq(t, "trim", Util.trim("  hi there  "), "hi there")
+        TestKit.eq(t, "lines", Util.lines("a" + Chr(13) + Chr(10) + "b" + Chr(10) + "c"), ["a", "b", "c"])
+        TestKit.eq(t, "firstLine skips blanks", Util.firstLine(Chr(10) + "  " + Chr(10) + "x" + Chr(10) + "y"), "x")
+        TestKit.eq(t, "getStr wrong type", Util.getStr({ a: 5 }, "a", "d"), "d")
+        TestKit.eq(t, "getStr on invalid", Util.getStr(invalid, "a", "d"), "d")
+        TestKit.eq(t, "getIntOrInvalid float", Util.getIntOrInvalid({ a: 7.9 }, "a"), 7)
+    end sub
+
+    sub testModules(t as object, st as object)
+        TestKit.suite(t, "Model: module switching by schedule (site time zone)")
+        sun = "2026-10-25T"
+        ' Toronto is EDT (UTC-4) that day
+        TestKit.eq(t, "09:20 slides", Model.moduleNow(st, at(sun + "13:20:00Z"), 0), "slides")
+        TestKit.eq(t, "09:10 kids (priority 9)", Model.moduleNow(st, at(sun + "13:10:00Z"), 0), "kids")
+        TestKit.eq(t, "09:40 off (later rule wins on a tie)", Model.moduleNow(st, at(sun + "13:40:00Z"), 0), "off")
+        TestKit.eq(t, "08:00 signage", Model.moduleNow(st, at(sun + "12:00:00Z"), 0), "signage")
+        TestKit.eq(t, "11:00 signage", Model.moduleNow(st, at(sun + "15:00:00Z"), 0), "signage")
+        TestKit.eq(t, "Monday 09:20 signage", Model.moduleNow(st, at("2026-10-26T13:20:00Z"), 0), "signage")
+        TestKit.eq(t, "rules end at 24:00 exclusive of next day", Model.moduleNow(st, at("2026-10-26T04:00:00Z"), 0), "signage")
+        noRules = { default_module: "slides", timezone: "America/Toronto", module_rules: [] }
+        TestKit.eq(t, "default module when no rule matches", Model.moduleNow(noRules, at(sun + "13:20:00Z"), 0), "slides")
+        TestKit.eq(t, "kids when nothing says otherwise", Model.moduleNow({}, 1000000, 0), "kids")
+
+        TestKit.suite(t, "Model: signage slot choice")
+        TestKit.eq(t, "08:30 slot s1", Model.signagePlaylistNow(st, at(sun + "12:30:00Z"), 0).id, "sp1")
+        TestKit.eq(t, "09:30 tie goes to the later slot", Model.signagePlaylistNow(st, at(sun + "13:30:00Z"), 0).id, "sp2")
+        TestKit.eq(t, "13:00 falls back to the default playlist", Model.signagePlaylistNow(st, at(sun + "17:00:00Z"), 0).id, "sd")
+        TestKit.eq(t, "Monday default", Model.signagePlaylistNow(st, at("2026-10-26T15:00:00Z"), 0).id, "sd")
+        TestKit.eq(t, "no signage block", Model.signagePlaylistNow({}, 1000, 0), invalid)
+        TestKit.eq(t, "DST: 1 Nov 2026 01:30 EDT, 08:30 Sunday morning slot still s1 at 12:30Z", Model.signagePlaylistNow(st, at("2026-11-01T13:30:00Z"), 0).id, "sp1")
+    end sub
+
+    sub testSchedules(t as object, st as object)
+        TestKit.suite(t, "Model: schedules")
+        kids = Model.kidsSchedules(st)
+        TestKit.eq(t, "latest started wins", Model.currentSchedule(kids, at("2026-10-25T14:10:00Z")).id, "c")
+        TestKit.eq(t, "earlier one after the later ended", Model.currentSchedule(kids, at("2026-10-25T14:40:00Z")).id, "a")
+        TestKit.eq(t, "none after everything ended", Model.currentSchedule(kids, at("2026-10-25T15:30:00Z")), invalid)
+        TestKit.eq(t, "next", Model.nextSchedule(kids, at("2026-10-25T15:30:00Z")).id, "b")
+        TestKit.eq(t, "next before first", Model.nextSchedule(kids, at("2026-10-25T12:00:00Z")).id, "a")
+        TestKit.eq(t, "open ended stays current", Model.currentSchedule(kids, at("2026-10-26T12:00:00Z")).id, "b")
+        TestKit.eq(t, "sorted by start", [Model.sortedByStart(kids)[0].id, Model.sortedByStart(kids)[1].id, Model.sortedByStart(kids)[2].id], ["a", "c", "b"])
+        TestKit.eq(t, "slides current", Model.currentSchedule(Model.slidesSchedules(st), at("2026-10-25T14:10:00Z")).id, "d1")
+    end sub
+
+    sub testBrand(t as object, st as object)
+        TestKit.suite(t, "Model: branding and splash")
+        b = Model.brand(st)
+        TestKit.eq(t, "primary", b.primary, "#112233")
+        TestKit.eq(t, "accent", b.accent, "#FFAA00")
+        TestKit.eq(t, "org name", b.orgName, "Forward Church")
+        TestKit.eq(t, "splash seconds", b.splashSeconds, 3)
+        TestKit.eq(t, "logo", b.logoUrl, "https://example.com/logo.png")
+        kb = Model.brand(st, "kids")
+        TestKit.eq(t, "kids: bad accent falls back to the church's", kb.accent, "#FFAA00")
+        sb = Model.brand(st, "signage")
+        TestKit.eq(t, "signage primary override", sb.primary, "#445566")
+        TestKit.eq(t, "signage splash disabled", sb.splashSeconds, invalid)
+        TestKit.eq(t, "default brand colours", Model.brand({}).primary, "#1B2A4A")
+        TestKit.eq(t, "default accent", Model.brand({}).accent, "#F2A33A")
+        TestKit.eq(t, "default name", Model.brand({}).orgName, "Church TV OS")
+        TestKit.eq(t, "dark logo on dark", Model.logoOn(b, Util.parseColor("#112233")), "https://example.com/logo-dark.png")
+        TestKit.eq(t, "normal logo on light", Model.logoOn(b, Util.parseColor("#FFFFFF")), "https://example.com/logo.png")
+        TestKit.eq(t, "splash clamps", Model.brand({ organization: { branding: { splash: { enabled: true, seconds: 99 } } } }).splashSeconds, 30)
+        TestKit.eq(t, "splash default 5", Model.brand({ organization: { branding: { splash: { enabled: true } } } }).splashSeconds, 5)
+    end sub
+
+    sub testPlaylistSlides(t as object, st as object)
+        TestKit.suite(t, "Model: Kids playlist to slides")
+        pl = Model.kidsSchedules(st)[0].playlist
+        s = Model.playlistSlides(pl, true)
+        kinds = []
+        for each x in s
+            kinds.push(x.kind)
+        end for
+        TestKit.eq(t, "kinds in order (YouTube, skip-NDI and unknown dropped)", kinds, ["countdown", "video", "image", "image", "songtitle", "lyric", "lyric", "stream", "sign", "ndi"])
+        TestKit.eq(t, "ndi flag off drops the message slide", Model.playlistSlides(pl, false).count(), 9)
+        cd = s[0].spec
+        TestKit.eq(t, "countdown mode", cd.mode, "until")
+        TestKit.eq(t, "countdown until", cd.until, "09:30")
+        TestKit.eq(t, "countdown at_zero", cd.atZero, "hold")
+        TestKit.eq(t, "countdown if_passed", cd.ifPassed, "skip")
+        TestKit.eq(t, "countdown audio volume", cd.audio.volume, 0.5)
+        TestKit.eq(t, "countdown audio align_end", cd.audio.alignEnd, true)
+        TestKit.eq(t, "countdown audio loop default", cd.audio.loop, true)
+        TestKit.eq(t, "countdown audio fade default", cd.audio.fadeSeconds, 3)
+        TestKit.eq(t, "image seconds", s[2].seconds, 7)
+        TestKit.eq(t, "image without seconds waits", s[3].seconds, invalid)
+        TestKit.eq(t, "song title first", s[4].title, "Song")
+        TestKit.eq(t, "song authors", s[4].authors, "A. Writer")
+        TestKit.eq(t, "song copyright missing", s[4].copyright, invalid)
+        TestKit.eq(t, "lyric text", s[5].text, "Line 1" + Chr(10) + "Line 2")
+        TestKit.eq(t, "lyric number", s[6].number, 2)
+        TestKit.eq(t, "lyric count", s[6].count, 2)
+        TestKit.eq(t, "stream fallback", s[7].fallback, "hold")
+        TestKit.eq(t, "sign defaults", [s[8].seconds, s[8].align, s[8].logo], [10, "center", false])
+        TestKit.eq(t, "ndi message", s[9].message, "Camera is off")
+        TestKit.eq(t, "unsupported items counted", Model.unsupportedItemCount(pl, true), 3)
+        TestKit.eq(t, "unsupported items counted (ndi flag off)", Model.unsupportedItemCount(pl, false), 4)
+        TestKit.eq(t, "label lyric", Model.slideLabel(s[5]), "Song " + Chr(183) + " Part 1 of 2")
+        TestKit.eq(t, "label title", Model.slideLabel(s[4]), "Song (title)")
+        TestKit.eq(t, "label blank countdown title", Model.slideLabel({ kind: "countdown", title: "" }), "Countdown")
+        TestKit.eq(t, "outline", Model.outline(s, false)[1], "Video")
+        loopSlides = Model.signageLoopSlides(s)
+        TestKit.eq(t, "signage: image without seconds gets 10", loopSlides[3].seconds, 10)
+        TestKit.eq(t, "signage: stream without seconds gets 30", loopSlides[7].seconds, 30)
+        TestKit.eq(t, "signage: explicit seconds kept", loopSlides[2].seconds, 7)
+        TestKit.eq(t, "signage copy leaves the original alone", s[3].seconds, invalid)
+        TestKit.eq(t, "empty playlist", Model.playlistSlides({ items: [] }, true).count(), 0)
+        TestKit.eq(t, "lyrics without show_title", Model.lyricSlides({ title: "x", slides: ["a"] }).count(), 1)
+    end sub
+
+    sub testDeckSlides(t as object, st as object)
+        TestKit.suite(t, "Model: Slides deck expansion and themes")
+        deck = Model.slidesSchedules(st)[0].deck
+        s = Model.deckSlides(deck, true)
+        kinds = []
+        for each x in s
+            kinds.push(x.kind)
+        end for
+        TestKit.eq(t, "kinds in order (unknown dropped)", kinds, ["text", "text", "image", "video", "songtitle", "lyric", "lyric", "countdown", "stream", "blank", "blank", "ndi"])
+        TestKit.eq(t, "ndi flag off drops ndi", Model.deckSlides(deck, false).count(), 11)
+        TestKit.eq(t, "unknown deck background ignored, theme background used", s[0].bg.url, "https://example.com/themebg.jpg")
+        TestKit.eq(t, "slide background beats theme", s[1].bg.type, "gradient")
+        TestKit.eq(t, "video background", s[3].bg.type, "video")
+        TestKit.eq(t, "media video audio off", s[3].audio, false)
+        TestKit.eq(t, "image fit", s[2].fit, "cover")
+        TestKit.eq(t, "image seconds", s[2].seconds, 5)
+        TestKit.eq(t, "text seconds", s[0].seconds, 8)
+        TestKit.eq(t, "text without seconds waits", s[1].seconds, invalid)
+        TestKit.eq(t, "lyric label", s[5].label, "Verse 1")
+        TestKit.eq(t, "deck list label (lyric with label)", Model.deckListLabel(s[5]), "Amazing " + Chr(183) + " Verse 1")
+        TestKit.eq(t, "deck list label (lyric without label)", Model.deckListLabel(s[6]), "Amazing " + Chr(183) + " Part 2")
+        TestKit.eq(t, "deck list label (text title)", Model.deckListLabel(s[0]), "Welcome")
+        TestKit.eq(t, "deck list label (text body first line)", Model.deckListLabel(s[1]), "Only body")
+        TestKit.eq(t, "deck list label (countdown)", Model.deckListLabel(s[7]), "Countdown: Soon")
+        TestKit.eq(t, "deck list label (stream)", Model.deckListLabel(s[8]), "Live: Overflow")
+        TestKit.eq(t, "blank colour default", s[9].color, invalid)
+        TestKit.eq(t, "blank colour", s[10].color, "#FF0000")
+        TestKit.eq(t, "ndi message default", s[11].message, "Waiting for the live feed" + Chr(8230))
+        th = deck.theme
+        ts = Model.themeStyle(th, s[5])
+        TestKit.eq(t, "title scale clamps to 1.5", ts.titleScale, 1.5)
+        TestKit.eq(t, "body scale clamps to 0.5", ts.bodyScale, 0.5)
+        TestKit.eq(t, "margin clamps to 20", ts.marginPct, 20)
+        TestKit.eq(t, "outline beats shadow", ts.shadow, "outline")
+        TestKit.eq(t, "left align from theme", ts.center, false)
+        TestKit.eq(t, "colour from theme", ts.colorHex, "#FFEECC")
+        TestKit.eq(t, "julius font", ts.titleFont, "julius")
+        TestKit.eq(t, "position", ts.position, "lower")
+        ts0 = Model.themeStyle(th, s[0])
+        TestKit.eq(t, "slide align overrides theme", ts0.center, true)
+        TestKit.eq(t, "slide colour overrides theme", ts0.colorHex, "#000000")
+        TestKit.eq(t, "empty theme: white, centred, shadow", Model.themeStyle({}, invalid).shadow, "shadow")
+        TestKit.eq(t, "empty theme colour", Model.themeStyle({}, invalid).colorHex, "#FFFFFF")
+        TestKit.eq(t, "empty theme margin", Model.themeStyle({}, invalid).marginPct, 8)
+        TestKit.eq(t, "shadow off", Model.themeStyle({ shadow: false }, invalid).shadow, "none")
+        TestKit.eq(t, "outline", Model.outline(s, true)[7], "Countdown: Soon")
+    end sub
+
+    sub testMedia(t as object, st as object)
+        TestKit.suite(t, "Model: media URLs")
+        deck = Model.slidesSchedules(st)[0].deck
+        TestKit.eq(t, "deck media", Model.deckMediaUrls(deck), ["https://example.com/themebg.jpg", "https://example.com/p.jpg", "https://example.com/bg.mp4", "https://example.com/v.mp4", "https://example.com/cd.mp3"])
+        TestKit.eq(t, "playlist media", Model.playlistMediaUrls(Model.kidsSchedules(st)[0].playlist), ["https://example.com/a.mp3", "https://example.com/story.mp4?x=1", "https://example.com/pic.jpg", "https://example.com/pic2.png"])
+        all = Model.allMediaUrls(st)
+        TestKit.eq(t, "all media count (distinct)", all.count(), 4 + 1 + 1 + 5 + 1)
+        TestKit.eq(t, "all media: override last", all[all.count() - 1], "https://example.com/ov.jpg")
+        TestKit.eq(t, "distinct", Model.distinct(["a", "b", "a"]), ["a", "b"])
+    end sub
+
+    sub testCountdown(t as object)
+        TestKit.suite(t, "Countdown")
+        TestKit.eq(t, "0", Countdown.format(0), "0:00")
+        TestKit.eq(t, "negative", Countdown.format(-50), "0:00")
+        TestKit.eq(t, "1 ms rounds up", Countdown.format(1), "0:01")
+        TestKit.eq(t, "7 s", Countdown.format(7000), "0:07")
+        TestKit.eq(t, "1:00 holds until 59.001 passes", Countdown.format(59001), "1:00")
+        TestKit.eq(t, "5:00", Countdown.format(300000), "5:00")
+        TestKit.eq(t, "1:05:00", Countdown.format(3900000), "1:05:00")
+        TestKit.eq(t, "fade mid", Countdown.fadeFactor(1500, 3), 0.5)
+        TestKit.eq(t, "fade early", Countdown.fadeFactor(10000, 3), 1.0)
+        TestKit.eq(t, "fade at zero", Countdown.fadeFactor(0, 3), 0.0)
+        TestKit.eq(t, "fade disabled", Countdown.fadeFactor(500, 0), 1.0)
+        spec = { mode: "until", seconds: 60, until: "09:30", atZero: "hold", ifPassed: "skip" }
+        p = Countdown.plan(spec, at("2026-10-25T13:20:00Z"), "America/Toronto", 0)
+        TestKit.eq(t, "until: end today 09:30 EDT", p.endEpoch, at("2026-10-25T13:30:00Z"))
+        TestKit.eq(t, "until: not passed", p.alreadyPassed, false)
+        TestKit.eq(t, "until: hold", p.hold, true)
+        p = Countdown.plan(spec, at("2026-10-25T13:40:00Z"), "America/Toronto", 0)
+        TestKit.eq(t, "until passed: skip", p.skip, true)
+        spec.ifPassed = "zero"
+        p = Countdown.plan(spec, at("2026-10-25T13:40:00Z"), "America/Toronto", 0)
+        TestKit.eq(t, "until passed: zero does not skip", [p.skip, p.alreadyPassed], [false, true])
+        d = Countdown.plan({ mode: "duration", seconds: 90, until: invalid, atZero: "next", ifPassed: "zero" }, 1000, "America/Toronto", 0)
+        TestKit.eq(t, "duration end", d.endEpoch, 1090)
+        TestKit.eq(t, "duration: next, not hold", d.hold, false)
+        bad = Countdown.plan({ mode: "until", seconds: 60, until: "nonsense", atZero: "next", ifPassed: "zero" }, 1000, "UTC", 0)
+        TestKit.eq(t, "unreadable until counts as passed", bad.alreadyPassed, true)
+        a = Countdown.alignEnd(60, 90)
+        TestKit.eq(t, "align end: long countdown waits", [a.delaySeconds, a.seekSeconds], [30, 0])
+        a = Countdown.alignEnd(60, 45)
+        TestKit.eq(t, "align end: short countdown seeks", [a.delaySeconds, a.seekSeconds], [0, 15])
+        a = Countdown.alignEnd(0, 45)
+        TestKit.eq(t, "align end: unknown duration plays from start", [a.delaySeconds, a.seekSeconds], [0, 0])
+        ' wall clock across a DST change: 9:00 on the Sunday clocks go back (Toronto 2026-11-01) is still 9:00 local
+        e = Countdown.plan({ mode: "until", seconds: 0, until: "09:00", atZero: "next", ifPassed: "zero" }, at("2026-11-01T11:00:00Z"), "America/Toronto", 0)
+        TestKit.eq(t, "until 09:00 after the fall-back change is 14:00Z", e.endEpoch, at("2026-11-01T14:00:00Z"))
+        e = Countdown.plan({ mode: "until", seconds: 0, until: "09:00", atZero: "next", ifPassed: "zero" }, at("2026-03-08T11:00:00Z"), "America/Toronto", 0)
+        TestKit.eq(t, "until 09:00 after the spring-forward change is 13:00Z", e.endEpoch, at("2026-03-08T13:00:00Z"))
+    end sub
+
+    sub testRemote(t as object)
+        TestKit.suite(t, "Remote commands and status")
+        TestKit.eq(t, "next", Remote.parse({ id: 1, command: "next" }), { type: "next" })
+        TestKit.eq(t, "previous", Remote.parse({ command: "previous", payload: {} }), { type: "previous" })
+        TestKit.eq(t, "jump", Remote.parse({ command: "jump", payload: { index: 4 } }), { type: "jump", index: 4 })
+        TestKit.eq(t, "jump without index ignored", Remote.parse({ command: "jump", payload: {} }), invalid)
+        TestKit.eq(t, "blank on", Remote.parse({ command: "blank", payload: { on: true } }).on, true)
+        TestKit.eq(t, "blank toggle", Remote.parse({ command: "blank", payload: {} }).on, invalid)
+        TestKit.eq(t, "stop", Remote.parse({ command: "stop" }).type, "stop")
+        TestKit.eq(t, "start", Remote.parse({ command: "start" }).type, "start")
+        m1 = Remote.parse({ command: "message", payload: { text: "Hi", seconds: 1 } })
+        TestKit.eq(t, "message seconds clamp low", m1.seconds, 5)
+        TestKit.eq(t, "message default background", m1.background, "#1B2A4A")
+        TestKit.eq(t, "message seconds clamp high", Remote.parse({ command: "message", payload: { text: "Hi", seconds: 9999 } }).seconds, 300)
+        TestKit.eq(t, "message default seconds", Remote.parse({ command: "message", payload: { text: "Hi" } }).seconds, 30)
+        TestKit.eq(t, "blank message ignored", Remote.parse({ command: "message", payload: { text: "  " } }), invalid)
+        TestKit.eq(t, "clear_message", Remote.parse({ command: "clear_message" }).type, "clear_message")
+        TestKit.eq(t, "unknown command ignored", Remote.parse({ command: "reboot" }), invalid)
+        TestKit.eq(t, "garbage ignored", Remote.parse("x"), invalid)
+        s = { module: "slides", state: "playing", title: "Deck", label: "Welcome", index: 2, count: 9, outline: ["a", "b"], refKind: "deck", refId: "u-1" }
+        TestKit.eq(t, "status key", Remote.statusKey(s), "slides|playing|Deck|2|9|Welcome")
+        p = Remote.reportParams(s, true)
+        TestKit.eq(t, "report outline", p.p_outline, ["a", "b"])
+        TestKit.eq(t, "report ref", [p.p_ref_kind, p.p_ref_id], ["deck", "u-1"])
+        TestKit.eq(t, "report without outline", Remote.reportParams(s, false).p_outline, invalid)
+        TestKit.eq(t, "report idle has no ref", Remote.reportParams(Remote.idleStatus(), true).p_ref_kind, invalid)
+        TestKit.eq(t, "same outline", Remote.sameOutline(["a"], ["a"]), true)
+        TestKit.eq(t, "different outline", Remote.sameOutline(["a"], ["b"]), false)
+    end sub
+
+    sub testCache(t as object)
+        TestKit.suite(t, "Media cache rules")
+        TestKit.eq(t, "ext kept", CacheLogic.fileName("abc", "https://x.com/a/b.mp4?t=1"), "abc.mp4")
+        TestKit.eq(t, "no ext", CacheLogic.fileName("abc", "https://x.com/stream"), "abc")
+        TestKit.eq(t, "long ext dropped", CacheLogic.fileName("abc", "https://x.com/a.verylongext"), "abc")
+        TestKit.eq(t, "ext case kept", CacheLogic.fileName("abc", "https://x.com/f.JPG"), "abc.JPG")
+        TestKit.eq(t, "dot only in host", CacheLogic.fileName("abc", "https://x.com"), "abc.com")
+        files = [{ name: "a.mp4", size: 1 }, { name: "b.png", size: 2 }, { name: "c.jpg.part", size: 3 }]
+        TestKit.eq(t, "stale files", CacheLogic.stale(files, { "a.mp4": true }), ["b.png", "c.jpg.part"])
+        TestKit.eq(t, "can store", CacheLogic.canStore(100&, 1000&, 5000000000&, 100000000&), true)
+        TestKit.eq(t, "cache full", CacheLogic.canStore(1000&, 1000&, 5000000000&, 100000000&), false)
+        TestKit.eq(t, "disk nearly full", CacheLogic.canStore(0&, 1000&, 50000000&, 100000000&), false)
+        TestKit.eq(t, "unknown free space is allowed", CacheLogic.canStore(0&, 1000&, -1&, 100000000&), true)
+    end sub
+
+    sub testPairing(t as object)
+        TestKit.suite(t, "Pairing QR payload")
+        base = "https://app.churchtvos.com/pair?code="
+        TestKit.eq(t, "plain", Model.pairingQrPayload("ABC123"), base + "ABC123")
+        TestKit.eq(t, "lowercase and spaces", Model.pairingQrPayload("abc 123"), base + "ABC123")
+        TestKit.eq(t, "double space display form", Model.pairingQrPayload("ABC  123"), base + "ABC123")
+        TestKit.eq(t, "placeholder", Model.pairingQrPayload(Chr(183) + Chr(183) + Chr(183) + Chr(183) + Chr(183) + Chr(183)), invalid)
+        TestKit.eq(t, "too short", Model.pairingQrPayload("ABC12"), invalid)
+        TestKit.eq(t, "bad char", Model.pairingQrPayload("ABC-12"), invalid)
+        TestKit.eq(t, "invalid", Model.pairingQrPayload(invalid), invalid)
+        TestKit.eq(t, "display", Model.codeDisplay("ABC123"), "ABC  123")
+    end sub
+
+    sub testRamps(t as object)
+        TestKit.suite(t, "Gradient ramp files")
+        TestKit.eq(t, "exact angle", Model.rampFile(135, false), "pkg:/images/ramps/L_135.png")
+        TestKit.eq(t, "snaps to 15 degrees", Model.rampFile(140, false), "pkg:/images/ramps/L_135.png")
+        TestKit.eq(t, "snaps up", Model.rampFile(143, true), "pkg:/images/ramps/P_150.png")
+        TestKit.eq(t, "wraps at 360", Model.rampFile(353, false), "pkg:/images/ramps/L_0.png")
+        TestKit.eq(t, "negative angles wrap", Model.rampFile(-20, false), "pkg:/images/ramps/L_345.png")
+        TestKit.eq(t, "default CSS bottom", Model.rampFile(180, true), "pkg:/images/ramps/P_180.png")
+    end sub
+
+    sub testTextFit(t as object)
+        TestKit.suite(t, "TextFit estimates")
+        TestKit.eq(t, "one short line", TextFit.estimateLines("Hello", 1000, 50, 0.5), 1)
+        TestKit.eq(t, "explicit newline", TextFit.estimateLines("a" + Chr(10) + "b", 1000, 50, 0.5), 2)
+        ' 10 glyphs of 25 px fit in 250 px; "aaaa bbbb cccc" = 14 chars wraps onto two lines
+        TestKit.eq(t, "wraps", TextFit.estimateLines("aaaa bbbb cccc", 250, 50, 0.5), 2)
+        TestKit.eq(t, "long word breaks", TextFit.estimateLines("abcdefghijklmnopqrstuvwxyz", 250, 50, 0.5), 3)
+        TestKit.eq(t, "blank text is one line", TextFit.estimateLines("", 250, 50, 0.5), 1)
+        big = TextFit.fitSize("Hello", 1000, 400, 20, 150, 3, 0.5, 1.2, 2)
+        TestKit.eq(t, "short text gets the maximum size", big, 150)
+        small = TextFit.fitSize(Util.repeatStr("word ", 60), 800, 300, 20, 150, 12, 0.5, 1.2, 2)
+        TestKit.check(t, "long text shrinks", small < 60 and small >= 20, small.toStr())
+        TestKit.eq(t, "never below the minimum", TextFit.fitSize(Util.repeatStr("word ", 2000), 200, 100, 20, 150, 12, 0.5, 1.2, 2), 20)
+        TestKit.eq(t, "max lines limits the size", TextFit.fitSize("aaaa bbbb cccc dddd", 300, 2000, 10, 100, 1, 0.5, 1.2, 2) <= 31, true)
+    end sub
+
+    sub testGarbage(t as object)
+        TestKit.suite(t, "Model: never crash on bad data")
+        junk = { kids: 5, signage: "x", slides: [], organization: 7, module_rules: [1, "a", { module: 3 }], timezone: 12 }
+        TestKit.eq(t, "moduleNow tolerates junk", Model.moduleNow(junk, 1000, 0), "kids")
+        TestKit.eq(t, "signage tolerates junk", Model.signagePlaylistNow(junk, 1000, 0), invalid)
+        TestKit.eq(t, "kids schedules tolerate junk", Model.kidsSchedules(junk).count(), 0)
+        TestKit.eq(t, "brand tolerates junk", Model.brand(junk).orgName, "Church TV OS")
+        TestKit.eq(t, "media urls tolerate junk", Model.allMediaUrls(junk).count(), 0)
+        TestKit.eq(t, "playlist of junk", Model.playlistSlides({ items: [1, "x", { type: 5 }, { type: "image" }] }, true).count(), 1)
+        TestKit.eq(t, "deck of junk", Model.deckSlides({ slides: [1, { kind: 3 }, { kind: "text" }] }, true).count(), 1)
+        TestKit.eq(t, "schedule with bad dates", Model.currentSchedule([{ starts_at: "junk" }, 3], 1000), invalid)
+    end sub
+
+end namespace

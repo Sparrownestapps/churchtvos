@@ -1,0 +1,9 @@
+import "pkg:/source/lib/Qr.bs"
+
+sub init()
+    m.top.functionName = "execute"
+end sub
+
+sub execute()
+    m.top.result = Qr.encode(m.top.payload)
+end sub

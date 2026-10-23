@@ -1,0 +1,71 @@
+' Text fitting estimates. Android has an auto-size text composable; Roku's Label does not. The FitLabel component measures real
+' text with Label.boundingRect() on the device; these pure estimates are its fallback when a measurement is unavailable, and
+' are unit tested.
+import "pkg:/source/lib/Util.bs"
+
+namespace TextFit
+
+    ' Average glyph width as a fraction of the font size: Lato is about 0.52 (bold 0.55, black 0.58), Julius Sans One is wider.
+    function charFactor(fontName as string, weight as string) as float
+        if fontName = "julius" then return 0.68
+        if weight = "black" then return 0.58
+        if weight = "bold" then return 0.55
+        return 0.52
+    end function
+
+    ' Number of lines [text] would take in a box [boxW] pixels wide at [size] px (greedy word wrap, explicit newlines kept).
+    function estimateLines(text as string, boxW as float, size as float, factor as float) as integer
+        glyph = size * factor
+        if glyph <= 0 or boxW <= 0 then return 1
+        perLine = Int(boxW / glyph)
+        if perLine < 1 then perLine = 1
+        total = 0
+        for each para in Util.lines(text)
+            words = para.split(" ")
+            cur = 0
+            lines = 1
+            for each w in words
+                n = Len(w)
+                if n = 0 then
+                    n = 0
+                end if
+                if cur = 0 then
+                    cur = n
+                else if cur + 1 + n <= perLine then
+                    cur = cur + 1 + n
+                else
+                    lines = lines + 1
+                    cur = n
+                end if
+                while cur > perLine
+                    lines = lines + 1
+                    cur = cur - perLine
+                end while
+            end for
+            total = total + lines
+        end for
+        if total < 1 then total = 1
+        return total
+    end function
+
+    function estimateHeight(text as string, boxW as float, size as float, factor as float, lineFactor as float) as float
+        return estimateLines(text, boxW, size, factor) * size * lineFactor
+    end function
+
+    ' The largest size (steps of [step] px, between minSize and maxSize) at which the text fits the box and [maxLines].
+    function fitSize(text as string, boxW as float, boxH as float, minSize as integer, maxSize as integer, maxLines as integer, factor as float, lineFactor as float, stepPx as integer) as integer
+        best = minSize
+        size = maxSize
+        while size >= minSize
+            lines = estimateLines(text, boxW, size, factor)
+            h = lines * size * lineFactor
+            if h <= boxH and (maxLines <= 0 or lines <= maxLines) then
+                best = size
+                exit while
+            end if
+            size = size - stepPx
+        end while
+        return best
+    end function
+
+end namespace

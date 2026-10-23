@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- A title and an optional detail line on the church's branded white screen (Connecting, account paused, module off). -->
+<component name="MessageView" extends="Group">
+    <interface>
+        <!-- { title, detail, brand, w, h } -->
+        <field id="config" type="assocarray" onChange="build" />
+    </interface>
+    <script type="text/brightscript" uri="MessageView.bs" />
+</component>

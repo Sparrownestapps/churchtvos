@@ -1,0 +1,287 @@
+' Small pure helpers shared by the player and the off-device tests.
+' Nothing here touches the device, the network or SceneGraph.
+
+namespace Util
+
+    ' --- tolerant JSON access (server data is never trusted; cached copies can be old) ---
+
+    function isAA(v as dynamic) as boolean
+        return type(v) = "roAssociativeArray"
+    end function
+
+    function isArr(v as dynamic) as boolean
+        return type(v) = "roArray"
+    end function
+
+    ' type() names differ between boxed and unboxed values (and between firmware and interpreters): "Integer", "roInt", "roInteger".
+    ' Normalise by dropping a leading "ro" and lower-casing.
+    function baseType(v as dynamic) as string
+        t = LCase(type(v))
+        if Left(t, 2) = "ro" and Len(t) > 2 then t = Mid(t, 3)
+        return t
+    end function
+
+    function isStr(v as dynamic) as boolean
+        return baseType(v) = "string"
+    end function
+
+    function isNum(v as dynamic) as boolean
+        t = baseType(v)
+        return t = "integer" or t = "int" or t = "float" or t = "double" or t = "longinteger"
+    end function
+
+    function isBool(v as dynamic) as boolean
+        return baseType(v) = "boolean"
+    end function
+
+    function getStr(aa as dynamic, key as string, fallback = "" as string) as string
+        if not isAA(aa) then return fallback
+        v = aa[key]
+        if isStr(v) then return v
+        return fallback
+    end function
+
+    ' Like str() but null/empty strings count as missing (used for optional text).
+    function getStrOrInvalid(aa as dynamic, key as string) as dynamic
+        s = getStr(aa, key, "")
+        if s = "" then return invalid
+        return s
+    end function
+
+    function getNum(aa as dynamic, key as string, fallback = 0 as dynamic) as dynamic
+        if not isAA(aa) then return fallback
+        v = aa[key]
+        if isNum(v) then return v
+        return fallback
+    end function
+
+    function getIntOrInvalid(aa as dynamic, key as string) as dynamic
+        if not isAA(aa) then return invalid
+        v = aa[key]
+        if isNum(v) then return Int(v)
+        return invalid
+    end function
+
+    function getBool(aa as dynamic, key as string, fallback = false as boolean) as boolean
+        if not isAA(aa) then return fallback
+        v = aa[key]
+        if isBool(v) then return v
+        return fallback
+    end function
+
+    function getArr(aa as dynamic, key as string) as object
+        if not isAA(aa) then return []
+        v = aa[key]
+        if isArr(v) then return v
+        return []
+    end function
+
+    function getObj(aa as dynamic, key as string) as dynamic
+        if not isAA(aa) then return invalid
+        v = aa[key]
+        if isAA(v) then return v
+        return invalid
+    end function
+
+    function clampF(v as float, lo as float, hi as float) as float
+        if v < lo then return lo
+        if v > hi then return hi
+        return v
+    end function
+
+    function clampI(v as integer, lo as integer, hi as integer) as integer
+        if v < lo then return lo
+        if v > hi then return hi
+        return v
+    end function
+
+    function inList(list as object, value as dynamic) as boolean
+        for each item in list
+            if item = value then return true
+        end for
+        return false
+    end function
+
+    function trim(s as string) as string
+        a = 1
+        b = Len(s)
+        while a <= b and isSpace(Mid(s, a, 1))
+            a++
+        end while
+        while b >= a and isSpace(Mid(s, b, 1))
+            b--
+        end while
+        if b < a then return ""
+        return Mid(s, a, b - a + 1)
+    end function
+
+    function isSpace(c as string) as boolean
+        return c = " " or c = Chr(9) or c = Chr(10) or c = Chr(13)
+    end function
+
+    function isBlank(s as dynamic) as boolean
+        if not isStr(s) then return true
+        return trim(s) = ""
+    end function
+
+    ' Splits text on newlines (\n or \r\n) into an array of lines.
+    function lines(s as string) as object
+        out = []
+        cur = ""
+        n = Len(s)
+        i = 1
+        while i <= n
+            c = Mid(s, i, 1)
+            if c = Chr(10) then
+                out.push(cur)
+                cur = ""
+            else if c <> Chr(13) then
+                cur += c
+            end if
+            i++
+        end while
+        out.push(cur)
+        return out
+    end function
+
+    function firstLine(s as dynamic) as string
+        if not isStr(s) then return ""
+        l = lines(s)
+        for each x in l
+            if not isBlank(x) then return x
+        end for
+        return ""
+    end function
+
+    function upper(s as string) as string
+        return UCase(s)
+    end function
+
+    function startsWith(s as string, prefix as string) as boolean
+        return Left(s, Len(prefix)) = prefix
+    end function
+
+    function endsWith(s as string, suffix as string) as boolean
+        if Len(suffix) > Len(s) then return false
+        return Right(s, Len(suffix)) = suffix
+    end function
+
+    function repeatStr(s as string, n as integer) as string
+        out = ""
+        for i = 1 to n
+            out += s
+        end for
+        return out
+    end function
+
+    function padLeft(s as string, width as integer, ch as string) as string
+        while Len(s) < width
+            s = ch + s
+        end while
+        return s
+    end function
+
+    function hex2(n as integer) as string
+        return padLeft(StrI(n, 16), 2, "0")
+    end function
+
+    ' --- colours ---
+
+    function hexDigit(c as string) as integer
+        code = Asc(c)
+        if code >= 48 and code <= 57 then return code - 48
+        if code >= 97 and code <= 102 then return code - 87
+        if code >= 65 and code <= 70 then return code - 55
+        return -1
+    end function
+
+    function hexToInt(s as string) as integer
+        v = 0
+        for i = 1 to Len(s)
+            d = hexDigit(Mid(s, i, 1))
+            if d < 0 then return -1
+            v = v * 16 + d
+        end for
+        return v
+    end function
+
+    ' Parses #RGB, #RRGGBB or #AARRGGBB (as Android's Color.parseColor does for hex) into
+    ' {r,g,b,a} with 0..255 integers, or invalid when it is not a colour.
+    function parseColor(hex as dynamic) as dynamic
+        if not isStr(hex) then return invalid
+        h = trim(hex)
+        if Left(h, 1) <> "#" then return invalid
+        h = Mid(h, 2)
+        n = Len(h)
+        if n = 3 then
+            r = hexToInt(Mid(h, 1, 1)) * 17
+            g = hexToInt(Mid(h, 2, 1)) * 17
+            b = hexToInt(Mid(h, 3, 1)) * 17
+            if r < 0 or g < 0 or b < 0 then return invalid
+            return { r: r, g: g, b: b, a: 255 }
+        else if n = 6 or n = 8 then
+            a = 255
+            p = 1
+            if n = 8 then
+                a = hexToInt(Mid(h, 1, 2))
+                p = 3
+            end if
+            r = hexToInt(Mid(h, p, 2))
+            g = hexToInt(Mid(h, p + 2, 2))
+            b = hexToInt(Mid(h, p + 4, 2))
+            if r < 0 or g < 0 or b < 0 or a < 0 then return invalid
+            return { r: r, g: g, b: b, a: a }
+        end if
+        return invalid
+    end function
+
+    ' Roku colour string "0xRRGGBBAA" from a parsed colour, with an alpha override 0..1 (or -1 to keep).
+    function toRoku(c as object, alpha = -1.0 as float) as string
+        a = c.a
+        if alpha >= 0 then a = Int(clampF(alpha, 0, 1) * 255 + 0.5)
+        return "0x" + UCase(hex2(c.r) + hex2(c.g) + hex2(c.b) + hex2(a))
+    end function
+
+    ' Hex text to a Roku colour string, or the fallback (already a Roku colour string) when unreadable.
+    function rokuColor(hex as dynamic, fallback as string, alpha = -1.0 as float) as string
+        c = parseColor(hex)
+        if c = invalid then
+            if alpha >= 0 and Len(fallback) = 10 then
+                return Left(fallback, 8) + UCase(hex2(Int(clampF(alpha, 0, 1) * 255 + 0.5)))
+            end if
+            return fallback
+        end if
+        return toRoku(c, alpha)
+    end function
+
+    function srgbToLinear(v as float) as float
+        c = v / 255.0
+        if c <= 0.04045 then return c / 12.92
+        return ((c + 0.055) / 1.055) ^ 2.4
+    end function
+
+    ' Relative luminance, the same formula as Compose's Color.luminance().
+    function luminance(c as object) as float
+        return 0.2126 * srgbToLinear(c.r) + 0.7152 * srgbToLinear(c.g) + 0.0722 * srgbToLinear(c.b)
+    end function
+
+    function isLight(c as object) as boolean
+        return luminance(c) > 0.5
+    end function
+
+    ' Dark text on light backgrounds (luminance above 0.5), else white: same rule as the Android app and the dashboard preview.
+    function textColorOn(c as object) as object
+        if luminance(c) > 0.5 then return { r: 17, g: 17, b: 17, a: 255 }
+        return { r: 255, g: 255, b: 255, a: 255 }
+    end function
+
+    function lerpColor(a as object, b as object, t as float) as object
+        return {
+            r: Int(a.r + (b.r - a.r) * t + 0.5),
+            g: Int(a.g + (b.g - a.g) * t + 0.5),
+            b: Int(a.b + (b.b - a.b) * t + 0.5),
+            a: 255
+        }
+    end function
+
+end namespace

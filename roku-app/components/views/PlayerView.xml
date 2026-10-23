@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Plays a list of slides from the TV remote: Kids playlists, Signage loops, Slides decks and the demos.
+     Mirrors PlayerScreen.kt and SlidesPlayer.kt. Keys: Right/Left = next/back, OK = pause video (Kids, Signage) or the slide list
+     (decks), Play/Pause = black screen (decks) or pause (playlists), Back = stop. -->
+<component name="PlayerView" extends="Group">
+    <interface>
+        <!-- { slides, isDeck, loop, theme, brand, report: { module, title, refKind, refId } or invalid, portrait, w, h, zone } -->
+        <field id="config" type="assocarray" onChange="setup" />
+        <!-- remote commands from the server: [{ seq, type, ... }] -->
+        <field id="commands" type="array" onChange="onCommands" />
+        <!-- what is on screen, for remotes (see RemoteTask) -->
+        <field id="status" type="assocarray" />
+        <!-- set true by the scene just before it removes the view: stops video, audio and timers -->
+        <field id="closing" type="boolean" value="false" onChange="onClosing" />
+        <!-- "finished" (reached the end) or "exit" (Back or a Stop command) -->
+        <field id="result" type="string" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="PlayerView.bs" />
+</component>

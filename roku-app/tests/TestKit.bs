@@ -1,0 +1,52 @@
+namespace TestKit
+
+    function create() as object
+        return { pass: 0, fail: 0, current: "" }
+    end function
+
+    sub suite(t as object, name as string)
+        t.current = name
+        print "== " + name
+    end sub
+
+    sub check(t as object, name as string, ok as boolean, detail = "" as string)
+        if ok then
+            t.pass++
+        else
+            t.fail++
+            print "  FAIL [" + t.current + "] " + name + " " + detail
+        end if
+    end sub
+
+    sub eq(t as object, name as string, actual as dynamic, expected as dynamic)
+        ok = false
+        if Util.isNum(actual) and Util.isNum(expected) then
+            ok = Abs(actual - expected) < 0.0001
+        else if Util.isStr(actual) and Util.isStr(expected) then
+            ok = actual = expected
+        else if Util.isBool(actual) and Util.isBool(expected) then
+            ok = actual = expected
+        else if actual = invalid and expected = invalid then
+            ok = true
+        else if (Util.isAA(actual) and Util.isAA(expected)) or (Util.isArr(actual) and Util.isArr(expected)) then
+            ok = FormatJson(actual) = FormatJson(expected)
+        end if
+        if ok then
+            t.pass++
+        else
+            t.fail++
+            print "  FAIL [" + t.current + "] " + name + ": got " + FormatJson(actual) + " expected " + FormatJson(expected)
+        end if
+    end sub
+
+    sub finish(t as object)
+        print ""
+        print "Tests passed: " + t.pass.toStr() + "   failed: " + t.fail.toStr()
+        if t.fail > 0 then
+            print "RESULT: FAIL"
+        else
+            print "RESULT: PASS"
+        end if
+    end sub
+
+end namespace

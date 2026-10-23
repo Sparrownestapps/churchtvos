@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- What is scheduled for this screen (a Kids playlist or a Slides deck) and a Play button. -->
+<component name="HomeView" extends="Group">
+    <interface>
+        <!-- { site, location, heading, name, rows: [{kind,label}], moreCount, status, canPlay, hint, brand, portrait, w, h } -->
+        <field id="config" type="assocarray" onChange="build" />
+        <!-- "play" -->
+        <field id="action" type="string" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="HomeView.bs" />
+</component>

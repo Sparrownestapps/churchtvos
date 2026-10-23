@@ -1,0 +1,100 @@
+import "pkg:/source/lib/Config.bs"
+import "pkg:/source/lib/Util.bs"
+import "pkg:/source/lib/TimeUtil.bs"
+import "pkg:/source/lib/Model.bs"
+import "pkg:/components/lib/Device.bs"
+import "pkg:/components/lib/Http.bs"
+
+sub init()
+    m.top.functionName = "execute"
+end sub
+
+sub execute()
+    port = CreateObject("roMessagePort")
+    m.top.observeField("wake", port)
+    m.top.observeField("reidentify", port)
+    registered = false
+    seq = 0
+    pairedNow = false
+    cached = Device.cachedState()
+    if cached <> invalid and Util.getBool(cached, "paired", false) then pairedNow = true
+
+    while true
+        seq++
+        id = Device.deviceId()
+        secret = Device.secret()
+        out = { deviceId: id, seq: seq, offline: false, error: "", state: invalid, mediaUrls: [], unknownDevice: false }
+        failed = false
+
+        if not registered then
+            r = Http.rpc("register_device", { p_device_id: id, p_secret: secret, p_model: Device.model(), p_app_version: Config.REPORTED_APP_VERSION })
+            if r.ok then
+                registered = true
+            else
+                failed = true
+                out.error = r.error
+                if isUnknownDevice(r) then out.unknownDevice = true
+            end if
+        end if
+
+        if registered then
+            r = Http.rpc("device_state", { p_device_id: id, p_secret: secret })
+            if r.ok then
+                parsed = ParseJson(r.body)
+                if Util.isAA(parsed) then
+                    Device.saveState(r.body)
+                    out.state = parsed
+                    pairedNow = Util.getBool(parsed, "paired", false)
+                    if pairedNow then out.mediaUrls = mediaUrlsFor(parsed)
+                else
+                    failed = true
+                    out.error = "Unreadable answer from the server"
+                end if
+            else
+                failed = true
+                out.error = r.error
+                if isUnknownDevice(r) then out.unknownDevice = true
+            end if
+        end if
+
+        if out.unknownDevice then
+            ' The server no longer knows this TV (deleted from the dashboard): start over with a fresh identity.
+            Device.reset()
+            registered = false
+            pairedNow = false
+            out.offline = false
+            out.error = ""
+        else if failed then
+            out.offline = true
+        end if
+        m.top.result = out
+
+        ' Poll quickly while waiting to be paired so it feels instant (same cadences as the Android app).
+        wait_ms = Config.STATE_POLL_UNPAIRED_MS
+        if pairedNow then wait_ms = Config.STATE_POLL_PAIRED_MS
+        if out.unknownDevice then wait_ms = 500
+        msg = wait(wait_ms, port)
+        while msg <> invalid
+            if type(msg) = "roSGNodeEvent" and msg.getField() = "reidentify" then registered = false
+            msg = wait(1, port)
+        end while
+    end while
+end sub
+
+function isUnknownDevice(r as object) as boolean
+    return Instr(1, r.error, "Unknown device") > 0 or Instr(1, r.body, "Unknown device") > 0
+end function
+
+' Remote files to keep on the TV, plus the church's logos so the home and pairing screens survive being offline.
+function mediaUrlsFor(state as object) as object
+    urls = Model.allMediaUrls(state)
+    brand = Model.brand(state)
+    if brand.logoUrl <> invalid then urls.push(brand.logoUrl)
+    if brand.logoDarkUrl <> invalid then urls.push(brand.logoDarkUrl)
+    for each moduleName in ["kids", "signage", "slides"]
+        b = Model.brand(state, moduleName)
+        if b.logoUrl <> invalid then urls.push(b.logoUrl)
+        if b.logoDarkUrl <> invalid then urls.push(b.logoDarkUrl)
+    end for
+    return Model.distinct(urls)
+end function

@@ -1,0 +1,749 @@
+' Everything the TV decides from device_state, as pure functions over the parsed JSON (associative arrays).
+' This mirrors tv-app Model.kt, Modules.kt, SlidesModel.kt and Theme.kt. Server data is never trusted: every read goes through
+' Util.get* with a default, and unknown item, slide and background kinds are skipped or ignored instead of failing.
+'
+' A "slide" here is one screen of content, an associative array with a `kind`:
+'   video, image, countdown, lyric, songtitle, sign, stream, ndi (message only), text, blank
+' plus kind-specific fields and, for deck slides, an optional resolved background `bg`.
+
+import "pkg:/source/lib/Config.bs"
+import "pkg:/source/lib/Util.bs"
+import "pkg:/source/lib/TimeUtil.bs"
+
+namespace Model
+
+    ' ---------- modules and schedules ----------
+
+    function isoOrInvalid(v as dynamic) as dynamic
+        return TimeUtil.parseIso(v)
+    end function
+
+    ' "HH:MM" or "HH:MM:SS" to seconds since midnight, or -1.
+    function clockSeconds(text as dynamic) as integer
+        if not Util.isStr(text) then return -1
+        t = Util.trim(text)
+        if Len(t) < 4 or Instr(1, t, ":") < 2 then return -1
+        parts = t.split(":")
+        if parts.count() < 2 then return -1
+        if not TimeUtil.allDigits(parts[0]) or not TimeUtil.allDigits(parts[1]) then return -1
+        h = parts[0].toInt()
+        mi = parts[1].toInt()
+        sec = 0
+        if parts.count() >= 3 and TimeUtil.allDigits(Left(parts[2], 2)) then sec = Left(parts[2], 2).toInt()
+        if h > 24 or mi > 59 then return -1
+        return h * 3600 + mi * 60 + sec
+    end function
+
+    ' Same rule the server uses: day in days (0 = Sunday) and start <= time < end, in the site's local time.
+    function ruleMatches(days as object, startText as dynamic, endText as dynamic, parts as object) as boolean
+        if not Util.inList(days, parts.weekday) then return false
+        s = clockSeconds(startText)
+        e = clockSeconds(endText)
+        if s < 0 or e < 0 then return false
+        return parts.secondsOfDay >= s and parts.secondsOfDay < e
+    end function
+
+    function siteParts(state as object, nowEpoch as integer, deviceOffset as integer) as object
+        zone = Util.getStr(state, "timezone", "America/Toronto")
+        return TimeUtil.localParts(nowEpoch, TimeUtil.offsetMinutes(zone, nowEpoch, deviceOffset))
+    end function
+
+    ' Highest priority wins; among equals the later rule (the server sends them oldest first) wins.
+    function pickRule(rules as object, parts as object) as dynamic
+        best = invalid
+        bestPriority = 0
+        for each rule in rules
+            if Util.isAA(rule) then
+                if ruleMatches(Util.getArr(rule, "days"), rule["start"], rule["end"], parts) then
+                    pr = Util.getNum(rule, "priority", 0)
+                    if best = invalid or pr >= bestPriority then
+                        best = rule
+                        bestPriority = pr
+                    end if
+                end if
+            end if
+        end for
+        return best
+    end function
+
+    ' The module this TV should run right now: kids, signage, slides or off. Evaluated on the TV so mixed TVs keep switching offline.
+    function moduleNow(state as object, nowEpoch as integer, deviceOffset as integer) as string
+        parts = siteParts(state, nowEpoch, deviceOffset)
+        rule = pickRule(Util.getArr(state, "module_rules"), parts)
+        if rule <> invalid then
+            return Util.getStr(rule, "module", Util.getStr(state, "default_module", "kids"))
+        end if
+        return Util.getStr(state, "default_module", "kids")
+    end function
+
+    ' The Signage playlist for right now (slot, else the default playlist), or invalid for a black screen.
+    ' Weekly slots and screen groups are resolved by the server (device_state only sends this screen's own and its group's slots).
+    function signagePlaylistNow(state as object, nowEpoch as integer, deviceOffset as integer) as dynamic
+        signage = Util.getObj(state, "signage")
+        if signage = invalid then return invalid
+        parts = siteParts(state, nowEpoch, deviceOffset)
+        slot = pickRule(Util.getArr(signage, "slots"), parts)
+        if slot <> invalid then
+            p = Util.getObj(slot, "playlist")
+            if p <> invalid then return p
+        end if
+        return Util.getObj(signage, "default_playlist")
+    end function
+
+    ' Schedules (Kids: key "playlist" inside state.kids.schedules; Slides: state.slides.schedules with "deck").
+    ' The schedule showing now is the latest one that has started and not ended.
+    function currentSchedule(list as object, nowEpoch as integer) as dynamic
+        best = invalid
+        bestStart = 0
+        for each sch in list
+            if Util.isAA(sch) then
+                st = TimeUtil.parseIso(sch["starts_at"])
+                if st <> invalid then
+                    en = TimeUtil.parseIso(sch["ends_at"])
+                    if st <= nowEpoch and (en = invalid or en > nowEpoch) then
+                        if best = invalid or st >= bestStart then
+                            best = sch
+                            bestStart = st
+                        end if
+                    end if
+                end if
+            end if
+        end for
+        return best
+    end function
+
+    function nextSchedule(list as object, nowEpoch as integer) as dynamic
+        best = invalid
+        bestStart = 0
+        for each sch in list
+            if Util.isAA(sch) then
+                st = TimeUtil.parseIso(sch["starts_at"])
+                if st <> invalid and st > nowEpoch then
+                    if best = invalid or st < bestStart then
+                        best = sch
+                        bestStart = st
+                    end if
+                end if
+            end if
+        end for
+        return best
+    end function
+
+    function kidsSchedules(state as object) as object
+        return Util.getArr(Util.getObj(state, "kids"), "schedules")
+    end function
+
+    function slidesSchedules(state as object) as object
+        return Util.getArr(Util.getObj(state, "slides"), "schedules")
+    end function
+
+    ' ---------- branding ----------
+
+    ' The church's look with a module's own settings laid over it. Colours are hex strings (or invalid); the views convert them.
+    function brand(state as object, moduleName = "" as string) as object
+        org = Util.getObj(state, "organization")
+        branding = Util.getObj(org, "branding")
+        own = invalid
+        if moduleName <> "" then own = Util.getObj(Util.getObj(branding, "modules"), moduleName)
+        splashOwn = Util.getObj(own, "splash")
+        splashOrg = Util.getObj(branding, "splash")
+        enabled = invalid
+        if splashOwn <> invalid and Util.isBool(splashOwn["enabled"]) then
+            enabled = splashOwn["enabled"]
+        else if splashOrg <> invalid and Util.isBool(splashOrg["enabled"]) then
+            enabled = splashOrg["enabled"]
+        end if
+        seconds = Util.getIntOrInvalid(splashOwn, "seconds")
+        if seconds = invalid then seconds = Util.getIntOrInvalid(splashOrg, "seconds")
+        splashSeconds = invalid
+        if enabled = true then
+            if seconds = invalid then seconds = 5
+            splashSeconds = Util.clampI(seconds, 2, 30)
+        end if
+        primary = pickColor(own, "primary_color", branding, "#1B2A4A")
+        accent = pickColor(own, "accent_color", branding, "#F2A33A")
+        return {
+            primary: primary,
+            accent: accent,
+            logoUrl: firstStr(own, "logo_url", branding),
+            logoDarkUrl: firstStr(own, "logo_dark_url", branding),
+            orgName: Util.getStr(org, "name", "Church TV OS"),
+            splashSeconds: splashSeconds
+        }
+    end function
+
+    function pickColor(own as dynamic, key as string, base as dynamic, fallback as string) as string
+        c = Util.getStr(own, key, "")
+        if Util.parseColor(c) <> invalid then return c
+        c = Util.getStr(base, key, "")
+        if Util.parseColor(c) <> invalid then return c
+        return fallback
+    end function
+
+    function firstStr(own as dynamic, key as string, base as dynamic) as dynamic
+        s = Util.getStr(own, key, "")
+        if s <> "" then return s
+        s = Util.getStr(base, key, "")
+        if s <> "" then return s
+        return invalid
+    end function
+
+    ' Logo for a background colour: the dark-background logo on dark colours, else the normal one (falling back either way).
+    function logoOn(look as object, background as object) as dynamic
+        if Util.luminance(background) < 0.4 then
+            if look.logoDarkUrl <> invalid then return look.logoDarkUrl
+            return look.logoUrl
+        end if
+        if look.logoUrl <> invalid then return look.logoUrl
+        return look.logoDarkUrl
+    end function
+
+    ' ---------- Kids / Signage playlists to slides ----------
+
+    ' A countdown spec from a playlist item or deck slide.
+    function countdownSpec(src as object) as object
+        audio = invalid
+        a = Util.getObj(src, "audio")
+        if a <> invalid and Util.getStr(a, "url", "") <> "" then
+            audio = {
+                url: a["url"],
+                volume: Util.getNum(a, "volume", 0.8),
+                loop: Util.getBool(a, "loop", true),
+                fadeSeconds: Util.getNum(a, "fade_seconds", 3),
+                alignEnd: Util.getBool(a, "align_end", false)
+            }
+        end if
+        return {
+            mode: Util.getStr(src, "mode", "duration"),
+            seconds: Int(Util.getNum(src, "seconds", 60)),
+            until: Util.getStrOrInvalid(src, "until"),
+            audio: audio,
+            atZero: Util.getStr(src, "at_zero", "next"),
+            ifPassed: Util.getStr(src, "if_passed", "zero")
+        }
+    end function
+
+    ' Roku has no NDI. Mirrors NdiSpec.isPlayable for a build without NDI: only items that asked for a message are kept (the message is
+    ' the whole slide); "skip" items are dropped at once, and nothing plays when the church's flag is off.
+    function ndiSlide(src as object, ndiFlag as boolean, extra as object) as dynamic
+        if not ndiFlag then return invalid
+        if Util.getStr(src, "fallback", "skip") <> "message" then return invalid
+        text = Util.trim(Util.getStr(src, "fallback_text", ""))
+        if text = "" then text = "Waiting for the live feed" + Chr(8230)
+        s = {
+            kind: "ndi",
+            title: Util.getStr(src, "title", ""),
+            source: Util.getStr(src, "source", ""),
+            message: text,
+            seconds: Util.getIntOrInvalid(src, "seconds")
+        }
+        s.append(extra)
+        return s
+    end function
+
+    ' One playlist item to its slides. YouTube cannot be embedded on Roku, so (like an unknown item type) it is skipped.
+    function itemSlides(item as object, ndiFlag as boolean) as object
+        t = Util.getStr(item, "type", "")
+        title = Util.getStr(item, "title", "")
+        if t = "video" then
+            return [{ kind: "video", title: title, url: Util.getStr(item, "url", ""), audio: true, fit: "contain" }]
+        else if t = "image" then
+            return [{ kind: "image", title: title, url: Util.getStr(item, "url", ""), seconds: Util.getIntOrInvalid(item, "seconds"), fit: "contain" }]
+        else if t = "countdown" then
+            return [{ kind: "countdown", title: title, spec: countdownSpec(item) }]
+        else if t = "lyrics" then
+            return lyricSlides(item)
+        else if t = "sign" then
+            return [{
+                kind: "sign", title: title, subtext: Util.getStr(item, "subtext", ""),
+                background: Util.getStr(item, "background", "#1B2A4A"), seconds: Int(Util.getNum(item, "seconds", 10)),
+                align: Util.getStr(item, "align", "center"), logo: Util.getBool(item, "logo", false)
+            }]
+        else if t = "stream" then
+            return [{
+                kind: "stream", title: title, url: Util.getStr(item, "url", ""), audio: Util.getBool(item, "audio", false),
+                seconds: Util.getIntOrInvalid(item, "seconds"), fallback: Util.getStr(item, "fallback", "skip")
+            }]
+        else if t = "ndi" then
+            s = ndiSlide(item, ndiFlag, {})
+            if s <> invalid then return [s]
+            return []
+        end if
+        ' "youtube", "unknown" and anything newer than this app
+        return []
+    end function
+
+    ' A song's slides: an optional title slide first (holds until Next), then one slide per lyric section.
+    function lyricSlides(item as object) as object
+        out = []
+        words = Util.getArr(item, "slides")
+        title = Util.getStr(item, "title", "")
+        if Util.getBool(item, "show_title", false) then
+            out.push({
+                kind: "songtitle", title: title, authors: Util.getStrOrInvalid(item, "authors"),
+                ccli: Util.getStrOrInvalid(item, "ccli"), copyright: Util.getStrOrInvalid(item, "copyright")
+            })
+        end if
+        labels = Util.getArr(item, "labels")
+        n = 0
+        for each text in words
+            if Util.isStr(text) then
+                n++
+                lbl = ""
+                if labels.count() >= n and Util.isStr(labels[n - 1]) then lbl = labels[n - 1]
+                out.push({ kind: "lyric", song: title, text: text, label: lbl, number: n, count: words.count() })
+            end if
+        end for
+        return out
+    end function
+
+    function playlistSlides(playlist as dynamic, ndiFlag as boolean) as object
+        out = []
+        if not Util.isAA(playlist) then return out
+        for each item in Util.getArr(playlist, "items")
+            if Util.isAA(item) then
+                for each s in itemSlides(item, ndiFlag)
+                    out.push(s)
+                end for
+            end if
+        end for
+        return out
+    end function
+
+    ' Items of a playlist that this player will not show (YouTube and unknown kinds), for the home screen note.
+    function unsupportedItemCount(playlist as dynamic, ndiFlag as boolean) as integer
+        n = 0
+        if not Util.isAA(playlist) then return 0
+        for each item in Util.getArr(playlist, "items")
+            if Util.isAA(item) then
+                t = Util.getStr(item, "type", "")
+                if t = "youtube" then
+                    n++
+                else if t <> "video" and t <> "image" and t <> "countdown" and t <> "lyrics" and t <> "sign" and t <> "stream" and t <> "ndi" then
+                    n++
+                else if t = "ndi" and itemSlides(item, ndiFlag).count() = 0 then
+                    n++
+                end if
+            end if
+        end for
+        return n
+    end function
+
+    ' Signage loops must move on: an image with no duration shows for 10 s, a stream or message for 30 s.
+    function signageLoopSlides(slides as object) as object
+        out = []
+        for each s in slides
+            c = {}
+            c.append(s)
+            if s.kind = "image" and c.seconds = invalid then c.seconds = 10
+            if (s.kind = "stream" or s.kind = "ndi") and c.seconds = invalid then c.seconds = 30
+            out.push(c)
+        end for
+        return out
+    end function
+
+    ' ---------- Slides decks ----------
+
+    function validBackground(bg as dynamic) as dynamic
+        if not Util.isAA(bg) then return invalid
+        t = Util.getStr(bg, "type", "")
+        if t = "color" or t = "gradient" or t = "image" or t = "video" then return bg
+        return invalid
+    end function
+
+    ' Resolution order: slide, then deck, then theme (then the church's primary colour, applied by the view).
+    function resolveBackground(deck as object, slide as dynamic) as dynamic
+        own = invalid
+        if Util.isAA(slide) then own = validBackground(slide["background"])
+        if own <> invalid then return own
+        d = validBackground(deck["background"])
+        if d <> invalid then return d
+        return validBackground(Util.getObj(Util.getObj(deck, "theme"), "background"))
+    end function
+
+    function deckSlide(raw as object, deck as object, ndiFlag as boolean) as dynamic
+        k = Util.getStr(raw, "kind", "")
+        bg = resolveBackground(deck, raw)
+        s = invalid
+        if k = "text" then
+            s = {
+                kind: "text", title: Util.getStrOrInvalid(raw, "title"), body: Util.getStrOrInvalid(raw, "body"),
+                layout: Util.getStr(raw, "layout", "title_body"), align: Util.getStrOrInvalid(raw, "align"),
+                textColor: Util.getStrOrInvalid(raw, "text_color"), seconds: Util.getIntOrInvalid(raw, "seconds")
+            }
+        else if k = "media" then
+            if Util.getStr(raw, "media_kind", "image") = "video" then
+                s = { kind: "video", title: "", url: Util.getStr(raw, "url", ""), audio: Util.getBool(raw, "audio", true), fit: Util.getStr(raw, "fit", "contain") }
+            else
+                s = { kind: "image", title: "", url: Util.getStr(raw, "url", ""), seconds: Util.getIntOrInvalid(raw, "seconds"), fit: Util.getStr(raw, "fit", "contain") }
+            end if
+        else if k = "countdown" then
+            s = { kind: "countdown", title: Util.getStr(raw, "title", ""), spec: countdownSpec(raw) }
+        else if k = "stream" then
+            s = {
+                kind: "stream", title: Util.getStr(raw, "title", ""), url: Util.getStr(raw, "url", ""), audio: Util.getBool(raw, "audio", false),
+                seconds: Util.getIntOrInvalid(raw, "seconds"), fallback: Util.getStr(raw, "fallback", "skip")
+            }
+        else if k = "ndi" then
+            s = ndiSlide(raw, ndiFlag, {})
+        else if k = "blank" then
+            s = { kind: "blank", color: Util.getStrOrInvalid(raw, "color") }
+        else if k = "song_title" then
+            s = {
+                kind: "songtitle", title: Util.getStr(raw, "title", ""), authors: Util.getStrOrInvalid(raw, "authors"),
+                ccli: Util.getStrOrInvalid(raw, "ccli"), copyright: Util.getStrOrInvalid(raw, "copyright")
+            }
+        else if k = "lyric" then
+            s = {
+                kind: "lyric", song: Util.getStr(raw, "song", ""), text: Util.getStr(raw, "text", ""), label: Util.getStr(raw, "label", ""),
+                number: Int(Util.getNum(raw, "number", 1)), count: Int(Util.getNum(raw, "count", 1))
+            }
+        end if
+        ' "unknown" and kinds newer than this app are skipped
+        if s = invalid then return invalid
+        s.bg = bg
+        return s
+    end function
+
+    function deckSlides(deck as dynamic, ndiFlag as boolean) as object
+        out = []
+        if not Util.isAA(deck) then return out
+        for each raw in Util.getArr(deck, "slides")
+            if Util.isAA(raw) then
+                s = deckSlide(raw, deck, ndiFlag)
+                if s <> invalid then out.push(s)
+            end if
+        end for
+        return out
+    end function
+
+    ' ---------- media ----------
+
+    function playlistMediaUrls(playlist as dynamic) as object
+        urls = []
+        if not Util.isAA(playlist) then return urls
+        for each item in Util.getArr(playlist, "items")
+            if Util.isAA(item) then
+                t = Util.getStr(item, "type", "")
+                if (t = "video" or t = "image") and Util.getStr(item, "url", "") <> "" then
+                    urls.push(item["url"])
+                else if t = "countdown" then
+                    a = Util.getObj(item, "audio")
+                    if a <> invalid and Util.getStr(a, "url", "") <> "" then urls.push(a["url"])
+                end if
+            end if
+        end for
+        return urls
+    end function
+
+    function backgroundUrl(bg as dynamic) as dynamic
+        bg = validBackground(bg)
+        if bg = invalid then return invalid
+        t = Util.getStr(bg, "type", "")
+        if (t = "image" or t = "video") and Util.getStr(bg, "url", "") <> "" then return bg["url"]
+        return invalid
+    end function
+
+    function deckMediaUrls(deck as dynamic) as object
+        urls = []
+        if not Util.isAA(deck) then return urls
+        u = backgroundUrl(deck["background"])
+        if u <> invalid then urls.push(u)
+        u = backgroundUrl(Util.getObj(Util.getObj(deck, "theme"), "background"))
+        if u <> invalid then urls.push(u)
+        for each s in Util.getArr(deck, "slides")
+            if Util.isAA(s) then
+                u = backgroundUrl(s["background"])
+                if u <> invalid then urls.push(u)
+                k = Util.getStr(s, "kind", "")
+                if k = "media" and Util.getStr(s, "url", "") <> "" then urls.push(s["url"])
+                if k = "countdown" then
+                    a = Util.getObj(s, "audio")
+                    if a <> invalid and Util.getStr(a, "url", "") <> "" then urls.push(a["url"])
+                end if
+            end if
+        end for
+        return distinct(urls)
+    end function
+
+    function distinct(list as object) as object
+        seen = {}
+        out = []
+        for each x in list
+            if seen[x] = invalid then
+                seen[x] = true
+                out.push(x)
+            end if
+        end for
+        return out
+    end function
+
+    ' Every remote file this TV may need, in the order Android downloads them (kids, signage, slides, override).
+    function allMediaUrls(state as object) as object
+        urls = []
+        sch = kidsSchedules(state)
+        for each s in sortedByStart(sch)
+            urls.append(playlistMediaUrls(s["playlist"]))
+        end for
+        signage = Util.getObj(state, "signage")
+        for each slot in Util.getArr(signage, "slots")
+            if Util.isAA(slot) then urls.append(playlistMediaUrls(slot["playlist"]))
+        end for
+        if signage <> invalid then urls.append(playlistMediaUrls(signage["default_playlist"]))
+        for each s in sortedByStart(slidesSchedules(state))
+            urls.append(deckMediaUrls(s["deck"]))
+        end for
+        ov = Util.getObj(state, "override")
+        if ov <> invalid then
+            urls.append(deckMediaUrls(ov["deck"]))
+            urls.append(playlistMediaUrls(ov["playlist"]))
+        end if
+        return distinct(urls)
+    end function
+
+    ' Schedules ordered by starts_at (insertion sort: the lists are short).
+    function sortedByStart(list as object) as object
+        out = []
+        for each sch in list
+            if Util.isAA(sch) then
+                st = TimeUtil.parseIso(sch["starts_at"])
+                if st = invalid then st = 0
+                i = out.count()
+                while i > 0 and out[i - 1].start > st
+                    i--
+                end while
+                out.push(invalid)
+                for j = out.count() - 1 to i + 1 step -1
+                    out[j] = out[j - 1]
+                end for
+                out[i] = { start: st, sch: sch }
+            end if
+        end for
+        res = []
+        for each e in out
+            res.push(e.sch)
+        end for
+        return res
+    end function
+
+    ' ---------- labels for remotes ("Jump to slide" lists and the now-showing line) ----------
+
+    function slideLabel(s as object) as string
+        k = s.kind
+        if k = "video" then return "Video"
+        if k = "image" then return "Picture"
+        if k = "countdown" then
+            if Util.isBlank(s.title) then return "Countdown"
+            return s.title
+        end if
+        if k = "lyric" then return s.song + " " + Chr(183) + " Part " + s.number.toStr() + " of " + s.count.toStr()
+        if k = "songtitle" then return s.title + " (title)"
+        if k = "sign" then
+            if Util.isBlank(s.title) then return "Sign"
+            return s.title
+        end if
+        if k = "stream" then return "Live stream"
+        if k = "ndi" then
+            n = s.title
+            if Util.isBlank(n) then n = s.source
+            if Util.isBlank(n) then n = "source"
+            return "NDI: " + n
+        end if
+        if k = "text" then
+            t = Util.getStr(s, "title", "")
+            if not Util.isBlank(t) then return t
+            b = Util.firstLine(s.body)
+            if b <> "" then return b
+            return "Text"
+        end if
+        if k = "blank" then return "Blank"
+        return "Slide"
+    end function
+
+    ' Deck slides use their own wording in the outline (same as SlidesPlayer.listLabel in the Android app).
+    function deckListLabel(s as object) as string
+        k = s.kind
+        if k = "video" then return "Video"
+        if k = "image" then return "Picture"
+        if k = "countdown" then
+            if not Util.isBlank(s.title) then return "Countdown: " + s.title
+            return "Countdown"
+        end if
+        if k = "stream" then
+            if not Util.isBlank(s.title) then return "Live: " + s.title
+            return "Live stream"
+        end if
+        if k = "lyric" then
+            lbl = s.label
+            if Util.isBlank(lbl) then lbl = "Part " + s.number.toStr()
+            return s.song + " " + Chr(183) + " " + lbl
+        end if
+        return slideLabel(s)
+    end function
+
+    ' The state a "start" command or override refers to, etc, live in the view code; here only the label list.
+    function outline(slides as object, isDeck as boolean) as object
+        out = []
+        for each s in slides
+            if isDeck then
+                out.push(deckListLabel(s))
+            else
+                out.push(slideLabel(s))
+            end if
+        end for
+        return out
+    end function
+
+    ' ---------- theme and text style (decks) ----------
+
+    ' How text looks on a deck slide: the theme with per-slide overrides applied (mirrors ThemeConfig.toStyle).
+    function themeStyle(theme as dynamic, slide as dynamic) as object
+        slideAlign = ""
+        slideColor = ""
+        if Util.isAA(slide) and slide.kind = "text" then
+            slideAlign = Util.getStr(slide, "align", "")
+            slideColor = Util.getStr(slide, "textColor", "")
+        end if
+        colorHex = "#FFFFFF"
+        if Util.parseColor(slideColor) <> invalid then
+            colorHex = slideColor
+        else if Util.parseColor(Util.getStr(theme, "text_color", "")) <> invalid then
+            colorHex = theme["text_color"]
+        end if
+        align = slideAlign
+        if align = "" then align = Util.getStr(theme, "align", "center")
+        shadow = "none"
+        if Util.getBool(theme, "outline", false) then
+            shadow = "outline"
+        else if Util.getBool(theme, "shadow", true) then
+            shadow = "shadow"
+        end if
+        titleFont = "lato"
+        if Util.getStr(theme, "font", "") = "julius" then titleFont = "julius"
+        return {
+            titleFont: titleFont,
+            titleScale: Util.clampF(Util.getNum(theme, "title_scale", 1), 0.5, 1.5),
+            bodyScale: Util.clampF(Util.getNum(theme, "body_scale", 1), 0.5, 1.5),
+            colorHex: colorHex,
+            center: align <> "left",
+            position: Util.getStr(theme, "position", "center"),
+            shadow: shadow,
+            marginPct: Util.clampF(Util.getNum(theme, "margin", 8), 0, 20),
+            showLabels: Util.getBool(theme, "show_labels", true)
+        }
+    end function
+
+    ' The default (Kids and Signage) text style: white, centred, no shadow.
+    function playlistStyle() as object
+        return {
+            titleFont: "lato", titleScale: 1, bodyScale: 1, colorHex: "#FFFFFF", center: true,
+            position: "center", shadow: "none", marginPct: 5, showLabels: false
+        }
+    end function
+
+    ' The shipped ramp image closest to a CSS gradient angle (steps of 15 degrees): "pkg:/images/ramps/L_135.png" (landscape)
+    ' or P_135.png (portrait). See tools/make_assets.py.
+    function rampFile(angle as float, portrait as boolean) as string
+        deg = (Int(angle / 15 + 0.5) * 15) mod 360
+        if deg < 0 then deg = deg + 360
+        side = "L"
+        if portrait then side = "P"
+        return "pkg:/images/ramps/" + side + "_" + deg.toStr() + ".png"
+    end function
+
+    ' ---------- home screen rows ----------
+
+    function itemKindLabel(item as object) as dynamic
+        t = Util.getStr(item, "type", "")
+        if t = "video" then return "VIDEO"
+        if t = "image" then return "SLIDE"
+        if t = "countdown" then return "COUNTDOWN"
+        if t = "lyrics" then return "LYRICS"
+        if t = "youtube" then
+            if Util.getStr(item, "video_id", "") = "" then return "LIVE"
+            return "YOUTUBE"
+        end if
+        if t = "sign" then return "SIGN"
+        if t = "stream" then return "STREAM"
+        if t = "ndi" then return "NDI"
+        return invalid ' unknown kinds are not listed
+    end function
+
+    ' Rows for the Kids home card: [{ kind, label }]. YouTube items are listed but marked, since Roku cannot play them.
+    function kidsHomeRows(playlist as dynamic) as object
+        rows = []
+        if not Util.isAA(playlist) then return rows
+        for each item in Util.getArr(playlist, "items")
+            if Util.isAA(item) then
+                k = itemKindLabel(item)
+                if k <> invalid then
+                    label = Util.getStr(item, "title", "")
+                    if Util.getStr(item, "type", "") = "youtube" then label = label + "  (not supported on Roku)"
+                    rows.push({ kind: k, label: label })
+                end if
+            end if
+        end for
+        return rows
+    end function
+
+    ' Rows for the Slides home card, from the deck as the server sent it.
+    function deckHomeRows(deck as dynamic) as object
+        rows = []
+        if not Util.isAA(deck) then return rows
+        for each s in Util.getArr(deck, "slides")
+            if Util.isAA(s) then
+                k = Util.getStr(s, "kind", "")
+                if k = "text" then
+                    label = Util.getStr(s, "title", "")
+                    if Util.isBlank(label) then label = Util.firstLine(Util.getStr(s, "body", ""))
+                    rows.push({ kind: "TEXT", label: label })
+                else if k = "media" then
+                    kind = "PICTURE"
+                    if Util.getStr(s, "media_kind", "image") = "video" then kind = "VIDEO"
+                    rows.push({ kind: kind, label: "" })
+                else if k = "countdown" then
+                    rows.push({ kind: "COUNTDOWN", label: Util.getStr(s, "title", "") })
+                else if k = "stream" then
+                    rows.push({ kind: "LIVE", label: Util.getStr(s, "title", "") })
+                else if k = "ndi" then
+                    rows.push({ kind: "NDI", label: Util.getStr(s, "title", "") })
+                else if k = "blank" then
+                    rows.push({ kind: "BLANK", label: "" })
+                else if k = "song_title" then
+                    rows.push({ kind: "SONG", label: Util.getStr(s, "title", "") })
+                else if k = "lyric" then
+                    part = Util.getStr(s, "label", "")
+                    if part = "" then part = "Part " + Int(Util.getNum(s, "number", 1)).toStr()
+                    rows.push({ kind: "LYRICS", label: Util.getStr(s, "song", "") + " " + Chr(183) + " " + part })
+                end if
+            end if
+        end for
+        return rows
+    end function
+
+    ' ---------- pairing ----------
+
+    ' The pairing QR contract (shared with iOS, Android and the dashboard /pair page): exactly https://app.churchtvos.com/pair?code=<CODE>,
+    ' the 6 characters uppercase with no spaces. Returns invalid for the "......" placeholder.
+    function pairingQrPayload(code as dynamic) as dynamic
+        if not Util.isStr(code) then return invalid
+        clean = ""
+        for i = 1 to Len(code)
+            c = Mid(code, i, 1)
+            if not Util.isSpace(c) then clean += UCase(c)
+        end for
+        if Len(clean) <> 6 then return invalid
+        for i = 1 to 6
+            a = Asc(Mid(clean, i, 1))
+            if not ((a >= 65 and a <= 90) or (a >= 48 and a <= 57)) then return invalid
+        end for
+        return "https://" + Config.DASHBOARD_HOST + "/pair?code=" + clean
+    end function
+
+    ' "ABC123" shown as "ABC  123".
+    function codeDisplay(code as string) as string
+        if Len(code) = 6 then return Left(code, 3) + "  " + Right(code, 3)
+        return code
+    end function
+
+end namespace

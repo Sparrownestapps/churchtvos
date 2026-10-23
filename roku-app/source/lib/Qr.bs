@@ -1,0 +1,483 @@
+' A small QR code encoder: byte mode, error correction level M, versions 1 to 6 (up to 106 bytes), automatic mask choice.
+' Roku has no QR generator. The pairing screen only ever encodes "https://app.churchtvos.com/pair?code=ABC123" (43 bytes, version 4,
+' 33 x 33 modules), but the encoder is general within those limits.
+'
+' The output is compared module for module with the `qrcode` npm package in tests/ (see tools/qr_reference.mjs).
+'
+' BrightScript has no XOR operator: xor(a, b) = (a or b) - (a and b) for non-negative integers.
+
+namespace Qr
+
+    function xor(a as integer, b as integer) as integer
+        return (a or b) - (a and b)
+    end function
+
+    ' Version table for level M. total = all codewords; ec = EC codewords per block; blocks = number of blocks; data = data codewords in total.
+    function versionInfo(version as integer) as dynamic
+        if version = 1 then return { total: 26, ec: 10, blocks: 1, data: 16, align: [] }
+        if version = 2 then return { total: 44, ec: 16, blocks: 1, data: 28, align: [6, 18] }
+        if version = 3 then return { total: 70, ec: 26, blocks: 1, data: 44, align: [6, 22] }
+        if version = 4 then return { total: 100, ec: 18, blocks: 2, data: 64, align: [6, 26] }
+        if version = 5 then return { total: 134, ec: 24, blocks: 2, data: 86, align: [6, 30] }
+        if version = 6 then return { total: 172, ec: 16, blocks: 4, data: 108, align: [6, 34] }
+        return invalid
+    end function
+
+    function maxVersion() as integer
+        return 6
+    end function
+
+    ' Smallest version that fits [byteCount] bytes in byte mode, or 0.
+    function pickVersion(byteCount as integer) as integer
+        for v = 1 to maxVersion()
+            info = versionInfo(v)
+            ' 4 bits mode + 8 bits length + 8 bits per byte must fit in the data codewords
+            if 12 + byteCount * 8 <= info.data * 8 then return v
+        end for
+        return 0
+    end function
+
+    ' --- Galois field GF(256), polynomial 0x11D ---
+
+    function gfTables() as object
+        if m.qrGf <> invalid then return m.qrGf
+        expT = []
+        logT = []
+        for i = 0 to 511
+            expT.push(0)
+        end for
+        for i = 0 to 255
+            logT.push(0)
+        end for
+        x = 1
+        for i = 0 to 254
+            expT[i] = x
+            logT[x] = i
+            x = x * 2
+            if x >= 256 then x = xor(x, 285)
+        end for
+        for i = 255 to 511
+            expT[i] = expT[i - 255]
+        end for
+        m.qrGf = { expT: expT, logT: logT }
+        return m.qrGf
+    end function
+
+    function gfMul(a as integer, b as integer) as integer
+        if a = 0 or b = 0 then return 0
+        t = gfTables()
+        return t.expT[t.logT[a] + t.logT[b]]
+    end function
+
+    ' Reed-Solomon: the [ecCount] error correction codewords for a data block.
+    function rsEncode(data as object, ecCount as integer) as object
+        t = gfTables()
+        gen = [1]
+        for i = 0 to ecCount - 1
+            nxt = []
+            for k = 0 to gen.count()
+                nxt.push(0)
+            end for
+            for k = 0 to gen.count() - 1
+                nxt[k] = xor(nxt[k], gen[k])
+                nxt[k + 1] = xor(nxt[k + 1], gfMul(gen[k], t.expT[i]))
+            end for
+            gen = nxt
+        end for
+        res = []
+        for each d in data
+            res.push(d)
+        end for
+        for i = 1 to ecCount
+            res.push(0)
+        end for
+        n = data.count()
+        for i = 0 to n - 1
+            coef = res[i]
+            if coef <> 0 then
+                for j = 1 to ecCount
+                    res[i + j] = xor(res[i + j], gfMul(gen[j], coef))
+                end for
+            end if
+        end for
+        out = []
+        for i = n to n + ecCount - 1
+            out.push(res[i])
+        end for
+        return out
+    end function
+
+    ' --- bit buffer ---
+
+    sub putBits(bits as object, value as integer, count as integer)
+        for i = count - 1 to 0 step -1
+            bits.push((value >> i) and 1)
+        end for
+    end sub
+
+    ' Text to its UTF-8 bytes (the pairing URL is ASCII, but be correct for anything).
+    function utf8Bytes(text as string) as object
+        ba = CreateObject("roByteArray")
+        ba.FromAsciiString(text)
+        out = []
+        for i = 0 to ba.count() - 1
+            out.push(ba[i])
+        end for
+        return out
+    end function
+
+    ' Data codewords (before error correction) for [bytes] at [version].
+    function dataCodewords(bytes as object, version as integer) as object
+        info = versionInfo(version)
+        bits = []
+        putBits(bits, 4, 4) ' byte mode
+        putBits(bits, bytes.count(), 8)
+        for each b in bytes
+            putBits(bits, b, 8)
+        end for
+        capacity = info.data * 8
+        if bits.count() + 4 <= capacity then putBits(bits, 0, 4)
+        while bits.count() mod 8 <> 0
+            bits.push(0)
+        end while
+        out = []
+        for i = 0 to bits.count() - 1 step 8
+            v = 0
+            for k = 0 to 7
+                v = v * 2 + bits[i + k]
+            end for
+            out.push(v)
+        end for
+        pad = 0
+        while out.count() < info.data
+            if pad mod 2 = 0 then
+                out.push(236)
+            else
+                out.push(17)
+            end if
+            pad++
+        end while
+        return out
+    end function
+
+    ' Splits into blocks, adds error correction and interleaves.
+    function finalCodewords(data as object, version as integer) as object
+        info = versionInfo(version)
+        blocks = info.blocks
+        perBlock = info.data \ blocks
+        extraBlocks = info.data mod blocks ' blocks that carry one more data codeword (none for versions 1 to 6 at level M)
+        dc = []
+        ec = []
+        offset = 0
+        maxData = 0
+        for b = 0 to blocks - 1
+            size = perBlock
+            if b >= blocks - extraBlocks then size = perBlock + 1
+            blk = []
+            for i = 0 to size - 1
+                blk.push(data[offset + i])
+            end for
+            offset += size
+            dc.push(blk)
+            ec.push(rsEncode(blk, info.ec))
+            if size > maxData then maxData = size
+        end for
+        out = []
+        for i = 0 to maxData - 1
+            for b = 0 to blocks - 1
+                if i < dc[b].count() then out.push(dc[b][i])
+            end for
+        end for
+        for i = 0 to info.ec - 1
+            for b = 0 to blocks - 1
+                out.push(ec[b][i])
+            end for
+        end for
+        return out
+    end function
+
+    ' --- matrix ---
+
+    function newMatrix(size as integer) as object
+        mods = []
+        res = []
+        for i = 0 to size * size - 1
+            mods.push(0)
+            res.push(0)
+        end for
+        return { size: size, mods: mods, res: res }
+    end function
+
+    sub setMod(mx as object, row as integer, col as integer, dark as integer, reserved as boolean)
+        idx = row * mx.size + col
+        mx.mods[idx] = dark
+        if reserved then mx.res[idx] = 1
+    end sub
+
+    function getMod(mx as object, row as integer, col as integer) as integer
+        return mx.mods[row * mx.size + col]
+    end function
+
+    sub setupFinders(mx as object)
+        size = mx.size
+        for each corner in [[0, 0], [size - 7, 0], [0, size - 7]]
+            row = corner[0]
+            col = corner[1]
+            for r = -1 to 7
+                if row + r > -1 and row + r < size then
+                    for c = -1 to 7
+                        if col + c > -1 and col + c < size then
+                            dark = 0
+                            if (r >= 0 and r <= 6 and (c = 0 or c = 6)) or (c >= 0 and c <= 6 and (r = 0 or r = 6)) or (r >= 2 and r <= 4 and c >= 2 and c <= 4) then dark = 1
+                            setMod(mx, row + r, col + c, dark, true)
+                        end if
+                    end for
+                end if
+            end for
+        end for
+    end sub
+
+    sub setupTiming(mx as object)
+        for r = 8 to mx.size - 9
+            dark = 0
+            if r mod 2 = 0 then dark = 1
+            setMod(mx, r, 6, dark, true)
+            setMod(mx, 6, r, dark, true)
+        end for
+    end sub
+
+    sub setupAlignment(mx as object, version as integer)
+        coords = versionInfo(version).align
+        last = coords.count() - 1
+        for i = 0 to last
+            for j = 0 to last
+                ' skip the three that would sit on a finder pattern
+                if not ((i = 0 and j = 0) or (i = 0 and j = last) or (i = last and j = 0)) then
+                    row = coords[i]
+                    col = coords[j]
+                    for r = -2 to 2
+                        for c = -2 to 2
+                            dark = 0
+                            if r = -2 or r = 2 or c = -2 or c = 2 or (r = 0 and c = 0) then dark = 1
+                            setMod(mx, row + r, col + c, dark, true)
+                        end for
+                    end for
+                end if
+            end for
+        end for
+    end sub
+
+    function bchDigit(v as integer) as integer
+        d = 0
+        while v <> 0
+            d++
+            v = v >> 1
+        end while
+        return d
+    end function
+
+    ' 15 format bits for level M (00) and a mask, BCH-protected and XORed with 0x5412.
+    function formatBits(mask as integer) as integer
+        g15 = 1335 ' 0x537
+        data = mask ' EC level M has indicator bits 00
+        d = data << 10
+        while bchDigit(d) - bchDigit(g15) >= 0
+            d = xor(d, g15 << (bchDigit(d) - bchDigit(g15)))
+        end while
+        return xor((data << 10) or d, 21522) ' 0x5412
+    end function
+
+    sub setupFormat(mx as object, mask as integer)
+        size = mx.size
+        bits = formatBits(mask)
+        for i = 0 to 14
+            dark = (bits >> i) and 1
+            if i < 6 then
+                setMod(mx, i, 8, dark, true)
+            else if i < 8 then
+                setMod(mx, i + 1, 8, dark, true)
+            else
+                setMod(mx, size - 15 + i, 8, dark, true)
+            end if
+            if i < 8 then
+                setMod(mx, 8, size - i - 1, dark, true)
+            else if i < 9 then
+                setMod(mx, 8, 15 - i - 1 + 1, dark, true)
+            else
+                setMod(mx, 8, 15 - i - 1, dark, true)
+            end if
+        end for
+        setMod(mx, size - 8, 8, 1, true) ' the always-dark module
+    end sub
+
+    sub setupData(mx as object, codewords as object)
+        size = mx.size
+        inc = -1
+        row = size - 1
+        bitIndex = 7
+        byteIndex = 0
+        col = size - 1
+        while col > 0
+            if col = 6 then col--
+            done = false
+            while not done
+                for c = 0 to 1
+                    if mx.res[row * size + col - c] = 0 then
+                        dark = 0
+                        if byteIndex < codewords.count() then dark = (codewords[byteIndex] >> bitIndex) and 1
+                        setMod(mx, row, col - c, dark, false)
+                        bitIndex--
+                        if bitIndex = -1 then
+                            byteIndex++
+                            bitIndex = 7
+                        end if
+                    end if
+                end for
+                row += inc
+                if row < 0 or row >= size then
+                    row -= inc
+                    inc = -inc
+                    done = true
+                end if
+            end while
+            col -= 2
+        end while
+    end sub
+
+    function maskAt(mask as integer, i as integer, j as integer) as boolean
+        if mask = 0 then return (i + j) mod 2 = 0
+        if mask = 1 then return i mod 2 = 0
+        if mask = 2 then return j mod 3 = 0
+        if mask = 3 then return (i + j) mod 3 = 0
+        if mask = 4 then return ((i \ 2) + (j \ 3)) mod 2 = 0
+        if mask = 5 then return ((i * j) mod 2) + ((i * j) mod 3) = 0
+        if mask = 6 then return (((i * j) mod 2) + ((i * j) mod 3)) mod 2 = 0
+        return (((i * j) mod 3) + ((i + j) mod 2)) mod 2 = 0
+    end function
+
+    sub applyMask(mx as object, mask as integer)
+        size = mx.size
+        for col = 0 to size - 1
+            for row = 0 to size - 1
+                idx = row * size + col
+                if mx.res[idx] = 0 and maskAt(mask, row, col) then
+                    mx.mods[idx] = 1 - mx.mods[idx]
+                end if
+            end for
+        end for
+    end sub
+
+    function penalty(mx as object) as integer
+        size = mx.size
+        mods = mx.mods
+        points = 0
+        ' N1: runs of 5 or more in a row or column
+        for row = 0 to size - 1
+            sameCol = 0
+            sameRow = 0
+            lastCol = -1
+            lastRow = -1
+            for col = 0 to size - 1
+                v = mods[row * size + col]
+                if v = lastCol then
+                    sameCol++
+                else
+                    if sameCol >= 5 then points += 3 + (sameCol - 5)
+                    lastCol = v
+                    sameCol = 1
+                end if
+                v = mods[col * size + row]
+                if v = lastRow then
+                    sameRow++
+                else
+                    if sameRow >= 5 then points += 3 + (sameRow - 5)
+                    lastRow = v
+                    sameRow = 1
+                end if
+            end for
+            if sameCol >= 5 then points += 3 + (sameCol - 5)
+            if sameRow >= 5 then points += 3 + (sameRow - 5)
+        end for
+        ' N2: 2x2 blocks of one colour
+        blocks = 0
+        for row = 0 to size - 2
+            for col = 0 to size - 2
+                s = mods[row * size + col] + mods[row * size + col + 1] + mods[(row + 1) * size + col] + mods[(row + 1) * size + col + 1]
+                if s = 4 or s = 0 then blocks++
+            end for
+        end for
+        points += blocks * 3
+        ' N3: 1:1:3:1:1 finder-like pattern with four light modules on one side
+        finders = 0
+        for row = 0 to size - 1
+            bitsCol = 0
+            bitsRow = 0
+            for col = 0 to size - 1
+                bitsCol = ((bitsCol << 1) and 2047) or mods[row * size + col]
+                if col >= 10 and (bitsCol = 1488 or bitsCol = 93) then finders++
+                bitsRow = ((bitsRow << 1) and 2047) or mods[col * size + row]
+                if col >= 10 and (bitsRow = 1488 or bitsRow = 93) then finders++
+            end for
+        end for
+        points += finders * 40
+        ' N4: balance of dark and light modules
+        dark = 0
+        for i = 0 to mods.count() - 1
+            dark += mods[i]
+        end for
+        pct = dark * 100 / mods.count()
+        k = Abs(Int(-Int(-pct / 5)) - 10) ' ceil(pct / 5) - 10
+        points += k * 10
+        return points
+    end function
+
+    function copyMatrix(mx as object) as object
+        mods = []
+        for each v in mx.mods
+            mods.push(v)
+        end for
+        return { size: mx.size, mods: mods, res: mx.res }
+    end function
+
+    ' Encodes text as a QR code. Returns { ok, version, mask, size, rows } where rows is an array of strings of "1" (dark) and "0",
+    ' or { ok: false, error } when the text is too long. No quiet zone is included.
+    function encode(text as string) as object
+        bytes = utf8Bytes(text)
+        version = pickVersion(bytes.count())
+        if version = 0 then return { ok: false, error: "Text is too long for a version " + maxVersion().toStr() + " QR code" }
+        data = dataCodewords(bytes, version)
+        words = finalCodewords(data, version)
+        size = 17 + 4 * version
+        base = newMatrix(size)
+        setupFinders(base)
+        setupTiming(base)
+        setupAlignment(base, version)
+        setupFormat(base, 0) ' reserves the format areas; the real bits are set per mask below
+        setupData(base, words)
+        bestMask = 0
+        bestScore = -1
+        for mask = 0 to 7
+            trial = copyMatrix(base)
+            setupFormat(trial, mask)
+            applyMask(trial, mask)
+            score = penalty(trial)
+            if bestScore < 0 or score < bestScore then
+                bestScore = score
+                bestMask = mask
+            end if
+        end for
+        fin = copyMatrix(base)
+        setupFormat(fin, bestMask)
+        applyMask(fin, bestMask)
+        rows = []
+        for r = 0 to size - 1
+            line = ""
+            for c = 0 to size - 1
+                line += fin.mods[r * size + c].toStr()
+            end for
+            rows.push(line)
+        end for
+        return { ok: true, version: version, mask: bestMask, size: size, rows: rows }
+    end function
+
+end namespace

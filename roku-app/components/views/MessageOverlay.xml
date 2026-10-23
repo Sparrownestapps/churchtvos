@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- A message sign from a remote covering everything for a while (clears itself, or when a remote sends clear_message). -->
+<component name="MessageOverlay" extends="Group">
+    <interface>
+        <!-- { text, background (hex), w, h } -->
+        <field id="config" type="assocarray" onChange="build" />
+    </interface>
+    <script type="text/brightscript" uri="MessageOverlay.bs" />
+</component>

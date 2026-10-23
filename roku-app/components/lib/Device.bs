@@ -1,0 +1,120 @@
+' Device identity, registry, clock and time zone helpers. These need the Roku runtime (roRegistrySection, roDateTime, roDeviceInfo)
+' and run on the render thread or in Task threads. The pure decisions live in source/lib.
+import "pkg:/source/lib/Config.bs"
+
+namespace Device
+
+    function registry() as object
+        return CreateObject("roRegistrySection", "churchtvos")
+    end function
+
+    function newUuid() as string
+        di = CreateObject("roDeviceInfo")
+        if FindMemberFunction(di, "GetRandomUUID") <> invalid then
+            u = di.GetRandomUUID()
+            if u <> invalid and u <> "" then return u
+        end if
+        ' Last resort for very old firmware: mix rnd() with the clock. Not cryptographic; registration still works.
+        dt = CreateObject("roDateTime")
+        up = CreateObject("roTimespan")
+        seed = dt.AsSeconds() + up.TotalMilliseconds()
+        hex = ""
+        for i = 1 to 32
+            hex += StrI((rnd(16) - 1 + (seed + i) mod 16) mod 16, 16)
+        end for
+        return Mid(hex, 1, 8) + "-" + Mid(hex, 9, 4) + "-4" + Mid(hex, 14, 3) + "-a" + Mid(hex, 18, 3) + "-" + Mid(hex, 21, 12)
+    end function
+
+    function deviceId() as string
+        r = registry()
+        id = r.Read("device_id")
+        if id = invalid or id = "" then
+            id = LCase(newUuid())
+            r.Write("device_id", id)
+            r.Flush()
+        end if
+        return id
+    end function
+
+    ' 64 hex characters from two random UUIDs (about 244 random bits). The server stores only its SHA-256.
+    function secret() as string
+        r = registry()
+        s = r.Read("secret")
+        if s = invalid or s = "" then
+            a = newUuid()
+            b = newUuid()
+            s = LCase(a + b)
+            s = s.replace("-", "")
+            r.Write("secret", s)
+            r.Flush()
+        end if
+        return s
+    end function
+
+    function isRegistered() as boolean
+        r = registry()
+        return r.Exists("device_id") and r.Exists("secret")
+    end function
+
+    ' Forget everything so the TV registers again with a fresh pairing code. Cached media is kept (it is keyed by URL).
+    sub reset()
+        r = registry()
+        r.Delete("device_id")
+        r.Delete("secret")
+        r.Flush()
+        fs = CreateObject("roFileSystem")
+        if fs.Exists(Config.STATE_FILE) then fs.Delete(Config.STATE_FILE)
+    end sub
+
+    function model() as string
+        di = CreateObject("roDeviceInfo")
+        name = di.GetModelDisplayName()
+        if name = invalid or name = "" then name = di.GetModel()
+        return "Roku " + name
+    end function
+
+    function nowEpoch() as integer
+        dt = CreateObject("roDateTime")
+        return dt.AsSeconds()
+    end function
+
+    ' Milliseconds from now until an epoch-seconds instant (negative once it has passed). Integer arithmetic on purpose: a
+    ' BrightScript Float has 24 bits of precision, so "seconds since 1970 as a Float" is only accurate to about two minutes.
+    function msUntil(endEpoch as integer) as integer
+        dt = CreateObject("roDateTime")
+        sec = dt.AsSeconds()
+        ms = 0
+        if FindMemberFunction(dt, "GetMilliseconds") <> invalid then ms = dt.GetMilliseconds()
+        return (endEpoch - sec) * 1000 - ms
+    end function
+
+    ' The Roku's own UTC offset in minutes (its Settings > System > Time zone). Used only when the site's zone is not in the table.
+    function deviceOffsetMinutes() as integer
+        dt = CreateObject("roDateTime")
+        utc = dt.AsSeconds()
+        dt.ToLocalTime()
+        localSecs = dt.AsSeconds()
+        return (localSecs - utc) \ 60
+    end function
+
+    function readTextFile(path as string) as dynamic
+        fs = CreateObject("roFileSystem")
+        if not fs.Exists(path) then return invalid
+        s = ReadAsciiFile(path)
+        if s = "" then return invalid
+        return s
+    end function
+
+    function saveState(raw as string) as boolean
+        return WriteAsciiFile(Config.STATE_FILE, raw)
+    end function
+
+    function cachedState() as dynamic
+        raw = readTextFile(Config.STATE_FILE)
+        if raw = invalid then return invalid
+        parsed = ParseJson(raw)
+        if parsed = invalid then return invalid
+        return parsed
+    end function
+
+end namespace

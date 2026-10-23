@@ -1,0 +1,49 @@
+import "pkg:/source/lib/Util.bs"
+import "pkg:/components/lib/Ui.bs"
+
+sub init()
+    m.top.observeField("payload", "onPayload")
+    m.task = invalid
+end sub
+
+sub onPayload()
+    Ui.clear(m.top)
+    size = m.top.size
+    Ui.rect(m.top, 0, 0, size, size, "0xFFFFFFFF")
+    if m.top.payload = "" then return
+    m.task = CreateObject("roSGNode", "QrTask")
+    m.task.observeField("result", "onResult")
+    m.task.payload = m.top.payload
+    m.task.control = "RUN"
+end sub
+
+sub onResult()
+    result = m.task.result
+    if not Util.isAA(result) or not Util.getBool(result, "ok", false) then return
+    Ui.clear(m.top)
+    size = m.top.size
+    Ui.rect(m.top, 0, 0, size, size, "0xFFFFFFFF")
+    quiet = 4
+    n = result.size
+    cell = size / (n + quiet * 2)
+    ' One rectangle per horizontal run of dark modules keeps the node count low (a few hundred).
+    for r = 0 to n - 1
+        row = result.rows[r]
+        c = 0
+        while c < n
+            if Mid(row, c + 1, 1) = "1" then
+                startC = c
+                while c < n and Mid(row, c + 1, 1) = "1"
+                    c++
+                end while
+                x = Int((startC + quiet) * cell)
+                x2 = Int((c + quiet) * cell + 0.5)
+                y = Int((r + quiet) * cell)
+                y2 = Int((r + 1 + quiet) * cell + 0.5)
+                Ui.rect(m.top, x, y, x2 - x, y2 - y, "0x000000FF")
+            else
+                c++
+            end if
+        end while
+    end for
+end sub

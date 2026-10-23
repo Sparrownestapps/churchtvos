@@ -1,0 +1,80 @@
+{
+  "paired": true,
+  "organization": {
+    "name": "Forward Church",
+    "status": "active",
+    "branding": {
+      "logo_url": "https://example.com/logo.png",
+      "logo_dark_url": "https://example.com/logo-dark.png",
+      "primary_color": "#112233",
+      "accent_color": "#FFAA00",
+      "splash": { "enabled": true, "seconds": 3 },
+      "modules": {
+        "signage": { "primary_color": "#445566", "splash": { "enabled": false } },
+        "kids": { "accent_color": "bad-color" }
+      }
+    }
+  },
+  "experimental": { "ndi": true },
+  "site": "Cambridge",
+  "location": "Room 201",
+  "timezone": "America/Toronto",
+  "screen": { "name": "Kids TV", "orientation": "portrait", "autoplay": true },
+  "enabled_modules": ["kids", "signage", "slides"],
+  "default_module": "kids",
+  "module_rules": [
+    { "module": "signage", "days": [0,1,2,3,4,5,6], "start": "00:00:00", "end": "24:00:00", "priority": 0 },
+    { "module": "slides", "days": [0], "start": "09:00:00", "end": "10:30:00", "priority": 5 },
+    { "module": "off", "days": [0], "start": "09:30", "end": "10:00", "priority": 5 },
+    { "module": "kids", "days": [0], "start": "09:00", "end": "09:15", "priority": 9 }
+  ],
+  "kids": { "schedules": [
+    { "id": "a", "starts_at": "2026-10-25T13:00:00+00:00", "ends_at": "2026-10-25T15:00:00+00:00",
+      "playlist": { "id": "p1", "name": "Week 3", "items": [
+        { "type": "countdown", "title": "Starts in", "seconds": 300, "mode": "until", "until": "09:30", "at_zero": "hold", "if_passed": "skip",
+          "audio": { "url": "https://example.com/a.mp3", "volume": 0.5, "align_end": true } },
+        { "type": "video", "title": "Story", "url": "https://example.com/story.mp4?x=1" },
+        { "type": "image", "title": "Pic", "url": "https://example.com/pic.jpg", "seconds": 7 },
+        { "type": "image", "title": "Pic2", "url": "https://example.com/pic2.png" },
+        { "type": "lyrics", "title": "Song", "slides": ["Line 1\nLine 2", "Chorus"], "labels": ["Verse 1", "Chorus"], "show_title": true, "authors": "A. Writer", "ccli": "123" },
+        { "type": "youtube", "title": "YT", "video_id": "abc" },
+        { "type": "stream", "title": "Live", "url": "https://example.com/live.m3u8", "audio": true, "fallback": "hold" },
+        { "type": "sign", "title": "Hello", "subtext": "World", "background": "#FFD700" },
+        { "type": "ndi", "title": "Cam", "source": "PC (Cam)", "fallback": "message", "fallback_text": "Camera is off" },
+        { "type": "ndi", "title": "Cam2", "fallback": "skip" },
+        { "type": "hologram", "title": "future" }
+      ] } },
+    { "id": "b", "starts_at": "2026-10-25T20:00:00+00:00", "ends_at": null, "playlist": { "id": "p2", "name": "Later", "items": [] } },
+    { "id": "c", "starts_at": "2026-10-25T14:00:00+00:00", "ends_at": "2026-10-25T14:30:00+00:00", "playlist": { "id": "p3", "name": "Overlap", "items": [] } }
+  ] },
+  "signage": {
+    "slots": [
+      { "id": "s1", "days": [0], "start": "08:00:00", "end": "12:00:00", "priority": 1, "playlist": { "id": "sp1", "name": "Sunday morning", "items": [ { "type": "image", "title": "i", "url": "https://example.com/s1.png" } ] } },
+      { "id": "s2", "days": [0], "start": "09:00:00", "end": "10:00:00", "priority": 1, "playlist": { "id": "sp2", "name": "Sunday service", "items": [] } }
+    ],
+    "default_playlist": { "id": "sd", "name": "Default", "items": [ { "type": "video", "title": "v", "url": "https://example.com/d.mp4" } ] }
+  },
+  "slides": { "schedules": [
+    { "id": "d1", "starts_at": "2026-10-25T13:00:00+00:00", "ends_at": null, "deck": {
+      "id": "deck1", "name": "Sunday deck", "loop": true,
+      "theme": { "font": "julius", "title_scale": 2.0, "body_scale": 0.1, "text_color": "#FFEECC", "align": "left", "position": "lower", "shadow": false, "outline": true, "margin": 30,
+                 "background": { "type": "image", "url": "https://example.com/themebg.jpg", "dim": 0.4 }, "show_labels": false, "logo": { "show": true, "position": "top_right" } },
+      "background": { "type": "mystery" },
+      "slides": [
+        { "kind": "text", "id": "t1", "title": "Welcome", "body": "To church\nsecond line", "layout": "title_body", "align": "center", "text_color": "#000000", "seconds": 8 },
+        { "kind": "text", "id": "t2", "body": "Only body", "background": { "type": "gradient", "color": "#000000", "color2": "#FFFFFF", "angle": 90, "dim": 0.2 } },
+        { "kind": "media", "id": "m1", "url": "https://example.com/p.jpg", "media_kind": "image", "fit": "cover", "seconds": 5 },
+        { "kind": "media", "id": "m2", "url": "https://example.com/v.mp4", "media_kind": "video", "audio": false, "background": { "type": "video", "url": "https://example.com/bg.mp4" } },
+        { "kind": "song_title", "title": "Amazing", "authors": "John", "ccli": "1", "copyright": "(c)" },
+        { "kind": "lyric", "song": "Amazing", "text": "Amazing grace", "label": "Verse 1", "number": 1, "count": 2 },
+        { "kind": "lyric", "song": "Amazing", "text": "How sweet", "number": 2, "count": 2 },
+        { "kind": "countdown", "id": "c1", "title": "Soon", "seconds": 90, "audio": { "url": "https://example.com/cd.mp3" } },
+        { "kind": "stream", "id": "st1", "title": "Overflow", "url": "https://example.com/o.m3u8" },
+        { "kind": "blank", "id": "b1" },
+        { "kind": "blank", "id": "b2", "color": "#FF0000" },
+        { "kind": "ndi", "id": "n1", "title": "Cam", "fallback": "message" },
+        { "kind": "hologram", "id": "x" }
+      ] } }
+  ] },
+  "override": { "kind": "deck", "until": "2026-10-25T16:00:00+00:00", "deck": { "id": "od", "name": "Override deck", "slides": [ { "kind": "media", "url": "https://example.com/ov.jpg", "media_kind": "image" } ] } }
+}

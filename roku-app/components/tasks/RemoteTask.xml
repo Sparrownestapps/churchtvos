@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Remote control: polls device_poll_commands and reports what is on screen (device_report_status). -->
+<component name="RemoteTask" extends="Task">
+    <interface>
+        <!-- paired TVs only -->
+        <field id="paired" type="boolean" value="false" />
+        <!-- what is on screen now: { module, state, title, label, index, count, outline, refKind, refId } -->
+        <field id="status" type="assocarray" />
+        <!-- [{ seq, type, ... }] parsed commands, newest batch -->
+        <field id="commands" type="array" />
+    </interface>
+    <script type="text/brightscript" uri="RemoteTask.bs" />
+</component>

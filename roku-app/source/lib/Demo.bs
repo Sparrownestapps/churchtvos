@@ -1,0 +1,27 @@
+' Built-in sample content for reviewers and first-time visitors. Needs no account and no network (mirrors Demo.kt).
+namespace Demo
+
+    const KIDS = "kids"
+    const SIGNAGE = "signage"
+
+    function bundled(file as string, seconds as integer) as object
+        return { kind: "bundled", file: file, seconds: seconds }
+    end function
+
+    function slides(which as string) as object
+        if which = SIGNAGE then
+            return [
+                bundled("pkg:/images/demo_welcome.png", 6),
+                bundled("pkg:/images/demo_events.png", 6),
+                bundled("pkg:/images/demo_info.png", 6)
+            ]
+        end if
+        return [
+            { kind: "countdown", title: "Service starts in", spec: { mode: "duration", seconds: 10, until: invalid, audio: invalid, atZero: "next", ifPassed: "zero" } },
+            { kind: "lyric", song: "Sample song", text: "Verse 1" + Chr(10) + "Sample lyrics appear" + Chr(10) + "large and centred", label: "", number: 1, count: 2 },
+            { kind: "lyric", song: "Sample song", text: "Chorus" + Chr(10) + "One slide per section," + Chr(10) + "advance with Right", label: "", number: 2, count: 2 },
+            bundled("pkg:/images/demo_welcome.png", 6)
+        ]
+    end function
+
+end namespace

@@ -1,0 +1,111 @@
+' SceneGraph node helpers shared by the views. Everything is laid out in pixels for a 1920 x 1080 screen (manifest ui_resolutions=fhd).
+' Android sizes in dp/sp become px at 2 px per dp (the Fire TV 1080p density the Android layouts were tuned on).
+import "pkg:/source/lib/Util.bs"
+import "pkg:/source/lib/Model.bs"
+import "pkg:/components/lib/Media.bs"
+
+namespace Ui
+
+    function fontUri(name as string, weight as string) as string
+        if name = "julius" then return "pkg:/fonts/julius_sans_one.ttf"
+        if weight = "black" then return "pkg:/fonts/lato_black.ttf"
+        if weight = "bold" then return "pkg:/fonts/lato_bold.ttf"
+        return "pkg:/fonts/lato_regular.ttf"
+    end function
+
+    ' A Font node for a family, weight and pixel size (cached per component, sizes rounded to even pixels).
+    function font(name as string, weight as string, size as integer) as object
+        if m.fontCache = invalid then m.fontCache = {}
+        if size < 8 then size = 8
+        if size mod 2 = 1 then size = size + 1
+        key = name + "|" + weight + "|" + size.toStr()
+        f = m.fontCache[key]
+        if f = invalid then
+            if m.fontCache.count() > 80 then m.fontCache = {}
+            f = CreateObject("roSGNode", "Font")
+            f.uri = fontUri(name, weight)
+            f.size = size
+            m.fontCache[key] = f
+        end if
+        return f
+    end function
+
+    function rect(parent as object, x as float, y as float, w as float, h as float, color as string) as object
+        r = parent.createChild("Rectangle")
+        r.translation = [x, y]
+        r.width = w
+        r.height = h
+        r.color = color
+        return r
+    end function
+
+    ' o: text, x, y, w, h, font ("lato"/"julius"), weight, size, color (Roku colour), align ("left"/"center"/"right"),
+    ' vAlign ("top"/"center"/"bottom"), wrap (bool), maxLines, lineSpacing
+    function label(parent as object, o as object) as object
+        l = parent.createChild("Label")
+        l.translation = [Util.getNum(o, "x", 0), Util.getNum(o, "y", 0)]
+        if o.w <> invalid then l.width = o.w
+        if o.h <> invalid then l.height = o.h
+        l.font = font(Util.getStr(o, "font", "lato"), Util.getStr(o, "weight", "regular"), Int(Util.getNum(o, "size", 32)))
+        l.color = Util.getStr(o, "color", "0xFFFFFFFF")
+        l.horizAlign = Util.getStr(o, "align", "left")
+        l.vertAlign = Util.getStr(o, "vAlign", "top")
+        l.wrap = Util.getBool(o, "wrap", false)
+        if o.maxLines <> invalid then l.maxLines = o.maxLines
+        l.lineSpacing = Util.getNum(o, "lineSpacing", 0)
+        l.text = Util.getStr(o, "text", "")
+        return l
+    end function
+
+    ' mode: "scaleToFit" (whole picture), "scaleToZoom" (fill, crop)
+    function poster(parent as object, x as float, y as float, w as float, h as float, uri as string, mode = "scaleToFit" as string) as object
+        p = parent.createChild("Poster")
+        p.translation = [x, y]
+        p.width = w
+        p.height = h
+        p.loadDisplayMode = mode
+        p.uri = uri
+        return p
+    end function
+
+    sub clear(group as object)
+        n = group.getChildCount()
+        if n > 0 then group.removeChildrenIndex(n, 0)
+    end sub
+
+    ' A focusable-looking button (a rectangle and a label). Returns { rect, label, w, h } for setButtons().
+    function button(parent as object, text as string, x as float, y as float, w as float, h as float, size = 36 as integer) as object
+        r = rect(parent, x, y, w, h, "0x1B2A4AFF")
+        l = label(parent, { text: text, x: x, y: y, w: w, h: h, font: "lato", weight: "bold", size: size, color: "0xFFFFFFFF", align: "center", vAlign: "center" })
+        return { rect: r, label: l, w: w, h: h }
+    end function
+
+    ' Highlights the selected button (accent colour), the others in the primary colour; disabled ones are faded.
+    sub paintButtons(buttons as object, selected as integer, primary as string, accent as string, enabled = invalid as dynamic)
+        for i = 0 to buttons.count() - 1
+            b = buttons[i]
+            ok = true
+            if enabled <> invalid and i < enabled.count() then ok = enabled[i]
+            if not ok then
+                b.rect.color = Util.rokuColor(primary, "0x1B2A4AFF", 0.2)
+            else if i = selected then
+                b.rect.color = Util.rokuColor(accent, "0xF2A33AFF")
+            else
+                b.rect.color = Util.rokuColor(primary, "0x1B2A4AFF")
+            end if
+        end for
+    end sub
+
+    ' The church's logo, or its name when no logo is set (at x, y inside a box w x h).
+    sub orgLogo(parent as object, brand as object, backgroundHex as string, x as float, y as float, w as float, h as float)
+        bg = Util.parseColor(backgroundHex)
+        if bg = invalid then bg = { r: 255, g: 255, b: 255, a: 255 }
+        logo = Model.logoOn(brand, bg)
+        if logo <> invalid then
+            poster(parent, x, y, w, h, Media.uri(logo), "scaleToFit")
+        else
+            label(parent, { text: UCase(Util.getStr(brand, "orgName", "Church TV OS")), x: x, y: y, w: w, h: h, font: "julius", size: 44, color: Util.rokuColor(brand.primary, "0x1B2A4AFF"), align: "left", vAlign: "center" })
+        end if
+    end sub
+
+end namespace

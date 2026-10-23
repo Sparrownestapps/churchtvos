@@ -1,0 +1,718 @@
+import "pkg:/source/lib/Config.bs"
+import "pkg:/source/lib/Util.bs"
+import "pkg:/source/lib/TimeUtil.bs"
+import "pkg:/source/lib/Model.bs"
+import "pkg:/source/lib/Remote.bs"
+import "pkg:/source/lib/Demo.bs"
+import "pkg:/components/lib/Ui.bs"
+import "pkg:/components/lib/Media.bs"
+import "pkg:/components/lib/Device.bs"
+
+' ---------------------------------------------------------------------------------------------------------------------
+' The app's brain (mirrors MainActivity.kt's App composable). It decides which view is on screen from the device state:
+'   demo / demo menu / settings > connecting > pairing > account paused > remote "play now" override > module (splash, off,
+'   not enabled, signage, slides, kids)
+' and keeps tasks running: SyncTask (device_state), RemoteTask (commands and status), MediaTask (downloads).
+' Views are rebuilt only when their description changes, so the 30 s poll never flickers the screen.
+' ---------------------------------------------------------------------------------------------------------------------
+
+sub init()
+    m.top.backgroundURI = ""
+    m.top.backgroundColor = "0x000000FF"
+
+    m.device = Device.cachedState() ' last known state, so a TV that boots offline still runs its schedule
+    m.offline = false
+    m.error = ""
+    m.progress = invalid
+    m.dismissedUntil = ""
+    m.playing = invalid
+    m.autoStartedFor = ""
+    m.demo = ""
+    m.demoMenu = false
+    m.settingsOpen = false
+    m.message = invalid
+    m.sig = ""
+    m.view = invalid
+    m.viewName = ""
+    m.curModule = ""
+    m.splashEndMs = 0
+    m.loopCounter = 0
+    m.overrideWaitStart = 0
+    m.lastStatus = Remote.idleStatus()
+    m.orientation = "landscape"
+    m.W = Config.SCREEN_W
+    m.H = Config.SCREEN_H
+    m.uptime = CreateObject("roTimespan")
+
+    m.stage = m.top.createChild("Group")
+    m.overlayGroup = m.stage.createChild("Group")
+    m.contentGroup = invalid
+    applyOrientation("landscape")
+
+    ' tasks
+    m.sync = CreateObject("roSGNode", "SyncTask")
+    m.sync.observeField("result", "onSyncResult")
+    m.sync.control = "RUN"
+    m.remote = CreateObject("roSGNode", "RemoteTask")
+    m.remote.observeField("commands", "onRemoteCommands")
+    m.remote.paired = isPaired()
+    m.remote.control = "RUN"
+    m.media = CreateObject("roSGNode", "MediaTask")
+    m.media.observeField("progress", "onMediaProgress")
+    m.media.control = "RUN"
+
+    ' timers
+    m.clock = m.top.createChild("Timer")
+    m.clock.duration = 15
+    m.clock.repeat = true
+    m.clock.observeField("fire", "onClock")
+    m.clock.control = "start"
+    m.waitTimer = m.top.createChild("Timer")
+    m.waitTimer.duration = 1
+    m.waitTimer.repeat = false
+    m.waitTimer.observeField("fire", "onClock")
+    m.msgTimer = m.top.createChild("Timer")
+    m.msgTimer.repeat = false
+    m.msgTimer.observeField("fire", "onMessageDone")
+
+    m.top.setFocus(true)
+    refresh()
+end sub
+
+function isPaired() as boolean
+    return m.device <> invalid and Util.getBool(m.device, "paired", false)
+end function
+
+function tzOffset() as integer
+    return Device.deviceOffsetMinutes()
+end function
+
+function siteZone() as string
+    if m.device = invalid then return "America/Toronto"
+    return Util.getStr(m.device, "timezone", "America/Toronto")
+end function
+
+function ndiOn() as boolean
+    if m.device = invalid then return false
+    return Util.getBool(Util.getObj(m.device, "experimental"), "ndi", false)
+end function
+
+' ---------- orientation ----------
+
+' Roku always outputs landscape, so a portrait-mounted TV gets the whole UI laid out sideways (width and height swapped) and
+' turned a quarter turn with a node rotation. Roku's rotation is counter-clockwise for positive values: "portrait" turns the
+' content clockwise (rotation -90 degrees), "portrait_flipped" the other way. The rotation is about the node's own origin (no
+' scaleRotateCenter), so the translation is chosen to put the turned rectangle exactly on the screen:
+'   clockwise:          (x, y) -> (-y, x), origin at (1920, 0)
+'   counter-clockwise:  (x, y) -> ( y,-x), origin at (0, 1080)
+' Video cannot be rotated (it lives on the video plane), so PlayerView leaves video out on portrait screens.
+sub applyOrientation(orientation as string)
+    m.orientation = orientation
+    quarter = 3.14159265 / 2
+    m.stage.scaleRotateCenter = [0, 0]
+    if orientation = "portrait" then
+        m.W = Config.SCREEN_H
+        m.H = Config.SCREEN_W
+        m.stage.translation = [Config.SCREEN_W, 0]
+        m.stage.rotation = -quarter
+    else if orientation = "portrait_flipped" then
+        m.W = Config.SCREEN_H
+        m.H = Config.SCREEN_W
+        m.stage.translation = [0, Config.SCREEN_H]
+        m.stage.rotation = quarter
+    else
+        m.W = Config.SCREEN_W
+        m.H = Config.SCREEN_H
+        m.stage.translation = [0, 0]
+        m.stage.rotation = 0
+    end if
+end sub
+
+function isPortrait() as boolean
+    return m.orientation = "portrait" or m.orientation = "portrait_flipped"
+end function
+
+' ---------- task results ----------
+
+sub onSyncResult()
+    r = m.sync.result
+    if not Util.isAA(r) then return
+    ' ignore an answer that was requested with an identity that has since been reset (Unpair)
+    if Util.getStr(r, "deviceId", "") <> "" and Device.isRegistered() and r.deviceId <> Device.deviceId() then return
+    if Util.getBool(r, "unknownDevice", false) then
+        m.device = invalid
+        m.offline = false
+        m.playing = invalid
+        m.error = ""
+    else if Util.isAA(r.state) then
+        m.device = r.state
+        m.offline = false
+        m.error = ""
+    else if Util.getBool(r, "offline", false) then
+        m.offline = true
+        m.error = Util.getStr(r, "error", "")
+    end if
+    m.remote.paired = isPaired()
+    urls = Util.getArr(r, "mediaUrls")
+    if urls.count() > 0 then m.media.urls = urls
+    refresh()
+end sub
+
+sub onMediaProgress()
+    m.progress = m.media.progress
+    refresh()
+end sub
+
+sub onRemoteCommands()
+    list = m.remote.commands
+    if not Util.isArr(list) then return
+    forward = []
+    for each c in list
+        t = c.type
+        if t = "message" then
+            showMessage(c)
+        else if t = "clear_message" then
+            clearMessage()
+        else if t = "start" then
+            m.sync.wake = m.sync.wake + 1
+        else if t = "stop" then
+            ov = activeOverride()
+            if ov <> invalid then m.dismissedUntil = Util.getStr(ov, "until", "")
+            forward.push(c)
+        else
+            forward.push(c)
+        end if
+    end for
+    if forward.count() > 0 and m.view <> invalid and m.viewName = "PlayerView" then m.view.commands = forward
+    if m.viewName <> "PlayerView" then refresh()
+end sub
+
+sub onClock()
+    refresh()
+end sub
+
+sub onLaunchArgs()
+    args = m.top.launchArgs
+    if not Util.isAA(args) then return
+    which = Util.getStr(args, "demo", "")
+    if which = "kids" or which = "signage" then
+        m.demo = which
+        m.demoMenu = false
+        m.settingsOpen = false
+    end if
+    if Util.getStr(args, "settings", "") = "1" then m.settingsOpen = true
+    refresh()
+end sub
+
+' ---------- messages from a remote ----------
+
+sub showMessage(c as object)
+    m.message = { text: c.text, background: c.background }
+    m.msgTimer.control = "stop"
+    m.msgTimer.duration = c.seconds
+    m.msgTimer.control = "start"
+    Ui.clear(m.overlayGroup)
+    ov = m.overlayGroup.createChild("MessageOverlay")
+    ov.config = { text: c.text, background: c.background, w: m.W, h: m.H }
+    pushStatus()
+end sub
+
+sub clearMessage()
+    m.msgTimer.control = "stop"
+    m.message = invalid
+    Ui.clear(m.overlayGroup)
+    pushStatus()
+end sub
+
+sub onMessageDone()
+    clearMessage()
+end sub
+
+' ---------- status for remotes ----------
+
+sub pushStatus()
+    st = {}
+    st.append(m.lastStatus)
+    if m.message <> invalid then st.state = "message"
+    m.remote.status = st
+end sub
+
+sub onPlayerStatus()
+    if m.view = invalid or m.viewName <> "PlayerView" then return
+    m.lastStatus = m.view.status
+    pushStatus()
+end sub
+
+' ---------- the decision ----------
+
+function activeOverride() as dynamic
+    if m.device = invalid then return invalid
+    ov = Util.getObj(m.device, "override")
+    if ov = invalid then return invalid
+    until = TimeUtil.parseIso(ov["until"])
+    if until = invalid then return invalid
+    if until <= Device.nowEpoch() then return invalid
+    if Util.getStr(ov, "until", "") = m.dismissedUntil then return invalid
+    return ov
+end function
+
+function brandFor(moduleName as string) as object
+    if m.device = invalid then return Model.brand({}, moduleName)
+    return Model.brand(m.device, moduleName)
+end function
+
+' What should be on screen now: { view, cfg, key (optional) }.
+function decide() as object
+    nowEpoch = Device.nowEpoch()
+    off = tzOffset()
+    W = m.W
+    H = m.H
+    portrait = isPortrait()
+    base = brandFor("")
+
+    if m.demo <> "" then
+        slides = Demo.slides(m.demo)
+        return { view: "PlayerView", key: "demo|" + m.demo + "|" + m.loopCounter.toStr(), role: "demo", cfg: playerConfig(slides, false, false, invalid, invalid, base) }
+    end if
+    if m.demoMenu then
+        return { view: "MenuView", cfg: { title: "Demo mode", lines: ["Sample content, no account needed.", "Press Back to leave a demo."], items: [{ id: "kids", text: "Kids demo (countdown, lyrics)" }, { id: "signage", text: "Signage demo (looping slides)" }, { id: "back", text: "Back" }], brand: base, w: W, h: H }, role: "demoMenu" }
+    end if
+    if m.settingsOpen then return { view: "MenuView", cfg: settingsConfig(base), role: "settings" }
+    if m.device = invalid then
+        return { view: "MessageView", cfg: { title: "Connecting" + Chr(8230), detail: m.error, brand: base, w: W, h: H } }
+    end if
+    if not isPaired() then
+        return { view: "PairingView", cfg: { code: Util.getStr(m.device, "pairing_code", Chr(183) + Chr(183) + Chr(183) + Chr(183) + Chr(183) + Chr(183)), offline: m.offline, brand: base, portrait: portrait, w: W, h: H } }
+    end if
+    if Util.getStr(Util.getObj(m.device, "organization"), "status", "active") = "suspended" then
+        return { view: "MessageView", cfg: { title: "This account is paused", detail: "Please ask your church's administrator to contact Church TV OS support.", brand: base, w: W, h: H } }
+    end if
+
+    ov = activeOverride()
+    if ov <> invalid then return overrideDescription(ov, base)
+
+    moduleName = Model.moduleNow(m.device, nowEpoch, off)
+    look = brandFor(moduleName)
+    enabled = Util.getArr(m.device, "enabled_modules")
+
+    ' Each module can have its own look, and its own splash when the TV starts or switches into it.
+    if moduleName <> m.curModule then
+        m.curModule = moduleName
+        m.splashEndMs = 0
+        if look.splashSeconds <> invalid and moduleName <> "off" then m.splashEndMs = m.uptime.TotalMilliseconds() + look.splashSeconds * 1000
+    end if
+    if m.splashEndMs > m.uptime.TotalMilliseconds() then
+        scheduleRefresh(m.splashEndMs - m.uptime.TotalMilliseconds() + 100)
+        return { view: "SplashView", cfg: { brand: look, w: W, h: H } }
+    end if
+    if moduleName = "off" then return { view: "BlackView", cfg: { w: W, h: H } }
+    if not Util.inList(enabled, moduleName) then
+        pretty = UCase(Left(moduleName, 1)) + Mid(moduleName, 2)
+        orgName = Util.getStr(Util.getObj(m.device, "organization"), "name", "this church")
+        return { view: "MessageView", cfg: { title: "This screen is set to " + pretty, detail: "That module isn't switched on for " + orgName + ". Ask your church's admin.", brand: look, w: W, h: H } }
+    end if
+    if moduleName = "signage" then return signageDescription(look, nowEpoch, off)
+    if moduleName = "slides" then return homeOrPlayer("slides", look, nowEpoch, off)
+    return homeOrPlayer("kids", look, nowEpoch, off)
+end function
+
+sub scheduleRefresh(ms as integer)
+    m.waitTimer.control = "stop"
+    m.waitTimer.duration = ms / 1000.0
+    m.waitTimer.control = "start"
+end sub
+
+function playerConfig(slides as object, isDeck as boolean, loopIt as boolean, theme as dynamic, report as dynamic, look as object) as object
+    return { slides: slides, isDeck: isDeck, loop: loopIt, theme: theme, report: report, brand: look, portrait: isPortrait(), w: m.W, h: m.H, zone: siteZone() }
+end function
+
+' ---------- Kids and Slides: a home screen, then the player ----------
+
+function homeOrPlayer(moduleName as string, look as object, nowEpoch as integer, off as integer) as object
+    isDeck = moduleName = "slides"
+    ndi = ndiOn()
+    if m.playing <> invalid and m.playing.module = moduleName then
+        p = m.playing
+        return { view: "PlayerView", key: "play|" + p.id + "|" + p.runId.toStr(), role: "playing", cfg: playerConfig(p.slides, isDeck, isDeck and p.loop, p.theme, p.report, look) }
+    end if
+    m.playing = invalid
+
+    if isDeck then
+        list = Model.slidesSchedules(m.device)
+    else
+        list = Model.kidsSchedules(m.device)
+    end if
+    current = Model.currentSchedule(list, nowEpoch)
+    schedule = current
+    if schedule = invalid then schedule = Model.nextSchedule(list, nowEpoch)
+    item = invalid
+    if schedule <> invalid then
+        if isDeck then
+            item = schedule["deck"]
+        else
+            item = schedule["playlist"]
+        end if
+    end if
+    if not Util.isAA(item) then item = invalid
+    if isDeck then
+        urls = Model.deckMediaUrls(item)
+        slideCount = Model.deckSlides(item, ndi).count()
+    else
+        urls = Model.playlistMediaUrls(item)
+        slideCount = Model.playlistSlides(item, ndi).count()
+    end if
+    allCached = true
+    for each u in urls
+        if not Media.isCached(u) then allCached = false
+    end for
+    ' If downloads were tried and some failed (storage full, bad link) the files stream from their URLs instead of blocking Play.
+    giveUp = mediaGiveUp()
+    ready = item <> invalid and (allCached or giveUp) and (not isDeck or slideCount > 0)
+
+    autoplay = Util.getBool(Util.getObj(m.device, "screen"), "autoplay", false)
+    if autoplay and current <> invalid and ready and m.autoStartedFor <> current["id"] then
+        m.autoStartedFor = current["id"]
+        startPlaying(moduleName, item)
+        return decide()
+    end if
+
+    heading = "NOTHING SCHEDULED"
+    if current <> invalid then
+        heading = "NOW SHOWING"
+    else if schedule <> invalid then
+        st = TimeUtil.parseIso(schedule["starts_at"])
+        if st <> invalid then heading = "UP NEXT " + Chr(183) + " " + TimeUtil.upcomingLabel(st, TimeUtil.offsetMinutes(siteZone(), st, off))
+    end if
+
+    status = ""
+    if item = invalid then
+        if isDeck then
+            status = "Schedule a deck for this location in the dashboard."
+        else
+            status = "Schedule a playlist for this location in the dashboard."
+        end if
+    else if isDeck and slideCount = 0 then
+        status = "This deck has no slides yet."
+    else if allCached then
+        status = "Ready to play"
+    else if m.progress <> invalid and Util.getBool(m.progress, "active", false) then
+        status = "Downloading media... " + (Util.getNum(m.progress, "done", 0) + 1).toStr() + " of " + Util.getNum(m.progress, "total", 0).toStr()
+    else if giveUp then
+        status = "Some media couldn't be saved; it will stream while playing."
+    else
+        status = "Preparing media..."
+    end if
+    unsupported = 0
+    if not isDeck and item <> invalid then unsupported = Model.unsupportedItemCount(item, ndi)
+    if unsupported > 0 then status = status + "  " + Chr(183) + "  " + unsupported.toStr() + " item(s) can't play on Roku and will be skipped"
+    if m.offline then status = status + "  " + Chr(183) + "  Offline, using saved schedule"
+
+    limit = 8
+    if isPortrait() then limit = 14
+    rows = []
+    if isDeck then
+        rows = Model.deckHomeRows(item)
+    else
+        rows = Model.kidsHomeRows(item)
+    end if
+    total = rows.count()
+    shown = []
+    for i = 0 to rows.count() - 1
+        if i < limit then shown.push(rows[i])
+    end for
+    more = 0
+    if total > limit then more = total - limit
+    hint = "OK or Play to start  " + Chr(183) + "  Left / Right to move between slides  " + Chr(183) + "  Back to stop"
+    if isDeck then hint = "OK or Play to start  " + Chr(183) + "  Right / Left for next / back  " + Chr(183) + "  OK for the slide list  " + Chr(183) + "  Play/Pause for a black screen  " + Chr(183) + "  Back to stop"
+    name = "-"
+    if item <> invalid then name = Util.getStr(item, "name", "-")
+
+    cfg = {
+        site: Util.getStr(m.device, "site", ""), location: Util.getStr(m.device, "location", ""), heading: heading, name: name,
+        rows: shown, moreCount: more, status: status, canPlay: ready, hint: hint, brand: look, portrait: isPortrait(), w: m.W, h: m.H
+    }
+    m.homeItem = item
+    m.homeModule = moduleName
+    return { view: "HomeView", cfg: cfg, role: "home" }
+end function
+
+function mediaGiveUp() as boolean
+    if m.progress = invalid then return false
+    return not Util.getBool(m.progress, "active", false) and Util.getNum(m.progress, "failed", 0) > 0
+end function
+
+sub startPlaying(moduleName as string, item as object)
+    ndi = ndiOn()
+    m.runCounter = Util.getNum(m, "runCounter", 0) + 1
+    if moduleName = "slides" then
+        slides = Model.deckSlides(item, ndi)
+        m.playing = {
+            module: "slides", id: Util.getStr(item, "id", ""), runId: m.runCounter, slides: slides,
+            loop: Util.getBool(item, "loop", false), theme: Util.getObj(item, "theme"),
+            report: { module: "slides", title: Util.getStr(item, "name", ""), refKind: "deck", refId: Util.getStr(item, "id", "") }
+        }
+    else
+        slides = Model.playlistSlides(item, ndi)
+        m.playing = {
+            module: "kids", id: Util.getStr(item, "id", ""), runId: m.runCounter, slides: slides, loop: false, theme: invalid,
+            report: { module: "kids", title: Util.getStr(item, "name", ""), refKind: "playlist", refId: Util.getStr(item, "id", "") }
+        }
+    end if
+end sub
+
+' ---------- Signage: loops whatever playlist is scheduled right now, black when nothing is ----------
+
+function signageDescription(look as object, nowEpoch as integer, off as integer) as object
+    playlist = Model.signagePlaylistNow(m.device, nowEpoch, off)
+    black = { view: "BlackView", cfg: { w: m.W, h: m.H }, role: "black" }
+    if playlist = invalid then return black
+    all = Model.playlistSlides(playlist, ndiOn())
+    ' Only items whose files have finished downloading, so the loop never stalls on a missing file.
+    giveUp = mediaGiveUp()
+    playable = []
+    for each s in all
+        ok = true
+        if (s.kind = "video" or s.kind = "image") and not Media.isCached(s.url) and not giveUp then ok = false
+        if ok then playable.push(s)
+    end for
+    if playable.count() = 0 then return black
+    slides = Model.signageLoopSlides(playable)
+    report = { module: "signage", title: Util.getStr(playlist, "name", ""), refKind: invalid, refId: invalid }
+    key = "signage|" + Util.getStr(playlist, "id", "") + "|" + m.loopCounter.toStr() + "|" + FormatJson(slides)
+    return { view: "PlayerView", key: key, role: "signage", cfg: playerConfig(slides, false, false, invalid, report, look) }
+end function
+
+' ---------- a "play this now" request from a remote ----------
+
+function overrideDescription(ov as object, base as object) as object
+    ndi = ndiOn()
+    kind = Util.getStr(ov, "kind", "")
+    isDeck = kind = "deck"
+    slides = []
+    urls = []
+    report = invalid
+    theme = invalid
+    if isDeck and Util.isAA(ov["deck"]) then
+        deck = ov["deck"]
+        slides = Model.deckSlides(deck, ndi)
+        urls = Model.deckMediaUrls(deck)
+        theme = Util.getObj(deck, "theme")
+        report = { module: "slides", title: Util.getStr(deck, "name", ""), refKind: "deck", refId: Util.getStr(deck, "id", "") }
+    else if kind = "playlist" and Util.isAA(ov["playlist"]) then
+        pl = ov["playlist"]
+        slides = Model.playlistSlides(pl, ndi)
+        urls = Model.playlistMediaUrls(pl)
+        report = { module: "kids", title: Util.getStr(pl, "name", ""), refKind: "playlist", refId: Util.getStr(pl, "id", "") }
+    else
+        return { view: "MessageView", cfg: { title: "Nothing to play", detail: m.error, brand: base, w: m.W, h: m.H } }
+    end if
+    ' Wait up to 30 s for the files to finish downloading, then play anyway (the rest streams).
+    ready = true
+    for each u in urls
+        if not Media.isCached(u) then ready = false
+    end for
+    nowMs = m.uptime.TotalMilliseconds()
+    if m.overrideWaitStart = 0 or Util.getStr(ov, "until", "") <> m.overrideWaitFor then
+        m.overrideWaitStart = nowMs + 1
+        m.overrideWaitFor = Util.getStr(ov, "until", "")
+    end if
+    if not ready and nowMs - m.overrideWaitStart < 30000 then
+        scheduleRefresh(1000)
+        return { view: "MessageView", cfg: { title: "Getting ready" + Chr(8230), detail: "Downloading what was just sent to this screen.", brand: base, w: m.W, h: m.H } }
+    end if
+    key = "override|" + Util.getStr(ov, "until", "") + "|" + Util.getStr(ov, "kind", "")
+    return { view: "PlayerView", key: key, role: "override", cfg: playerConfig(slides, isDeck, false, theme, report, base) }
+end function
+
+' ---------- settings ----------
+
+function settingsConfig(base as object) as object
+    lines = []
+    paired = isPaired()
+    lines.push("Church TV OS for Roku " + Config.CHANNEL_VERSION + "   " + Chr(183) + "   protocol " + Config.REPORTED_APP_VERSION)
+    if m.device <> invalid and paired then
+        org = Util.getStr(Util.getObj(m.device, "organization"), "name", "")
+        scr = Util.getStr(Util.getObj(m.device, "screen"), "name", "")
+        place = Util.getStr(m.device, "site", "")
+        loc = Util.getStr(m.device, "location", "")
+        if loc <> "" then place = place + " / " + loc
+        lines.push("Church: " + org)
+        lines.push("Screen: " + scr + "   " + Chr(183) + "   " + place)
+        lines.push("Time zone: " + siteZone() + "   " + Chr(183) + "   " + m.orientation)
+    else
+        lines.push("This TV is not paired yet.")
+    end if
+    state = "Online"
+    if m.offline then state = "Offline (using the saved schedule)"
+    lines.push(state + "   " + Chr(183) + "   " + Config.DASHBOARD_HOST)
+    lines.push("Device ID: " + Device.deviceId())
+    items = [{ id: "refresh", text: "Refresh now" }, { id: "demo", text: "Demo mode" }]
+    if Device.isRegistered() then items.push({ id: "unpair", text: "Unpair this TV", confirm: true, confirmText: "Press OK again to unpair" })
+    items.push({ id: "close", text: "Close" })
+    return { title: "Settings", lines: lines, items: items, brand: base, w: m.W, h: m.H }
+end function
+
+' ---------- rendering ----------
+
+sub refresh()
+    desc = decide()
+    orientation = "landscape"
+    if m.device <> invalid then orientation = Util.getStr(Util.getObj(m.device, "screen"), "orientation", "landscape")
+    if orientation <> m.orientation then
+        applyOrientation(orientation)
+        m.sig = ""
+        if m.message <> invalid then clearMessage()
+        desc = decide()
+    end if
+    if desc.key <> invalid then
+        sig = desc.view + "|" + desc.key
+    else
+        sig = desc.view + "|" + FormatJson(desc.cfg) + "|" + m.orientation
+    end if
+    if sig = m.sig and m.view <> invalid then return
+    m.sig = sig
+    m.role = Util.getStr(desc, "role", "")
+    replaceView(desc)
+end sub
+
+sub replaceView(desc as object)
+    if m.view <> invalid then
+        if m.viewName = "PlayerView" then
+            m.view.unobserveField("result")
+            m.view.unobserveField("status")
+            ' stop its video, audio and timers before it goes
+            m.view.closing = true
+        end if
+        m.stage.removeChild(m.view)
+        m.view = invalid
+        if m.viewName = "PlayerView" then
+            m.lastStatus = Remote.idleStatus()
+            pushStatus()
+        end if
+    end if
+    m.viewName = desc.view
+    if desc.view = "BlackView" then
+        v = CreateObject("roSGNode", "Rectangle")
+        v.width = m.W
+        v.height = m.H
+        v.color = "0x000000FF"
+    else
+        v = CreateObject("roSGNode", desc.view)
+    end if
+    ' the content goes under the message overlay
+    m.stage.insertChild(v, 0)
+    m.view = v
+    if desc.view = "PlayerView" then
+        v.observeField("result", "onPlayerResult")
+        v.observeField("status", "onPlayerStatus")
+        v.config = desc.cfg
+    else if desc.view = "MenuView" then
+        v.observeField("action", "onMenuAction")
+        v.config = desc.cfg
+    else if desc.view = "HomeView" then
+        v.observeField("action", "onHomeAction")
+        v.config = desc.cfg
+    else if desc.view = "PairingView" then
+        v.observeField("action", "onPairingAction")
+        v.config = desc.cfg
+    else if desc.view <> "BlackView" then
+        v.config = desc.cfg
+    end if
+    if desc.view = "BlackView" or desc.view = "SplashView" or desc.view = "MessageView" then
+        m.top.setFocus(true)
+    else
+        v.setFocus(true)
+    end if
+end sub
+
+' ---------- actions from views ----------
+
+sub onHomeAction()
+    if m.view = invalid or m.homeItem = invalid then return
+    if m.view.action = "play" then
+        startPlaying(m.homeModule, m.homeItem)
+        refresh()
+    end if
+end sub
+
+sub onPairingAction()
+    if m.view <> invalid and m.view.action = "settings" then
+        m.settingsOpen = true
+        refresh()
+    end if
+end sub
+
+sub onMenuAction()
+    if m.view = invalid then return
+    id = m.view.action
+    if m.role = "demoMenu" then
+        if id = "kids" or id = "signage" then
+            m.demo = id
+            m.demoMenu = false
+            m.settingsOpen = false
+        else
+            m.demoMenu = false
+        end if
+    else if m.role = "settings" then
+        if id = "close" or id = "back" then
+            m.settingsOpen = false
+        else if id = "demo" then
+            m.demoMenu = true
+        else if id = "refresh" then
+            m.sync.wake = m.sync.wake + 1
+            m.settingsOpen = false
+        else if id = "unpair" then
+            Device.reset()
+            m.device = invalid
+            m.playing = invalid
+            m.offline = false
+            m.error = ""
+            m.settingsOpen = false
+            m.remote.paired = false
+            m.sync.reidentify = m.sync.reidentify + 1
+            m.sync.wake = m.sync.wake + 1
+        end if
+    end if
+    refresh()
+end sub
+
+sub onPlayerResult()
+    if m.view = invalid then return
+    reason = m.view.result
+    role = m.role
+    if role = "demo" then
+        if reason = "exit" then
+            m.demo = ""
+        else
+            m.loopCounter = m.loopCounter + 1 ' the demo starts over when it ends
+        end if
+    else if role = "signage" then
+        m.loopCounter = m.loopCounter + 1 ' loops: finishing (or Back) restarts the playlist
+    else if role = "override" then
+        ov = Util.getObj(m.device, "override")
+        if ov <> invalid then m.dismissedUntil = Util.getStr(ov, "until", "")
+    else
+        m.playing = invalid
+    end if
+    refresh()
+end sub
+
+' ---------- keys ----------
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+    ' The * (options) button opens and closes Settings from anywhere: Roku remotes have no Menu button.
+    if key = "options" then
+        if m.demo <> "" then
+            m.demo = ""
+        else if m.demoMenu then
+            m.demoMenu = false
+        else
+            m.settingsOpen = not m.settingsOpen
+        end if
+        refresh()
+        return true
+    end if
+    ' Back on the pairing and home screens falls through, which leaves the channel (the Roku home button does the same).
+    return false
+end function
