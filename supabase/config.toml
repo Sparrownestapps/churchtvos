@@ -416,3 +416,6 @@ enabled = true
 
 [functions.notify-offline]
 verify_jwt = false
+
+[functions.mcp]
+verify_jwt = false

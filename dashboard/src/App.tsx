@@ -17,6 +17,7 @@ import PeoplePage from './pages/PeoplePage'
 import SettingsPage from './pages/SettingsPage'
 import GetStartedPage from './pages/GetStartedPage'
 import PairPage from './pages/PairPage'
+import OAuthConsentPage, { isConsentPath } from './pages/OAuthConsentPage'
 import { isPairPath, pairCodeFromSearch } from './pairLink'
 import { helpUrl } from './links'
 import { canControlNav } from './control/logic'
@@ -148,6 +149,7 @@ export default function App() {
 
   if (session === undefined) return null
   if (!session) return <Login />
+  if (isConsentPath(location.pathname)) return <OAuthConsentPage />
   return <SignedIn session={session} />
 }
 
