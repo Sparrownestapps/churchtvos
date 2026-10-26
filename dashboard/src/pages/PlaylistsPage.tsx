@@ -13,6 +13,7 @@ import { NdiItemEditor, NDI_LABEL, cleanNdi, newNdiItem, ndiProblem } from '../N
 import ImportDialog from '../importer/ImportDialog'
 import { insertAt } from '../importer/importLogic'
 import { LyricsItemEditor, newLyricsItem, type SongLite } from '../LyricsItem'
+import ContentBrowser from '../folders/ContentBrowser'
 
 const KIND_LABEL: Record<PlaylistItem['type'], string> = {
   video: 'Video',
@@ -29,6 +30,7 @@ export default function PlaylistsPage() {
   const defaultScope = useDefaultScope()
   const [editing, setEditing] = useState<Playlist | 'new' | null>(null)
   const [importing, setImporting] = useState(false)
+  const [folder, setFolder] = useState<string | null>(null)
 
   const { data, reload } = useLoad(async () => {
     const [playlists, media, folders, songs] = await Promise.all([
@@ -48,6 +50,7 @@ export default function PlaylistsPage() {
         media={data?.media ?? []}
         folders={data?.folders ?? []}
         songs={data?.songs ?? []}
+        folderId={folder}
         onDone={() => (setEditing(null), reload())}
       />
     )
@@ -55,7 +58,7 @@ export default function PlaylistsPage() {
 
   async function duplicate(p: Playlist) {
     const ok = await attempt(async () =>
-      must(await supabase.from('playlists').insert({ organization_id: org.id, site_id: p.site_id, name: `${p.name} (copy)`, items: p.items })),
+      must(await supabase.from('playlists').insert({ organization_id: org.id, site_id: p.site_id, folder_id: p.folder_id ?? null, name: `${p.name} (copy)`, items: p.items })),
     )
     if (ok) reload()
   }
@@ -69,58 +72,70 @@ export default function PlaylistsPage() {
 
   return (
     <div className="stack">
-      {canEditContent('kids', defaultScope) && (
-        <div>
-          <button className="btn primary" onClick={() => setEditing('new')}>
-            + New playlist
-          </button>{' '}
-          <button className="btn" onClick={() => setImporting(true)} title="Make a playlist from a PDF, a PowerPoint or pictures">
-            Import PDF / PowerPoint…
-          </button>
-        </div>
-      )}
-      {playlists.length === 0 && (
-        <EmptyState help="kids">
-          A playlist is what a Kids room plays, in order: videos, slides, a countdown, lyrics. Add media first, then press New playlist.
-        </EmptyState>
-      )}
-      {playlists.map((p) => {
-        const canEdit = canEditContent('kids', p.site_id)
-        return (
-          <div key={p.id} className="card row spread">
-            <div>
-              <h3>{p.name}</h3>
-              <span className="muted">
-                {p.items.length} items · {scopeLabel(p.site_id, sites)} ·{' '}
-                {p.items.map((i) => KIND_LABEL[i.type]).join(', ') || 'empty'}
-              </span>
+      <ContentBrowser
+        module="kids"
+        table="playlists"
+        noun="playlist"
+        items={playlists}
+        folder={folder}
+        onFolder={setFolder}
+        onChanged={reload}
+        toolbar={
+          canEditContent('kids', defaultScope) && (
+            <>
+              <button className="btn primary" onClick={() => setEditing('new')}>
+                + New playlist
+              </button>
+              <button className="btn" onClick={() => setImporting(true)} title="Make a playlist from a PDF, a PowerPoint or pictures">
+                Import PDF / PowerPoint…
+              </button>
+            </>
+          )
+        }
+        empty={
+          <EmptyState help="kids">
+            A playlist is what a Kids room plays, in order: videos, slides, a countdown, lyrics. Add media first, then press New playlist.
+          </EmptyState>
+        }
+        render={(p, extra) => {
+          const canEdit = canEditContent('kids', p.site_id)
+          return (
+            <div key={p.id} className="card row spread wrap-sm">
+              <div>
+                <h3>{p.name}</h3>
+                <span className="muted">
+                  {p.items.length} items · {scopeLabel(p.site_id, sites)} · {p.items.map((i) => KIND_LABEL[i.type]).join(', ') || 'empty'}
+                </span>
+                {extra.meta}
+              </div>
+              <div className="row wrap-sm">
+                {canEdit && (
+                  <button className="btn" onClick={() => setEditing(p)}>
+                    Edit
+                  </button>
+                )}
+                {canEdit && (
+                  <button className="btn" onClick={() => duplicate(p)}>
+                    Duplicate
+                  </button>
+                )}
+                {extra.actions}
+                {canEdit && (
+                  <button className="btn danger" onClick={() => remove(p)}>
+                    Delete
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="row">
-              {canEdit && (
-                <button className="btn" onClick={() => setEditing(p)}>
-                  Edit
-                </button>
-              )}
-              {canEditContent('kids', p.site_id) && (
-                <button className="btn" onClick={() => duplicate(p)}>
-                  Duplicate
-                </button>
-              )}
-              {canEdit && (
-                <button className="btn danger" onClick={() => remove(p)}>
-                  Delete
-                </button>
-              )}
-            </div>
-          </div>
-        )
-      })}
+          )
+        }}
+      />
       {importing && <ImportDialog mode="playlist" onClose={() => setImporting(false)} onCreated={reload} />}
     </div>
   )
 }
 
-function PlaylistEditor({ playlist, media, folders, songs, onDone }: { playlist: Playlist | null; media: Media[]; folders: MediaFolder[]; songs: SongLite[]; onDone: () => void }) {
+function PlaylistEditor({ playlist, media, folders, songs, folderId, onDone }: { playlist: Playlist | null; media: Media[]; folders: MediaFolder[]; songs: SongLite[]; folderId: string | null; onDone: () => void }) {
   const { org } = useApp()
   const defaultScope = useDefaultScope()
   const channelId = org.branding.youtube_channel_id || null
@@ -176,7 +191,7 @@ function PlaylistEditor({ playlist, media, folders, songs, onDone }: { playlist:
       must(
         playlist
           ? await supabase.from('playlists').update(row).eq('id', playlist.id)
-          : await supabase.from('playlists').insert(row),
+          : await supabase.from('playlists').insert({ ...row, folder_id: folderId }),
       ),
     )
     setSaving(false)

@@ -2,7 +2,7 @@ import { Suspense, lazy, useState } from 'react'
 import { useApp } from '../context'
 import { supabase } from '../supabase'
 import type { Playlist, Schedule } from '../types'
-import { attempt, fmtWhen, must, nextSundayAt, locationLabel, toLocalInput, useLoad } from '../lib'
+import { attempt, fmtWhen, must, nextSundayAt, locationLabel, toLocalInput, useLoad, unarchived } from '../lib'
 import { EmptyState, ReadOnlyNote } from '../ui'
 
 const SeriesManager = lazy(() => import('../calendar/SeriesManager'))
@@ -17,7 +17,7 @@ export default function SchedulePage() {
 
   const { data, reload } = useLoad(async () => {
     const [playlists, schedules] = await Promise.all([
-      supabase.from('playlists').select('id, name, site_id').eq('organization_id', org.id).order('name'),
+      supabase.from('playlists').select('id, name, site_id, archived_at').eq('organization_id', org.id).order('name'),
       supabase
         .from('schedules')
         .select('*')
@@ -78,7 +78,7 @@ export default function SchedulePage() {
             <span>Playlist</span>
             <select value={playlistId} onChange={(e) => setPlaylistId(e.target.value)}>
               <option value="">Choose…</option>
-              {playlists.map((p) => (
+              {unarchived(playlists).map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>

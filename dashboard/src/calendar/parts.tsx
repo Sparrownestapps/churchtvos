@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
-import { moveItem } from '../lib'
+import { moveItem, unarchived } from '../lib'
 import type { NamedRow } from '../calendarTypes'
 import '../calendar.css'
 
@@ -92,7 +92,7 @@ export function RotationEditor({
             <>
               <select className="grow" value={id} onChange={(e) => onChange(value.map((v, j) => (j === i ? e.target.value : v)))}>
                 <option value="">Choose…</option>
-                {playlists.map((p) => (
+                {unarchived(playlists).map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
                   </option>

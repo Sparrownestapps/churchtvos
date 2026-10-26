@@ -4,6 +4,7 @@ import {
   CONFIRM_NOTE, PREVIEW_NOTE, Recorder, ToolError, activityLine, isUuid, must, needUuid, text,
   type Ctx, type Db, type Tool,
 } from "./lib.ts";
+import { LIST_PROPS, folderFor, listContent } from "./organize.ts";
 
 type Lookups = { media: Map<string, any>; songs: Map<string, any> };
 
@@ -99,9 +100,10 @@ const itemLine = (x: any, n: number) => {
 
 // ───────────────────────── Kids playlists ─────────────────────────
 async function listKidsPlaylists({ db }: Ctx, a: any) {
-  const org = needUuid(a.organization_id, "organization_id");
-  const rows = must(await db.from("playlists").select("id,name,items,updated_at").eq("organization_id", org).order("name"), "read Kids playlists") as any[];
-  return rows.length ? rows.map((p) => `- ${p.name} (${(p.items ?? []).length} items)  playlist_id: ${p.id}`).join("\n") : "No Kids playlists yet.";
+  const { rows, path } = await listContent(db, "kids", a, "id,name,items");
+  return rows.length
+    ? rows.map((p) => `- ${p.name} (${(p.items ?? []).length} items)${p.archived_at ? " ARCHIVED" : ""}${path(p.folder_id)}  playlist_id: ${p.id}`).join("\n")
+    : "No matching Kids playlists.";
 }
 async function getKidsPlaylist({ db }: Ctx, a: any) {
   const p = must(await db.from("playlists").select("id,name,items").eq("id", needUuid(a.playlist_id, "playlist_id")).maybeSingle(), "read that playlist") as any;
@@ -123,7 +125,8 @@ async function saveKidsPlaylist({ db }: Ctx, a: any) {
   }
   if (!editing) {
     const rec = new Recorder(db, org, "create_kids_playlist");
-    const [row] = await rec.insert("playlists", { organization_id: org, site_id: isUuid(a.site_id) ? a.site_id : null, name, items: items ?? [] }, "create the Kids playlist");
+    const folder_id = await folderFor(db, org, "kids", a.folder_id);
+    const [row] = await rec.insert("playlists", { organization_id: org, site_id: isUuid(a.site_id) ? a.site_id : null, folder_id, source: "mcp", name, items: items ?? [] }, "create the Kids playlist");
     const act = await rec.commit(`Kids playlist "${name}" created`);
     return `Created Kids playlist "${name}"  playlist_id: ${row.id}\n${(items ?? []).map(itemLine).join("\n")}\n\nIt isn't on any screen until scheduled (schedule_kids).${activityLine(act)}`;
   }
@@ -137,9 +140,10 @@ async function saveKidsPlaylist({ db }: Ctx, a: any) {
 
 // ───────────────────────── Slides decks ─────────────────────────
 async function listDecks({ db }: Ctx, a: any) {
-  const org = needUuid(a.organization_id, "organization_id");
-  const rows = must(await db.from("decks").select("id,name,slides,loops").eq("organization_id", org).order("name"), "read decks") as any[];
-  return rows.length ? rows.map((d) => `- ${d.name} (${(d.slides ?? []).length} slides${d.loops ? ", loops" : ""})  deck_id: ${d.id}`).join("\n") : "No decks yet.";
+  const { rows, path } = await listContent(db, "slides", a, "id,name,slides,loops");
+  return rows.length
+    ? rows.map((d) => `- ${d.name} (${(d.slides ?? []).length} slides${d.loops ? ", loops" : ""})${d.archived_at ? " ARCHIVED" : ""}${path(d.folder_id)}  deck_id: ${d.id}`).join("\n")
+    : "No matching decks.";
 }
 async function getDeck({ db }: Ctx, a: any) {
   const d = must(await db.from("decks").select("id,name,slides,loops,theme_id").eq("id", needUuid(a.deck_id, "deck_id")).maybeSingle(), "read that deck") as any;
@@ -165,7 +169,8 @@ async function saveDeck({ db }: Ctx, a: any) {
   if (a.theme_id !== undefined) patch.theme_id = isUuid(a.theme_id) ? a.theme_id : null;
   if (!editing) {
     const rec = new Recorder(db, org, "create_deck");
-    const [row] = await rec.insert("decks", { organization_id: org, site_id: isUuid(a.site_id) ? a.site_id : null, loops: false, ...patch }, "create the deck");
+    const folder_id = await folderFor(db, org, "slides", a.folder_id);
+    const [row] = await rec.insert("decks", { organization_id: org, site_id: isUuid(a.site_id) ? a.site_id : null, folder_id, source: "mcp", loops: false, ...patch }, "create the deck");
     const act = await rec.commit(`Deck "${name}" created`);
     return `Created deck "${name}"  deck_id: ${row.id}\n${(slides ?? []).map(itemLine).join("\n")}\n\nIt isn't on any screen until scheduled (schedule_slides) or played (play_now).${activityLine(act)}`;
   }
@@ -199,7 +204,7 @@ const SLIDE_DOC =
   "seconds absent = waits for Next on the remote.";
 
 export const CONTENT_TOOLS: Tool[] = [
-  { name: "list_kids_playlists", description: "Lists a church's Kids playlists.", inputSchema: { type: "object", properties: { organization_id: { type: "string" } }, required: ["organization_id"], additionalProperties: false }, annotations: { readOnlyHint: true }, run: listKidsPlaylists },
+  { name: "list_kids_playlists", description: "Lists a church's Kids playlists with their folders (archived ones hidden unless include_archived).", inputSchema: { type: "object", properties: LIST_PROPS, required: ["organization_id"], additionalProperties: false }, annotations: { readOnlyHint: true }, run: listKidsPlaylists },
   { name: "get_kids_playlist", description: "Shows the items in a Kids playlist.", inputSchema: { type: "object", properties: { playlist_id: { type: "string" } }, required: ["playlist_id"], additionalProperties: false }, annotations: { readOnlyHint: true }, run: getKidsPlaylist },
   {
     name: "save_kids_playlist",
@@ -208,13 +213,14 @@ export const CONTENT_TOOLS: Tool[] = [
       type: "object",
       properties: {
         organization_id: { type: "string", description: "Required when creating" }, playlist_id: { type: "string" }, site_id: { type: "string", description: "Optional: only for one site" },
+        folder_id: { type: "string", description: "Creating: folder to put it in (list_folders); default \"Made by assistant\"; \"top\" for the top level" },
         name: { type: "string" }, items: { type: "array", items: { type: "object" } }, confirm: { type: "boolean" },
       },
       additionalProperties: false,
     },
     run: saveKidsPlaylist,
   },
-  { name: "list_decks", description: "Lists a church's Slides decks.", inputSchema: { type: "object", properties: { organization_id: { type: "string" } }, required: ["organization_id"], additionalProperties: false }, annotations: { readOnlyHint: true }, run: listDecks },
+  { name: "list_decks", description: "Lists a church's Slides decks with their folders (archived ones hidden unless include_archived).", inputSchema: { type: "object", properties: LIST_PROPS, required: ["organization_id"], additionalProperties: false }, annotations: { readOnlyHint: true }, run: listDecks },
   { name: "get_deck", description: "Shows the slides in a deck.", inputSchema: { type: "object", properties: { deck_id: { type: "string" } }, required: ["deck_id"], additionalProperties: false }, annotations: { readOnlyHint: true }, run: getDeck },
   {
     name: "save_deck",
@@ -223,6 +229,7 @@ export const CONTENT_TOOLS: Tool[] = [
       type: "object",
       properties: {
         organization_id: { type: "string", description: "Required when creating" }, deck_id: { type: "string" }, site_id: { type: "string" },
+        folder_id: { type: "string", description: "Creating: folder to put it in (list_folders); default \"Made by assistant\"; \"top\" for the top level" },
         name: { type: "string" }, slides: { type: "array", items: { type: "object" } }, theme_id: { type: "string" }, loops: { type: "boolean" }, confirm: { type: "boolean" },
       },
       additionalProperties: false,

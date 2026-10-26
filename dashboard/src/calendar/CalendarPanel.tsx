@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useApp } from '../context'
 import { supabase } from '../supabase'
 import { DayPicker } from '../ScheduleRules'
-import { MODULE_NAME, attempt, daysLabel, must } from '../lib'
+import { MODULE_NAME, attempt, daysLabel, must, unarchived } from '../lib'
 import type { Block, Domain, NamedRow, PanelState, Prefill, ResolvedTarget } from '../calendarTypes'
 import { DOMAINS, exceptionRow, locationRuns } from './domain'
 import type { Screen, ScreenGroup, ScreenSchedule, ScreenModule, SignageSlot } from '../types'
@@ -607,7 +607,7 @@ function RuleEdit({ ctx, block, done }: { ctx: CalCtx; block: Extract<Block, { k
         <label className="field">
           <span>Playlist</span>
           <select value={playlistId} disabled={ro} onChange={(e) => setPlaylistId(e.target.value)}>
-            {ctx.signagePlaylists.map((p) => (
+            {unarchived(ctx.signagePlaylists).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>

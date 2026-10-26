@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useApp } from '../context'
 import { supabase } from '../supabase'
 import { DayPicker } from '../ScheduleRules'
-import { attempt, daysLabel, locationLabel, must, shortTime, useLoad } from '../lib'
+import { attempt, daysLabel, locationLabel, must, shortTime, useLoad, unarchived } from '../lib'
 import type { Domain, KidsSeries, NamedRow, SeriesException } from '../calendarTypes'
 import { DOMAINS, exceptionRow, normException, normSeries } from './domain'
 import { RotationEditor } from './parts'
@@ -60,7 +60,7 @@ export default function SeriesManager({
   const { data, reload } = useLoad(async () => {
     const [series, playlists] = await Promise.all([
       supabase.from(dn.seriesTable).select('*').eq('organization_id', org.id).order('start_date'),
-      supabase.from(domain === 'slides' ? 'decks' : 'playlists').select('id, name, site_id').eq('organization_id', org.id).order('name'),
+      supabase.from(domain === 'slides' ? 'decks' : 'playlists').select('id, name, site_id, archived_at').eq('organization_id', org.id).order('name'),
     ])
     const list = (must(series) as unknown[]).map((r) => normSeries(domain, r))
     const ex = list.length
@@ -295,7 +295,7 @@ function Exceptions({
               <span>{domain === 'slides' ? 'Deck' : 'Playlist'}</span>
               <select value={playlist} onChange={(e) => setPlaylist(e.target.value)}>
                 <option value="">Choose…</option>
-                {playlists.map((p) => (
+                {unarchived(playlists).map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
                   </option>

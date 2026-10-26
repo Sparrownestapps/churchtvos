@@ -4,7 +4,7 @@ import { useApp } from '../context'
 import { supabase } from '../supabase'
 import type { DeckSchedule } from '../slidesTypes'
 import type { DeckRef } from '../slidesPages.types'
-import { attempt, fmtWhen, locationLabel, must, nextSundayAt, toLocalInput, useLoad } from '../lib'
+import { attempt, fmtWhen, locationLabel, must, nextSundayAt, toLocalInput, useLoad, unarchived } from '../lib'
 import { ReadOnlyNote } from '../ui'
 import DeckSeriesManager from './DeckSeriesManager'
 import LocationPicker, { LocationHint, isSlidesLocation } from './LocationPicker'
@@ -19,7 +19,7 @@ export default function SlidesSchedulePage() {
 
   const { data, reload } = useLoad(async () => {
     const [decks, schedules] = await Promise.all([
-      supabase.from('decks').select('id, name, site_id').eq('organization_id', org.id).order('name'),
+      supabase.from('decks').select('id, name, site_id, archived_at').eq('organization_id', org.id).order('name'),
       supabase.from('deck_schedules').select('*').eq('organization_id', org.id).or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`).order('starts_at'),
     ])
     return { decks: must(decks) as DeckRef[], schedules: must(schedules) as DeckSchedule[] }
@@ -77,7 +77,7 @@ export default function SlidesSchedulePage() {
               <span>Deck</span>
               <select value={deckId} onChange={(e) => setDeckId(e.target.value)}>
                 <option value="">Choose…</option>
-                {decks.map((d) => (
+                {unarchived(decks).map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name}
                   </option>

@@ -27,7 +27,7 @@ export default function ScreensPage() {
       supabase.from('screen_groups').select('*').eq('organization_id', org.id).order('name'),
       supabase.from('screen_schedules').select('*').eq('organization_id', org.id),
       hasModule('signage')
-        ? supabase.from('signage_playlists').select('id, name').eq('organization_id', org.id).order('name')
+        ? supabase.from('signage_playlists').select('id, name').eq('organization_id', org.id).is('archived_at', null).order('name')
         : Promise.resolve({ data: [], error: null }),
       supabase.rpc('tv_limit', { p_org: org.id }),
     ])

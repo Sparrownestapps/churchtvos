@@ -6,7 +6,7 @@ import { DayPicker } from '../ScheduleRules'
 import { RotationEditor } from '../calendar/parts'
 import type { DeckOccurrence, DeckSeries, DeckSeriesException } from '../slidesTypes'
 import type { DeckRef } from '../slidesPages.types'
-import { attempt, daysLabel, locationLabel, must, nextSundayAt, shortTime, useLoad } from '../lib'
+import { attempt, daysLabel, locationLabel, must, nextSundayAt, shortTime, useLoad, unarchived } from '../lib'
 import LocationPicker, { LocationHint, isSlidesLocation } from './LocationPicker'
 
 type Draft = {
@@ -125,7 +125,7 @@ export default function DeckSeriesManager({ decks }: { decks: DeckRef[] }) {
   const tzOf = (loc: string) => sites.find((s) => s.id === siteOf(loc))?.timezone
   const list = data.series.filter((s) => locations.some((l) => l.id === s.location_id))
   const deckName = (id: string | null) => decks.find((d) => d.id === id)?.name ?? '—'
-  const deckOptions = decks.map((d) => ({ id: d.id, name: d.site_id ? `${d.name} (${sites.find((s) => s.id === d.site_id)?.name ?? 'one site'} only)` : d.name }))
+  const deckOptions = unarchived(decks).map((d) => ({ id: d.id, name: d.site_id ? `${d.name} (${sites.find((s) => s.id === d.site_id)?.name ?? 'one site'} only)` : d.name }))
   const editableSites = mySites.filter((s) => canEditContent('slides', s.id))
   const offered = locations.filter((l) => isSlidesLocation(l) && editableSites.some((s) => s.id === l.site_id))
 

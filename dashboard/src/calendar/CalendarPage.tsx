@@ -133,12 +133,12 @@ function CalendarView() {
     const [screens, groups, kp, sp, slots, rules, series, decks, dseries] = await Promise.all([
       supabase.from('screens').select('*').eq('organization_id', org.id).order('name'),
       supabase.from('screen_groups').select('*').eq('organization_id', org.id).order('name'),
-      kidsOn ? supabase.from('playlists').select('id, name, site_id').eq('organization_id', org.id).order('name') : none,
-      signageOn ? supabase.from('signage_playlists').select('id, name, site_id').eq('organization_id', org.id).order('name') : none,
+      kidsOn ? supabase.from('playlists').select('id, name, site_id, archived_at').eq('organization_id', org.id).order('name') : none,
+      signageOn ? supabase.from('signage_playlists').select('id, name, site_id, archived_at').eq('organization_id', org.id).order('name') : none,
       signageOn ? supabase.from('signage_slots').select('*').eq('organization_id', org.id) : none,
       supabase.from('screen_schedules').select('*').eq('organization_id', org.id),
       kidsOn ? supabase.from('kids_series').select('*').eq('organization_id', org.id) : none,
-      slidesOn ? supabase.from('decks').select('id, name, site_id').eq('organization_id', org.id).order('name') : none,
+      slidesOn ? supabase.from('decks').select('id, name, site_id, archived_at').eq('organization_id', org.id).order('name') : none,
       slidesOn ? supabase.from('deck_series').select('*').eq('organization_id', org.id) : none,
     ])
     return {

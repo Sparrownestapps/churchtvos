@@ -42,7 +42,7 @@ Object.assign(T, {
   ],
   songs: [{ id: SONG, organization_id: ORG, title: 'Way Maker', authors: 'Sinach', ccli_number: '7115744' }],
   screen_schedules: [], signage_slots: [], signage_playlists: [], playlists: [], decks: [], slide_themes: [],
-  schedules: [], deck_schedules: [], kids_series: [], deck_series: [], kids_series_exceptions: [], deck_series_exceptions: [], mcp_activity: [], mcp_upload_requests: [],
+  schedules: [], deck_schedules: [], kids_series: [], deck_series: [], kids_series_exceptions: [], deck_series_exceptions: [], mcp_activity: [], mcp_upload_requests: [], content_folders: [],
 });
 
 let id = 1;
@@ -221,5 +221,32 @@ bad(await tool('schedule_signage', { screen_ids: [SC1], upload: { title: 'x' }, 
 
 t = ok(await tool('list_targets', {}), 'list_targets shows unassigned screens');
 assert.match(t, /not in a room[\s\S]*Loose TV/);
+
+
+// ── folders ──
+const kidsFolder = () => T.content_folders.find((f) => f.module === 'kids' && f.system === 'assistant');
+t = ok(await tool('save_kids_playlist', { organization_id: ORG, name: 'Assistant made', items: [] }), 'kids playlist goes to assistant folder');
+const AM = T.playlists.at(-1);
+assert.ok(kidsFolder()); assert.equal(AM.folder_id, kidsFolder().id); assert.equal(AM.source, 'mcp');
+assert.equal(T.signage_playlists.at(-1).folder_id, T.content_folders.find((f) => f.module === 'signage' && f.system === 'assistant').id, 'signage playlist filed');
+t = ok(await tool('organize_content', { module: 'kids', ids: [AM.id], new_folder_name: 'Fall series' }), 'organize into a new folder');
+const fall = T.content_folders.find((f) => f.name === 'Fall series');
+assert.ok(fall); assert.equal(T.playlists.find((p) => p.id === AM.id).folder_id, fall.id);
+t = ok(await tool('list_folders', { organization_id: ORG, module: 'kids' }), 'list_folders');
+assert.match(t, /Fall series \(1\)/); assert.match(t, /Made by assistant \(1\)/); // "Sunday wk1" from earlier
+t = ok(await tool('list_kids_playlists', { organization_id: ORG }), 'list shows folder path');
+assert.match(t, /Assistant made .*\[Fall series\]/);
+T.kids_series.push({ id: 'ks-x', organization_id: ORG, location_id: KIDSROOM, playlist_ids: [AM.id], days: [0], start_time: '09:00:00', end_time: '10:00:00', start_date: '2030-01-01', end_date: null });
+bad(await tool('organize_content', { module: 'kids', ids: [AM.id], archive: true }), /Still in use/, 'archive refused while scheduled');
+T.kids_series.pop();
+ok(await tool('organize_content', { module: 'kids', ids: [AM.id], archive: true }), 'archive');
+assert.ok(T.playlists.find((p) => p.id === AM.id).archived_at);
+assert.doesNotMatch(ok(await tool('list_kids_playlists', { organization_id: ORG }), 'archived hidden'), /Assistant made/);
+assert.match(ok(await tool('list_kids_playlists', { organization_id: ORG, include_archived: true }), 'include_archived'), /Assistant made .*ARCHIVED/);
+const orgAct = T.mcp_activity.at(-1).id;
+ok(await tool('undo_change', { activity_id: orgAct, confirm: true }), 'undo archive');
+assert.ok(!T.playlists.find((p) => p.id === AM.id).archived_at);
+t = ok(await tool('save_deck', { organization_id: ORG, name: 'Top deck', slides: [], folder_id: 'top' }), 'deck at top level when asked');
+assert.equal(T.decks.at(-1).folder_id, null);
 
 console.log('\nAll tests passed.');

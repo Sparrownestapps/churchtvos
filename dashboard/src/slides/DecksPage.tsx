@@ -9,6 +9,7 @@ import DeckEditor from './DeckEditor'
 import ImportDialog from '../importer/ImportDialog'
 import { MiniSlide } from './DeckPreview'
 import { useSlidesLibrary, useSongs, useThemes } from './data'
+import ContentBrowser from '../folders/ContentBrowser'
 
 type Sort = 'updated' | 'name' | 'name-desc' | 'slides'
 
@@ -16,7 +17,7 @@ export default function DecksPage() {
   const { org, sites, canEditContent } = useApp()
   const defaultScope = useDefaultScope()
   const [editing, setEditing] = useState<Deck | 'new' | null>(null)
-  const [search, setSearch] = useState('')
+  const [folder, setFolder] = useState<string | null>(null)
   const [sort, setSort] = useState<Sort>('updated')
   const [importing, setImporting] = useState(false)
 
@@ -26,15 +27,9 @@ export default function DecksPage() {
   const lib = useSlidesLibrary()
   const songMap = useMemo(() => new Map((songs.data ?? []).map((s) => [s.id, s])), [songs.data])
 
-  const shown = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    const list = (data ?? []).filter((d) => !q || d.name.toLowerCase().includes(q))
-    const byName = (a: Deck, b: Deck) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true })
-    if (sort === 'name') return list.sort(byName)
-    if (sort === 'name-desc') return list.sort((a, b) => byName(b, a))
-    if (sort === 'slides') return list.sort((a, b) => b.slides.length - a.slides.length)
-    return list.sort((a, b) => b.updated_at.localeCompare(a.updated_at))
-  }, [data, search, sort])
+  const byName = (a: Deck, b: Deck) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true })
+  const sorter = (a: Deck, b: Deck) =>
+    sort === 'name' ? byName(a, b) : sort === 'name-desc' ? byName(b, a) : sort === 'slides' ? b.slides.length - a.slides.length : b.updated_at.localeCompare(a.updated_at)
 
   if (editing) {
     if (!themes.data) return <p className={themes.error ? 'error' : 'muted'}>{themes.error ? `Couldn't load themes: ${themes.error}` : 'Loading…'}</p>
@@ -44,6 +39,7 @@ export default function DecksPage() {
         lib={lib}
         themes={themes.data}
         songs={songs.data ?? []}
+        folderId={folder}
         onDone={() => (setEditing(null), reload())}
       />
     )
@@ -51,7 +47,7 @@ export default function DecksPage() {
 
   async function duplicate(d: Deck) {
     const ok = await attempt(async () =>
-      must(await supabase.from('decks').insert({ organization_id: org.id, site_id: d.site_id, name: `${d.name} (copy)`, theme_id: d.theme_id, background: d.background, slides: d.slides, loops: d.loops })),
+      must(await supabase.from('decks').insert({ organization_id: org.id, site_id: d.site_id, folder_id: d.folder_id ?? null, name: `${d.name} (copy)`, theme_id: d.theme_id, background: d.background, slides: d.slides, loops: d.loops })),
     )
     if (ok) reload()
   }
@@ -80,37 +76,44 @@ export default function DecksPage() {
     <div className="stack">
       {error && <p className="error">Couldn't load decks: {error}</p>}
       {!canCreate && !sites.some((s) => canEditContent('slides', s.id)) && <ReadOnlyNote />}
-      <div className="sl-toolbar">
-        {canCreate && (
-          <button className="btn primary" onClick={() => setEditing('new')} disabled={!themes.data}>
-            + New deck
-          </button>
-        )}
-        {canCreate && (
-          <button className="btn" onClick={() => setImporting(true)} title="Make a deck from a PDF, a PowerPoint or pictures">
-            Import PDF / PowerPoint…
-          </button>
-        )}
-        <input type="search" className="sl-search" aria-label="Search decks" placeholder="Search decks" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <label className="sl-sort">
-          <span className="muted">Sort</span>
-          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-            <option value="updated">Recently edited</option>
-            <option value="name">Name A to Z</option>
-            <option value="name-desc">Name Z to A</option>
-            <option value="slides">Most slides</option>
-          </select>
-        </label>
-      </div>
-
-      {data && decks.length === 0 && (
-        <p className="muted empty-state">A deck is a presentation: slides with words, pictures, songs, a countdown or a live stream, shown on a TV. Press New deck to build one, and use Themes to set the look.</p>
-      )}
-      {data && decks.length > 0 && shown.length === 0 && <p className="muted">No decks match that search.</p>}
-
-      {shown.map((d) => {
-        const canEdit = canEditContent('slides', d.site_id)
-        const theme = d.theme_id ? themes.data?.find((t) => t.id === d.theme_id) : undefined
+      <ContentBrowser
+        module="slides"
+        table="decks"
+        noun="deck"
+        items={decks}
+        folder={folder}
+        onFolder={setFolder}
+        onChanged={reload}
+        sort={sorter}
+        toolbar={
+          <>
+            {canCreate && (
+              <button className="btn primary" onClick={() => setEditing('new')} disabled={!themes.data}>
+                + New deck
+              </button>
+            )}
+            {canCreate && (
+              <button className="btn" onClick={() => setImporting(true)} title="Make a deck from a PDF, a PowerPoint or pictures">
+                Import PDF / PowerPoint…
+              </button>
+            )}
+            <label className="sl-sort">
+              <span className="muted">Sort</span>
+              <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+                <option value="updated">Recently edited</option>
+                <option value="name">Name A to Z</option>
+                <option value="name-desc">Name Z to A</option>
+                <option value="slides">Most slides</option>
+              </select>
+            </label>
+          </>
+        }
+        empty={
+          <p className="muted empty-state">A deck is a presentation: slides with words, pictures, songs, a countdown or a live stream, shown on a TV. Press New deck to build one, and use Themes to set the look.</p>
+        }
+        render={(d, extra) => {
+          const canEdit = canEditContent('slides', d.site_id)
+          const theme = d.theme_id ? themes.data?.find((t) => t.id === d.theme_id) : undefined
         return (
           <div key={d.id} className="card row spread sl-deckrow">
             <div className="row sl-deckmain">
@@ -123,6 +126,7 @@ export default function DecksPage() {
                   {d.slides.length} {d.slides.length === 1 ? 'slide' : 'slides'} · {scopeLabel(d.site_id, sites)} · {themeName(d.theme_id) ?? 'No theme'}
                   {d.loops ? ' · loops' : ''} · edited {timeAgo(d.updated_at)}
                 </span>
+                {extra.meta}
               </div>
             </div>
             <div className="row wrap-sm">
@@ -137,6 +141,7 @@ export default function DecksPage() {
                   <button className="btn" onClick={() => duplicate(d)}>
                     Duplicate
                   </button>
+                  {extra.actions}
                   <button className="btn danger" onClick={() => remove(d)}>
                     Delete
                   </button>
@@ -145,7 +150,8 @@ export default function DecksPage() {
             </div>
           </div>
         )
-      })}
+        }}
+      />
       {importing && <ImportDialog mode="deck" onClose={() => setImporting(false)} onCreated={reload} />}
     </div>
   )

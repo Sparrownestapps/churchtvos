@@ -73,8 +73,8 @@ export default function Remote({
     let off = false
     ;(async () => {
       const [d, p] = await Promise.all([
-        moduleOn('slides') ? supabase.from('decks').select('id, name').eq('organization_id', org.id).order('name') : null,
-        moduleOn('kids') ? supabase.from('playlists').select('id, name').eq('organization_id', org.id).order('name') : null,
+        moduleOn('slides') ? supabase.from('decks').select('id, name').eq('organization_id', org.id).is('archived_at', null).order('name') : null,
+        moduleOn('kids') ? supabase.from('playlists').select('id, name').eq('organization_id', org.id).is('archived_at', null).order('name') : null,
       ])
       if (off) return
       if (d?.error || p?.error) setLibError((d?.error ?? p?.error)!.message)

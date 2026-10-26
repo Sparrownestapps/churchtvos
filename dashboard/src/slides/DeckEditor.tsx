@@ -54,12 +54,15 @@ export default function DeckEditor({
   themes,
   songs,
   onDone,
+  folderId,
 }: {
   deck: Deck | null
   lib: SlidesLibrary | undefined
   themes: SlideTheme[]
   songs: SongForSlides[]
   onDone: () => void
+  /** Folder a NEW deck is created in (the one being viewed). */
+  folderId?: string | null
 }) {
   const { org, sites, allSites, mySites, canEditContent } = useApp()
   const defaultScope = useDefaultScope()
@@ -173,7 +176,7 @@ export default function DeckEditor({
         const rows = must(await supabase.from('decks').update(row).eq('id', deckId).eq('organization_id', org.id).select('id'))
         if (!rows?.length) throw new Error("Couldn't save this deck. You may not have permission.")
       } else {
-        const created = must(await supabase.from('decks').insert(row).select('id').single())
+        const created = must(await supabase.from('decks').insert({ ...row, folder_id: folderId ?? null }).select('id').single())
         setDeckId((created as { id: string }).id)
       }
     })

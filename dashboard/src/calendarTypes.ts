@@ -40,7 +40,7 @@ export type SeriesOccurrence = {
   is_override: boolean
 }
 
-export type NamedRow = { id: string; name: string; site_id?: string | null }
+export type NamedRow = { id: string; name: string; site_id?: string | null; archived_at?: string | null }
 
 type BlockBase = { editable: boolean; lockReason?: string; warn?: string; label: string; sub?: string }
 /** What a calendar event stands for (kept in event.extendedProps.block). */

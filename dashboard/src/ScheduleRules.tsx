@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from './supabase'
 import { useApp } from './context'
 import type { ScreenModule, ScreenSchedule, SignageSlot, SignagePlaylist } from './types'
-import { MODULE_NAME, WEEK, attempt, daysLabel, must, slotDatesLabel, summarizeRules, timeLabel } from './lib'
+import { MODULE_NAME, WEEK, attempt, daysLabel, must, slotDatesLabel, summarizeRules, timeLabel, unarchived } from './lib'
 
 export function DayPicker({ value, onChange }: { value: number[]; onChange: (days: number[]) => void }) {
   const toggle = (d: number) => onChange(value.includes(d) ? value.filter((x) => x !== d) : [...value, d])
@@ -162,7 +162,7 @@ export default function ScheduleRules(props: Props) {
                 <span>Playlist</span>
                 <select value={playlistId} onChange={(e) => setPlaylistId(e.target.value)}>
                   <option value="">Choose…</option>
-                  {props.kind === 'slot' && props.playlists.map((p) => (
+                  {props.kind === 'slot' && unarchived(props.playlists).map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
                     </option>

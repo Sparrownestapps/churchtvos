@@ -7,6 +7,7 @@ import { EmptyState, ScopeSelect, useDefaultScope } from '../ui'
 import { MediaSelect } from '../MediaSelect'
 import { StreamItemEditor, newStreamItem, validStreamUrl } from '../StreamItem'
 import { SignItemEditor, newSignItem } from '../SignItem'
+import ContentBrowser from '../folders/ContentBrowser'
 
 const KIND_LABEL: Record<SignageItem['type'], string> = { image: 'Image', video: 'Video', sign: 'Sign', stream: 'Live stream' }
 
@@ -14,8 +15,11 @@ export default function SignagePlaylistsPage() {
   const { org, sites, canEditContent } = useApp()
   const defaultScope = useDefaultScope()
   const [editing, setEditing] = useState<SignagePlaylist | 'new' | null>(null)
+  const [folder, setFolder] = useState<string | null>(null)
 
   const { data, reload } = useLoad(async () => {
+    // Clears out assistant-made one-off playlists whose schedules ended over a week ago (best effort).
+    await supabase.rpc('tidy_assistant_content', { p_org: org.id })
     const [playlists, media, folders] = await Promise.all([
       supabase.from('signage_playlists').select('*').eq('organization_id', org.id).order('updated_at', { ascending: false }),
       fetchAll<Media>((a, b) => supabase.from('media').select('*').eq('organization_id', org.id).eq('module', 'signage').order('title').range(a, b)),
@@ -30,6 +34,7 @@ export default function SignagePlaylistsPage() {
         playlist={editing === 'new' ? null : editing}
         media={data?.media ?? []}
         folders={data?.folders ?? []}
+        folderId={folder}
         onDone={() => (setEditing(null), reload())}
       />
     )
@@ -37,7 +42,7 @@ export default function SignagePlaylistsPage() {
 
   async function duplicate(p: SignagePlaylist) {
     const ok = await attempt(async () =>
-      must(await supabase.from('signage_playlists').insert({ organization_id: org.id, site_id: p.site_id, name: `${p.name} (copy)`, items: p.items })),
+      must(await supabase.from('signage_playlists').insert({ organization_id: org.id, site_id: p.site_id, folder_id: p.folder_id ?? null, name: `${p.name} (copy)`, items: p.items })),
     )
     if (ok) reload()
   }
@@ -51,50 +56,67 @@ export default function SignagePlaylistsPage() {
 
   return (
     <div className="stack">
-      {canEditContent('signage', defaultScope) && (
-        <div>
-          <button className="btn primary" onClick={() => setEditing('new')}>
-            + New playlist
-          </button>
-        </div>
-      )}
-      {playlists.length === 0 && <EmptyState help="signage">
-          A Signage playlist is the loop a screen shows: images, videos, text signs and live streams. Add media first, then make your first playlist.
-        </EmptyState>}
-      {playlists.map((p) => {
-        const canEdit = canEditContent('signage', p.site_id)
-        const held = p.items.some((i) => i.type === 'image' && isHeld(i.seconds))
-        const seconds = p.items.reduce((t, i) => t + (i.type === 'image' && !isHeld(i.seconds) ? i.seconds ?? 10 : 0), 0)
-        return (
-          <div key={p.id} className="card row spread wrap-sm">
-            <div>
-              <h3>{p.name}</h3>
-              <span className="muted">
-                {p.items.length} items · {scopeLabel(p.site_id, sites)}
-                {held ? ' · holds on an image until the slot ends' : seconds > 0 && ` · about ${Math.round(seconds / 60 * 10) / 10} min of images`}
-              </span>
-            </div>
-            {canEdit && (
-              <div className="row">
-                <button className="btn" onClick={() => setEditing(p)}>
-                  Edit
-                </button>
-                <button className="btn" onClick={() => duplicate(p)}>
-                  Duplicate
-                </button>
-                <button className="btn danger" onClick={() => remove(p)}>
-                  Delete
-                </button>
+      <ContentBrowser
+        module="signage"
+        table="signage_playlists"
+        noun="playlist"
+        items={playlists}
+        folder={folder}
+        onFolder={setFolder}
+        onChanged={reload}
+        toolbar={
+          canEditContent('signage', defaultScope) && (
+            <button className="btn primary" onClick={() => setEditing('new')}>
+              + New playlist
+            </button>
+          )
+        }
+        empty={
+          <EmptyState help="signage">
+            A Signage playlist is the loop a screen shows: images, videos, text signs and live streams. Add media first, then make your first playlist.
+          </EmptyState>
+        }
+        render={(p, extra) => {
+          const canEdit = canEditContent('signage', p.site_id)
+          const held = p.items.some((i) => i.type === 'image' && isHeld(i.seconds))
+          const seconds = p.items.reduce((t, i) => t + (i.type === 'image' && !isHeld(i.seconds) ? i.seconds ?? 10 : 0), 0)
+          return (
+            <div key={p.id} className="card row spread wrap-sm">
+              <div>
+                <h3>{p.name}</h3>
+                <span className="muted">
+                  {p.items.length} items · {scopeLabel(p.site_id, sites)}
+                  {held ? ' · holds on an image until the slot ends' : seconds > 0 && ` · about ${Math.round((seconds / 60) * 10) / 10} min of images`}
+                </span>
+                {extra.meta}
               </div>
-            )}
-          </div>
-        )
-      })}
+              <div className="row wrap-sm">
+                {canEdit && (
+                  <>
+                    <button className="btn" onClick={() => setEditing(p)}>
+                      Edit
+                    </button>
+                    <button className="btn" onClick={() => duplicate(p)}>
+                      Duplicate
+                    </button>
+                  </>
+                )}
+                {extra.actions}
+                {canEdit && (
+                  <button className="btn danger" onClick={() => remove(p)}>
+                    Delete
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        }}
+      />
     </div>
   )
 }
 
-function Editor({ playlist, media, folders, onDone }: { playlist: SignagePlaylist | null; media: Media[]; folders: MediaFolder[]; onDone: () => void }) {
+function Editor({ playlist, media, folders, folderId, onDone }: { playlist: SignagePlaylist | null; media: Media[]; folders: MediaFolder[]; folderId: string | null; onDone: () => void }) {
   const { org } = useApp()
   const defaultScope = useDefaultScope()
   const [name, setName] = useState(playlist?.name ?? '')
@@ -128,7 +150,7 @@ function Editor({ playlist, media, folders, onDone }: { playlist: SignagePlaylis
       must(
         playlist
           ? await supabase.from('signage_playlists').update(row).eq('id', playlist.id)
-          : await supabase.from('signage_playlists').insert(row),
+          : await supabase.from('signage_playlists').insert({ ...row, folder_id: folderId }),
       ),
     )
     setSaving(false)

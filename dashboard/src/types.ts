@@ -84,6 +84,21 @@ export type Media = {
   created_at: string
 }
 
+/** A folder of Kids playlists, Signage playlists or Slides decks (content_folders). system 'assistant' = "Made by assistant". */
+export type ContentFolder = {
+  id: string
+  organization_id: string
+  module: 'kids' | 'signage' | 'slides'
+  parent_id: string | null
+  site_id: string | null
+  name: string
+  system: 'assistant' | null
+  created_at: string
+}
+
+/** Organizing fields shared by playlists, signage playlists and decks. */
+export type Organized = { folder_id?: string | null; archived_at?: string | null; source?: 'mcp' | null }
+
 export type MediaFolder = {
   id: string
   organization_id: string
@@ -204,7 +219,7 @@ export type Playlist = {
   name: string
   items: PlaylistItem[]
   updated_at: string
-}
+} & Organized
 
 export type Schedule = {
   id: string
@@ -233,7 +248,7 @@ export type SignagePlaylist = {
   name: string
   items: SignageItem[]
   updated_at: string
-}
+} & Organized
 
 export type ScreenGroup = { id: string; organization_id: string; name: string }
 

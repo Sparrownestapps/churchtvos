@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Entitlement, Location, MediaFolder, ModuleDef, Role, ScreenModule, Site } from './types'
+import type { Entitlement, Location, ModuleDef, Role, ScreenModule, Site } from './types'
 
 /** Unwraps a Supabase response, throwing its error so callers can show it. */
 export function must<T>(res: { data: T; error: { message: string } | null }): T {
@@ -144,7 +144,7 @@ export const MODULE_NAME: Record<ScreenModule, string> = new Proxy({ kids: 'Kids
 // ───────── Media folders ─────────
 
 /** 'Curriculum / Fall 2026' for a folder id ('' for the top level). */
-export function folderPath(id: string | null, byId: Map<string, MediaFolder>): string {
+export function folderPath(id: string | null, byId: Map<string, { id: string; parent_id: string | null; name: string }>): string {
   const names: string[] = []
   const seen = new Set<string>()
   for (let f = id ? byId.get(id) : undefined; f && !seen.has(f.id); f = f.parent_id ? byId.get(f.parent_id) : undefined) {
@@ -178,6 +178,9 @@ export function shortTime(t: string) {
  * (a loop must move on), so holding is stored as a day, which outlasts any slot (slots end by midnight). Same value in the MCP server.
  */
 export const HOLD_SECONDS = 86400
+
+/** Drops archived playlists/decks from a list, for "choose one" menus (labels for existing schedules keep the full list). */
+export const unarchived = <T extends { archived_at?: string | null }>(list: T[]) => list.filter((x) => !x.archived_at)
 export const isHeld = (seconds: number | null | undefined) => (seconds ?? 0) >= HOLD_SECONDS
 
 /** ' · on 2026-10-30', ' · from … to …', plus ' · by assistant'; '' for an ordinary weekly slot. */

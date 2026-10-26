@@ -7,6 +7,7 @@ import {
   type Ctx, type Db, type Tool,
 } from "./lib.ts";
 import { APP_URL, createUploadRequest } from "./common.ts";
+import { LIST_PROPS, assistantFolder, listContent } from "./organize.ts";
 
 const ONE_OFF_PRIORITY = 100; // a dated one-off beats everything else
 const RUN_PRIORITY = 50;      // assistant-made recurring runs beat everyday slots (0..)
@@ -140,7 +141,8 @@ async function scheduleSignage({ db }: Ctx, a: any) {
   if (!playlist) {
     const sites = new Set(screens.map((s) => s.site_id));
     [playlist] = await rec.insert("signage_playlists", {
-      organization_id: org, site_id: sites.size === 1 ? [...sites][0] : null, name: `Scheduled: ${label}`.slice(0, 120), items, source: "mcp",
+      organization_id: org, site_id: sites.size === 1 ? [...sites][0] : null, folder_id: await assistantFolder(db, org, "signage"),
+      name: `Scheduled: ${label}`.slice(0, 120), items, source: "mcp",
     }, "create the playlist");
   }
   const made = await rec.insert("signage_slots", screens.map((s) => ({
@@ -154,14 +156,14 @@ async function scheduleSignage({ db }: Ctx, a: any) {
 }
 
 async function listSignagePlaylists({ db }: Ctx, a: any) {
-  const org = needUuid(a.organization_id, "organization_id");
-  const rows = must(await db.from("signage_playlists").select("id,name,items,source").eq("organization_id", org).order("name"), "read signage playlists") as any[];
-  if (!rows.length) return "No signage playlists yet.";
-  return rows.map((p) => `- ${p.name} (${(p.items ?? []).length} items${p.source === "mcp" ? ", made by an assistant" : ""})  playlist_id: ${p.id}`).join("\n");
+  const { rows, path } = await listContent(db, "signage", a, "id,name,items");
+  if (!rows.length) return "No matching signage playlists.";
+  return rows.map((p) => `- ${p.name} (${(p.items ?? []).length} items${p.source === "mcp" ? ", made by an assistant" : ""})${p.archived_at ? " ARCHIVED" : ""}${path(p.folder_id)}  playlist_id: ${p.id}`).join("\n");
 }
 
 async function listSignageSchedule({ db }: Ctx, a: any) {
   const org = needUuid(a.organization_id, "organization_id");
+  await db.rpc("tidy_assistant_content", { p_org: org }); // best effort: clears assistant-made signage that ended a while ago
   let q = db.from("signage_slots").select("id,screen_id,group_id,playlist_id,days,start_time,end_time,start_date,end_date,label,priority,source").eq("organization_id", org);
   if (a.screen_id) q = q.eq("screen_id", needUuid(a.screen_id, "screen_id"));
   const slots = must(await q, "read the signage schedule") as any[];
@@ -249,8 +251,8 @@ export const SIGNAGE_TOOLS: Tool[] = [
   },
   {
     name: "list_signage_playlists",
-    description: "Lists a church's signage playlists.",
-    inputSchema: { type: "object", properties: { organization_id: { type: "string" } }, required: ["organization_id"], additionalProperties: false },
+    description: "Lists a church's signage playlists with their folders (archived ones hidden unless include_archived).",
+    inputSchema: { type: "object", properties: LIST_PROPS, required: ["organization_id"], additionalProperties: false },
     annotations: { readOnlyHint: true },
     run: listSignagePlaylists,
   },

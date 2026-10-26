@@ -124,6 +124,9 @@ export type Deck = {
   background: SlideBackground | null // deck default (beats the theme's)
   slides: DeckSlide[]
   loops: boolean // start over after the last slide (database column 'loops')
+  folder_id?: string | null
+  archived_at?: string | null
+  source?: 'mcp' | null
   created_at: string
   updated_at: string
 }

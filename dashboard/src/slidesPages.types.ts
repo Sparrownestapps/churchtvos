@@ -23,4 +23,4 @@ export type SongForSlides = {
 }
 
 /** A deck as listed in pickers (schedules, rotations). */
-export type DeckRef = { id: string; name: string; site_id: string | null }
+export type DeckRef = { id: string; name: string; site_id: string | null; archived_at?: string | null }
