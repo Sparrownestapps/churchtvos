@@ -18,6 +18,7 @@ import SettingsPage from './pages/SettingsPage'
 import GetStartedPage from './pages/GetStartedPage'
 import PairPage from './pages/PairPage'
 import OAuthConsentPage, { isConsentPath } from './pages/OAuthConsentPage'
+import McpUploadPage, { isUploadPath } from './pages/McpUploadPage'
 import { isPairPath, pairCodeFromSearch } from './pairLink'
 import { helpUrl } from './links'
 import { canControlNav } from './control/logic'
@@ -150,6 +151,7 @@ export default function App() {
   if (session === undefined) return null
   if (!session) return <Login />
   if (isConsentPath(location.pathname)) return <OAuthConsentPage />
+  if (isUploadPath(location.pathname)) return <McpUploadPage />
   return <SignedIn session={session} />
 }
 

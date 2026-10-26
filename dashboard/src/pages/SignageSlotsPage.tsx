@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useApp } from '../context'
 import { supabase } from '../supabase'
 import type { Screen, ScreenGroup, SignagePlaylist, SignageSlot } from '../types'
-import { daysLabel, must, timeLabel, useLoad } from '../lib'
+import { daysLabel, must, slotDatesLabel, slotExpired, timeLabel, useLoad } from '../lib'
 import ScheduleRules from '../ScheduleRules'
 import { EmptyState, ReadOnlyNote } from '../ui'
 
@@ -21,7 +21,8 @@ export default function SignageSlotsPage() {
       screens: must(screens) as Screen[],
       groups: must(groups) as ScreenGroup[],
       playlists: must(playlists) as SignagePlaylist[],
-      slots: must(slots) as SignageSlot[],
+      // Dated slots (e.g. scheduled by an assistant) disappear from the list once they are over.
+      slots: (must(slots) as SignageSlot[]).filter((s) => !slotExpired(s)),
     }
   })
 
@@ -90,6 +91,7 @@ export default function SignageSlotsPage() {
               <div key={s.id} className="list-row">
                 <b>{label}</b> · {playlistName(s.playlist_id)} · {daysLabel(s.days)}
                 {timeLabel(s.start_time, s.end_time) ? ` · ${timeLabel(s.start_time, s.end_time)}` : ' · all day'}
+                {slotDatesLabel(s)}
               </div>
             )
           })

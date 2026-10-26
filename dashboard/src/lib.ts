@@ -173,6 +173,17 @@ export function shortTime(t: string) {
 }
 
 /** "Mon-Sat", "Sun", "Mon, Wed, Fri" or "daily". */
+/** ' · on 2026-10-30', ' · from … to …', plus ' · by assistant'; '' for an ordinary weekly slot. */
+export function slotDatesLabel(s: { start_date?: string | null; end_date?: string | null; source?: string | null }) {
+  let out = ''
+  if (s.start_date && s.start_date === s.end_date) out = ` · on ${s.start_date}`
+  else if (s.start_date || s.end_date) out = `${s.start_date ? ` · from ${s.start_date}` : ''}${s.end_date ? ` · until ${s.end_date}` : ''}`
+  return out + (s.source === 'mcp' ? ' · by assistant' : '')
+}
+
+/** A dated slot whose last date was more than a day ago (any time zone) no longer plays anywhere. */
+export const slotExpired = (s: { end_date?: string | null }) => !!s.end_date && s.end_date < new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)
+
 export function daysLabel(days: number[]) {
   const on = WEEK.filter((d) => days.includes(d.value))
   if (on.length === 7) return 'daily'

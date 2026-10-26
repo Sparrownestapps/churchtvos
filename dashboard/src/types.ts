@@ -268,4 +268,5 @@ type RuleBase = {
   created_at: string
 }
 export type ScreenSchedule = RuleBase & { module: ScreenModule }
-export type SignageSlot = RuleBase & { playlist_id: string }
+/** start_date/end_date (site-local, inclusive) limit a slot to those dates; null = every week. source 'mcp' = made by an AI assistant. */
+export type SignageSlot = RuleBase & { playlist_id: string; start_date?: string | null; end_date?: string | null; label?: string | null; source?: 'mcp' | null }

@@ -13,10 +13,12 @@ export async function uploadMedia(opts: {
   module: Module
   folderId: string | null
   siteId: string | null
+  /** Library title; default is the file name without its extension. */
+  title?: string
   onProgress?: (percent: number) => void
   signal?: AbortSignal
 }): Promise<Media> {
-  const { file, orgId, module, folderId, siteId, onProgress, signal } = opts
+  const { file, orgId, module, folderId, siteId, title, onProgress, signal } = opts
   const kind: Media['kind'] | null = file.type.startsWith('video/') ? 'video' : file.type.startsWith('image/') ? 'image' : file.type.startsWith('audio/') ? 'audio' : null
   if (!kind) throw new Error('Only videos, images and audio can be uploaded.')
   const path = `${orgId}/${randomName(file.name)}`
@@ -50,7 +52,7 @@ export async function uploadMedia(opts: {
       module,
       folder_id: folderId,
       site_id: siteId,
-      title: file.name.replace(/\.[^.]+$/, ''),
+      title: title || file.name.replace(/\.[^.]+$/, ''),
       kind,
       storage_path: path,
       url,

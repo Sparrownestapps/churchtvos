@@ -120,3 +120,41 @@ begin
     'override', v_override
   );
 end $$;
+
+-- ───────────────────────── Assistant (MCP) activity and undo ─────────────────────────
+-- Every change an assistant makes is recorded with the rows it inserted, updated or deleted, so it can be listed and undone.
+-- changes: [{"table":"signage_slots","op":"insert"|"update"|"delete","key":{"id":"..."},"row":{...before, for update/delete}}]
+create table public.mcp_activity (
+  id              bigint generated always as identity primary key,
+  organization_id uuid not null references public.organizations on delete cascade,
+  user_id         uuid not null default auth.uid() references auth.users on delete cascade,
+  tool            text not null,
+  summary         text not null,
+  changes         jsonb not null default '[]',
+  undone_at       timestamptz,
+  created_at      timestamptz not null default now()
+);
+create index on public.mcp_activity (organization_id, created_at desc);
+alter table public.mcp_activity enable row level security;
+create policy "read assistant activity" on public.mcp_activity for select to authenticated
+  using (user_id = auth.uid() or public.is_org_admin(organization_id));
+create policy "record assistant activity" on public.mcp_activity for insert to authenticated
+  with check (user_id = auth.uid() and public.is_member(organization_id));
+create policy "mark assistant activity undone" on public.mcp_activity for update to authenticated
+  using (user_id = auth.uid() or public.is_org_admin(organization_id))
+  with check (user_id = auth.uid() or public.is_org_admin(organization_id));
+
+-- A file too big to pass through a chat (videos): the assistant makes a request, the person opens
+-- app.churchtvos.com/upload?request=<id> (signed in), picks the file, and the page fills in media_id.
+create table public.mcp_upload_requests (
+  id              uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations on delete cascade,
+  user_id         uuid not null default auth.uid() references auth.users on delete cascade,
+  module          text not null check (public.valid_module(module)),
+  title           text not null,
+  media_id        uuid references public.media on delete set null,
+  created_at      timestamptz not null default now()
+);
+alter table public.mcp_upload_requests enable row level security;
+create policy "own upload requests" on public.mcp_upload_requests for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid() and public.is_member(organization_id));
