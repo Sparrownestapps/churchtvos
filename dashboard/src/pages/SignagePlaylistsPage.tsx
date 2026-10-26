@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useApp } from '../context'
 import { supabase } from '../supabase'
 import type { Media, MediaFolder, SignageItem, SignageMediaItem, SignagePlaylist } from '../types'
-import { attempt, fetchAll, moveItem, must, scopeLabel, useLoad } from '../lib'
+import { HOLD_SECONDS, attempt, fetchAll, isHeld, moveItem, must, scopeLabel, useLoad } from '../lib'
 import { EmptyState, ScopeSelect, useDefaultScope } from '../ui'
 import { MediaSelect } from '../MediaSelect'
 import { StreamItemEditor, newStreamItem, validStreamUrl } from '../StreamItem'
@@ -63,14 +63,15 @@ export default function SignagePlaylistsPage() {
         </EmptyState>}
       {playlists.map((p) => {
         const canEdit = canEditContent('signage', p.site_id)
-        const seconds = p.items.reduce((t, i) => t + (i.type === 'image' ? i.seconds ?? 10 : 0), 0)
+        const held = p.items.some((i) => i.type === 'image' && isHeld(i.seconds))
+        const seconds = p.items.reduce((t, i) => t + (i.type === 'image' && !isHeld(i.seconds) ? i.seconds ?? 10 : 0), 0)
         return (
           <div key={p.id} className="card row spread wrap-sm">
             <div>
               <h3>{p.name}</h3>
               <span className="muted">
                 {p.items.length} items · {scopeLabel(p.site_id, sites)}
-                {seconds > 0 && ` · about ${Math.round(seconds / 60 * 10) / 10} min of images`}
+                {held ? ' · holds on an image until the slot ends' : seconds > 0 && ` · about ${Math.round(seconds / 60 * 10) / 10} min of images`}
               </span>
             </div>
             {canEdit && (
@@ -179,16 +180,23 @@ function Editor({ playlist, media, folders, onDone }: { playlist: SignagePlaylis
                 <span>{item.type === 'image' ? 'Image' : 'Video'} from the library</span>
                 <MediaSelect media={media} folders={folders} kind={item.type} value={item.media_id} onChange={(id) => pick(i, item, id)} />
               </label>
-              {item.type === 'image' && (
+              {item.type === 'image' && !isHeld(item.seconds) && (
                 <label className="field">
                   <span>Show for (seconds)</span>
                   <input
                     type="number"
                     min={1}
+                    max={HOLD_SECONDS - 1}
                     style={{ width: 110 }}
                     value={item.seconds ?? ''}
-                    onChange={(e) => update(i, { ...item, seconds: e.target.value ? Number(e.target.value) : 10 })}
+                    onChange={(e) => update(i, { ...item, seconds: e.target.value ? Math.min(Number(e.target.value), HOLD_SECONDS - 1) : 10 })}
                   />
+                </label>
+              )}
+              {item.type === 'image' && (
+                <label className="row" title="Stays on screen for the whole slot instead of moving on. Anything after it in the playlist won't show.">
+                  <input type="checkbox" checked={isHeld(item.seconds)} onChange={(e) => update(i, { ...item, seconds: e.target.checked ? HOLD_SECONDS : 10 })} />
+                  <span>Hold until the slot ends</span>
                 </label>
               )}
               {item.type === 'video' && <span className="muted">Plays to the end</span>}

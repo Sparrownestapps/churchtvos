@@ -10,6 +10,9 @@ import { APP_URL, createUploadRequest } from "./common.ts";
 
 const ONE_OFF_PRIORITY = 100; // a dated one-off beats everything else
 const RUN_PRIORITY = 50;      // assistant-made recurring runs beat everyday slots (0..)
+// "Hold until the slot ends": the TV app turns a missing signage duration into 10 s, so holding is stored as a day
+// (slots end by midnight). Same value as HOLD_SECONDS in dashboard/src/lib.ts.
+export const HOLD_SECONDS = 86400;
 
 type Item = { type: string; title: string; url: string; media_id: string; seconds?: number };
 
@@ -24,12 +27,17 @@ async function buildItems(db: Db, a: any): Promise<{ org: string; items: Item[];
     if (!m) throw new ToolError(`media_id ${i.media_id} wasn't found (or you don't have access). Use list_media.`);
     if (m.kind === "audio") throw new ToolError(`"${m.title}" is audio; signage shows images and videos.`);
     const item: Item = { type: m.kind, title: m.title, url: m.url, media_id: m.id };
-    if (m.kind === "image") item.seconds = Math.min(Math.max(Math.round(+i.seconds || +a.seconds || 10), 3), 600);
+    if (m.kind === "image") {
+      // A lone image (with no seconds asked for) or hold:true stays up for the whole window instead of restarting every few seconds.
+      const hold = i.hold === true || (list.length === 1 && !i.seconds && !a.seconds);
+      item.seconds = hold ? HOLD_SECONDS : Math.min(Math.max(Math.round(+i.seconds || +a.seconds || 10), 3), 3600);
+    }
     items.push(item);
   }
   const orgs = new Set(media.map((m) => m.organization_id));
   if (orgs.size !== 1) throw new ToolError("All graphics must belong to the same church.");
-  return { org: [...orgs][0], items, names: items.map((i) => `${i.title}${i.seconds ? ` (${i.seconds}s)` : ""}`) };
+  const dur = (i: Item) => (!i.seconds ? "" : i.seconds >= HOLD_SECONDS ? " (holds for the whole window)" : ` (${i.seconds}s)`);
+  return { org: [...orgs][0], items, names: items.map((i) => `${i.title}${dur(i)}`) };
 }
 
 type When = { days: number[]; startDate: string; endDate: string | null; oneOff: boolean; start: string; end: string };
@@ -214,8 +222,8 @@ export const SIGNAGE_TOOLS: Tool[] = [
         screen_ids: { type: "array", items: { type: "string" } },
         items: {
           type: "array",
-          description: "Graphics in order: [{media_id, seconds?}] (seconds applies to images, default 10)",
-          items: { type: "object", properties: { media_id: { type: "string" }, seconds: { type: "integer" } }, required: ["media_id"] },
+          description: "Graphics in order: [{media_id, seconds?, hold?}]. Images rotate every `seconds` (default 10). A single image holds for the whole window automatically; hold:true makes any image stay up (items after it won't show).",
+          items: { type: "object", properties: { media_id: { type: "string" }, seconds: { type: "integer" }, hold: { type: "boolean" } }, required: ["media_id"] },
         },
         playlist_id: { type: "string", description: "Instead of items: an existing signage playlist (list_signage_playlists)" },
         upload: {

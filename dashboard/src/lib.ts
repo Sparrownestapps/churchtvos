@@ -173,6 +173,13 @@ export function shortTime(t: string) {
 }
 
 /** "Mon-Sat", "Sun", "Mon, Wed, Fri" or "daily". */
+/**
+ * Signage image duration that means "hold until the slot ends". The TV app treats a missing duration as 10 s in signage
+ * (a loop must move on), so holding is stored as a day, which outlasts any slot (slots end by midnight). Same value in the MCP server.
+ */
+export const HOLD_SECONDS = 86400
+export const isHeld = (seconds: number | null | undefined) => (seconds ?? 0) >= HOLD_SECONDS
+
 /** ' · on 2026-10-30', ' · from … to …', plus ' · by assistant'; '' for an ordinary weekly slot. */
 export function slotDatesLabel(s: { start_date?: string | null; end_date?: string | null; source?: string | null }) {
   let out = ''

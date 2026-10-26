@@ -92,6 +92,7 @@ const runActivity = +/activity_id: (\d+)/.exec(t)[1];
 
 // one-off Friday 8–10pm that overlaps nothing, then one that overlaps the run
 t = ok(await tool('schedule_signage', { screen_ids: [SC1, SC2], items: [{ media_id: IMG1 }], date: '2030-11-01', start: '20:00', end: '22:00' }), 'one-off preview');
+assert.match(t, /holds for the whole window/);
 assert.match(t, /Friday 2030-11-01/); assert.match(t, /Lobby Portrait.*offline/);
 t = ok(await tool('schedule_signage', { screen_ids: [SC1], items: [{ media_id: IMG1 }], date: '2030-11-01', start: '12:00', end: '13:00' }), 'one-off overlapping preview');
 assert.match(t, /Takes over from/);
@@ -145,8 +146,8 @@ assert.equal(T.kids_series.length, 1); assert.equal(T.kids_series_exceptions.len
 const tor = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto', hourCycle: 'h23', hour: '2-digit', minute: '2-digit', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
 const P = Object.fromEntries(tor.map((x) => [x.type, x.value]));
 const today = `${P.year}-${P.month}-${P.day}`, hh = +P.hour;
-if (hh >= 1 && hh <= 21) {
-  bad(await tool('schedule_kids', { location_id: KIDSROOM, playlist_ids: [PL], date: today, start: `${String(hh).padStart(2, '0')}:59`, end: `${String(hh + 2).padStart(2, '0')}:00` }), /within 30 minutes/, 'service guard');
+if (hh <= 21) { // a window starting this very minute
+  bad(await tool('schedule_kids', { location_id: KIDSROOM, playlist_ids: [PL], date: today, start: `${P.hour}:${P.minute}`, end: `${String(hh + 2).padStart(2, '0')}:00` }), /within 30 minutes/, 'service guard');
 }
 
 // ── slides ──
