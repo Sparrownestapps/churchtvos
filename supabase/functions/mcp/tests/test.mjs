@@ -30,6 +30,7 @@ Object.assign(T, {
   screens: [
     { id: SC1, organization_id: ORG, location_id: LOBBY, group_id: null, name: 'Lobby TV', default_module: 'signage', last_seen_at: now, signage_default_playlist_id: null, app_version: '1.7.0' },
     { id: SC2, organization_id: ORG, location_id: LOBBY, group_id: null, name: 'Lobby Portrait', default_module: 'signage', last_seen_at: null, signage_default_playlist_id: null, app_version: '1.7.0' },
+    { id: '10000000-0000-4000-8000-0000000000ff', organization_id: ORG, location_id: null, group_id: null, name: 'Loose TV', default_module: 'signage', last_seen_at: null, signage_default_playlist_id: null, app_version: '1.7.0' },
     { id: SCK, organization_id: ORG, location_id: KIDSROOM, group_id: null, name: 'Kids TV', default_module: 'kids', last_seen_at: now, signage_default_playlist_id: null, app_version: '1.3.0' },
   ],
   screen_groups: [],
@@ -172,4 +173,52 @@ assert.equal(T.screen_schedules.length, 1);
 t = ok(await tool('list_screen_rules', { screen_id: SCK }), 'list_screen_rules');
 t = ok(await tool('list_activity', { organization_id: ORG }), 'list_activity');
 assert.match(t, /UNDONE/);
+
+// ── getting files in ──
+const JPG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0]);
+const MP4 = new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d]);
+const seen = [];
+globalThis.fetch = async (url) => {
+  url = String(url); seen.push(url);
+  if (url.includes('redirect-to-private')) return new Response(null, { status: 302, headers: { location: 'https://10.0.0.5/x.png' } });
+  if (url.includes('webpage')) return new Response('<html>', { status: 200, headers: { 'content-type': 'text/html' } });
+  if (url.includes('.mp4')) return new Response(MP4, { status: 200 });
+  return new Response(JPG, { status: 200 });
+};
+t = ok(await tool('upload_from_url', { organization_id: ORG, title: 'Canva promo', url: 'https://export-download.canva.com/abc/design.png?sig=1' }), 'upload_from_url (Canva link)');
+assert.equal(T.media.at(-1).kind, 'image');
+ok(await tool('upload_from_url', { organization_id: ORG, title: 'Drive pic', url: 'https://drive.google.com/file/d/1AbC-dEf/view?usp=sharing' }), 'upload_from_url (Drive share link)');
+assert.match(seen.at(-1), /drive\.usercontent\.google\.com\/download\?id=1AbC-dEf/);
+ok(await tool('upload_from_url', { organization_id: ORG, title: 'Dropbox clip', url: 'https://www.dropbox.com/s/xyz/clip.mp4?dl=0' }), 'upload_from_url (Dropbox video)');
+assert.match(seen.at(-1), /raw=1/); assert.equal(T.media.at(-1).kind, 'video');
+bad(await tool('upload_from_url', { organization_id: ORG, title: 'x', url: 'https://example.com/redirect-to-private' }), /public https/, 'redirect to private address refused');
+bad(await tool('upload_from_url', { organization_id: ORG, title: 'x', url: 'https://example.com/webpage' }), /web page, not the file/, 'web page explained');
+bad(await tool('upload_from_url', { organization_id: ORG, title: 'x', url: 'http://example.com/a.png' }), /public https/, 'http refused');
+
+t = ok(await tool('create_upload_url', { organization_id: ORG, title: 'Disk poster', filename: 'poster.png' }), 'create_upload_url');
+assert.match(t, /curl -sS -X PUT -H "Content-Type: image\/png"/);
+const sid = /upload_id ([0-9a-f-]{36})/.exec(t)[1];
+assert.match(ok(await tool('check_upload', { upload_id: sid }), 'check_upload before PUT'), /hasn't arrived/);
+T.__files.push({ path: T.mcp_upload_requests.find((r) => r.id === sid).storage_path, mimetype: 'image/png', size: 1234 }); // the PUT landing
+t = ok(await tool('check_upload', { upload_id: sid }), 'check_upload after PUT');
+assert.equal(T.media.at(-1).title, 'Disk poster'); assert.equal(T.media.at(-1).size_bytes, 1234);
+assert.match(ok(await tool('check_upload', { upload_id: sid }), 'check_upload again (idempotent)'), new RegExp(T.media.at(-1).id));
+bad(await tool('create_upload_url', { organization_id: ORG, title: 'x', filename: 'evil.exe' }), /filename must end/, 'bad extension refused');
+
+// upload & schedule in one step
+const nMediaBefore = T.media.length, nSlotsBefore = T.signage_slots.length;
+t = ok(await tool('schedule_signage', { screen_ids: [SC1], upload: { title: 'Fall promo', files: 2 }, days: 'weekdays', start: '09:00', end: '18:00', seconds: 10 }), 'schedule_signage with upload');
+assert.match(t, /NOTHING IS SCHEDULED YET/); assert.match(t, /upload\?request=/); assert.match(t, /Monday–Friday/);
+assert.equal(T.signage_slots.length, nSlotsBefore); assert.equal(T.media.length, nMediaBefore);
+const reqRow = T.mcp_upload_requests.at(-1);
+assert.equal(reqRow.plan.files, 2); assert.equal(reqRow.plan.start, '09:00'); assert.ok(!('upload' in reqRow.plan)); assert.match(reqRow.summary, /Lobby TV/);
+// what the page does after uploading two files:
+const { files: _f, ...plan } = reqRow.plan;
+t = ok(await tool('schedule_signage', { ...plan, items: [{ media_id: IMG1 }, { media_id: IMG2 }], confirm: true }), 'page confirms the plan');
+assert.equal(T.signage_slots.length, nSlotsBefore + 1); assert.equal(T.signage_playlists.at(-1).items.length, 2);
+bad(await tool('schedule_signage', { screen_ids: [SC1], upload: { title: 'x' }, items: [{ media_id: IMG1 }], date: '2030-11-01', start: '09:00', end: '10:00' }), /not several/, 'upload + items refused');
+
+t = ok(await tool('list_targets', {}), 'list_targets shows unassigned screens');
+assert.match(t, /not in a room[\s\S]*Loose TV/);
+
 console.log('\nAll tests passed.');

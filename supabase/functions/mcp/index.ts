@@ -17,7 +17,7 @@ import { CONTROL_TOOLS } from "./control.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const FUNCTION_URL = `${SUPABASE_URL}/functions/v1/mcp`;
-const SERVER = { name: "church-tv-os", version: "0.2.0" };
+const SERVER = { name: "church-tv-os", version: "0.3.0" };
 const PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 
 export const TOOLS: Tool[] = [...COMMON_TOOLS, ...SIGNAGE_TOOLS, ...CONTENT_TOOLS, ...SCHEDULE_TOOLS, ...CONTROL_TOOLS];
@@ -28,7 +28,9 @@ const INSTRUCTIONS = [
   "Start with list_targets: it gives the ids and each site's LOCAL date and time. Resolve words like 'Friday' or 'tonight' against that local date, and say the actual date back to the user.",
   "Signage is scheduled on screens (screen_ids); Kids and Slides are scheduled into rooms (location_id). A screen only shows a module while its rules say so; previews warn when they don't (set_screen_module fixes it).",
   "Every tool that changes something returns a PREVIEW first. Show the preview to the user in plain words (what, which screens/rooms, day and date, local times, and any warnings or what it takes over from) and only call again with confirm=true after they say yes. Never confirm on your own.",
-  "Images can be sent with upload_image; videos and big files go through request_upload (the user opens a link). Mistakes can be reversed with undo_change.",
+  "Getting files in: images the user attaches in chat can NOT be passed to this server. If the file is online (a Canva design you can export, a Drive/Dropbox share link, a web link) use upload_from_url. " +
+    "If you can run shell commands and the file is on disk, use create_upload_url. Otherwise give the user the upload page: for signage use schedule_signage with `upload` " +
+    "(they upload and confirm in one step, on their phone or computer); for anything else request_upload. Portrait screens need upright portrait artwork. Mistakes can be reversed with undo_change.",
 ].join(" ");
 
 const CORS = {

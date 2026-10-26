@@ -6,6 +6,7 @@ import {
   moduleActive, moduleWarnings, must, needUuid, parseDays, parseWindow, span, text,
   type Ctx, type Db, type Tool,
 } from "./lib.ts";
+import { APP_URL, createUploadRequest } from "./common.ts";
 
 const ONE_OFF_PRIORITY = 100; // a dated one-off beats everything else
 const RUN_PRIORITY = 50;      // assistant-made recurring runs beat everyday slots (0..)
@@ -57,7 +58,16 @@ async function scheduleSignage({ db }: Ctx, a: any) {
   const screens = await loadScreens(db, screenIds);
 
   let org: string, names: string[], items: Item[] | null = null, playlist: any = null;
-  if (a.playlist_id) {
+  const upload = a.upload && typeof a.upload === "object" ? a.upload : null;
+  if (upload) {
+    // Files not uploaded yet: the person uploads them on the upload page, which also confirms this schedule.
+    if (a.items || a.playlist_id) throw new ToolError("Give upload OR items OR playlist_id, not several.");
+    org = screens[0].organization_id;
+    const files = Math.min(Math.max(Math.round(+upload.files || 1), 1), 20);
+    const title = text(upload.title, 120);
+    if (!title) throw new ToolError("upload.title is required (the name the graphic gets in the library).");
+    names = [`${files === 1 ? `"${title}"` : `${files} graphics ("${title}")`} — to be uploaded on the next page`];
+  } else if (a.playlist_id) {
     playlist = must(await db.from("signage_playlists").select("id,name,organization_id,items").eq("id", needUuid(a.playlist_id, "playlist_id")).maybeSingle(), "read that playlist") as any;
     if (!playlist) throw new ToolError("That signage playlist wasn't found. Use list_signage_playlists.");
     org = playlist.organization_id;
@@ -105,6 +115,16 @@ async function scheduleSignage({ db }: Ctx, a: any) {
     replaces.length ? `Takes over from, during that window only:\n  - ${replaces.join("\n  - ")}` : "",
     warnings.length ? `Warnings:\n  - ${[...new Set(warnings)].join("\n  - ")}` : "",
   ].filter(Boolean).join("\n");
+  if (upload) {
+    const { upload: _u, confirm: _c, ...plan } = a;
+    const files = Math.min(Math.max(Math.round(+upload.files || 1), 1), 20);
+    const id = await createUploadRequest(db, {
+      organization_id: org, module: "signage", title: text(upload.title, 120), plan: { ...plan, files }, summary: summary.replace(/ — to be uploaded on the next page/, ""),
+    });
+    return `NOTHING IS SCHEDULED YET. Give the user this link; on it they choose the file${files > 1 ? "s" : ""} and press "Upload & schedule", which is their confirmation:\n` +
+      `${APP_URL}/upload?request=${id}\n\nWhat the page will schedule:\n${summary}\n\n` +
+      `Tell the user the link works on their phone too. When they say it's done, call check_upload with upload_id ${id} to confirm the result.`;
+  }
   if (a.confirm !== true) return `${PREVIEW_NOTE}\n\n${summary}\n\n${CONFIRM_NOTE}`;
 
   const rec = new Recorder(db, org, "schedule_signage");
@@ -186,7 +206,8 @@ export const SIGNAGE_TOOLS: Tool[] = [
       "Puts graphics on signage screens for a time window: one image, several images that rotate (each for N seconds), videos, or an existing signage playlist. " +
       "One day: give date. Weekly run: give days (e.g. \"weekdays\", [\"mon\",\"wed\"]) and optionally start_date/end_date. Times are the site's local time. " +
       "Outside the window the screen goes back to whatever else is scheduled, or its default content, or blank. " +
-      "ALWAYS call without confirm first, show the preview to the user, then call again with confirm=true once they agree.",
+      "ALWAYS call without confirm first, show the preview to the user, then call again with confirm=true once they agree. " +
+      "If the graphic is an image the user attached in chat, use upload (not items): the user uploads and confirms on a page in one step.",
     inputSchema: {
       type: "object",
       properties: {
@@ -197,6 +218,12 @@ export const SIGNAGE_TOOLS: Tool[] = [
           items: { type: "object", properties: { media_id: { type: "string" }, seconds: { type: "integer" } }, required: ["media_id"] },
         },
         playlist_id: { type: "string", description: "Instead of items: an existing signage playlist (list_signage_playlists)" },
+        upload: {
+          type: "object",
+          description: "Instead of items, when the graphics are only on the user's device (e.g. attached in chat): {title, files?}. Returns a link where the user uploads them and confirms in one step.",
+          properties: { title: { type: "string" }, files: { type: "integer", description: "How many files (rotate in the order chosen), default 1" } },
+          required: ["title"],
+        },
         seconds: { type: "integer", description: "Default seconds per image" },
         date: { type: "string", description: "YYYY-MM-DD for a single day" },
         days: { description: "Weekly: list of days or \"weekdays\"/\"weekends\"/\"every day\"" },

@@ -83,9 +83,11 @@ export function createClient() {
     rpc: async (name, args) => { calls.push({ rpc: name, args }); return { data: name.endsWith('occurrences') ? (T['__occ'] ?? []) : 1, error: null }; },
     storage: {
       from: () => ({
-        upload: async (path, bytes) => { (T.__files ??= []).push(path); return { data: { path }, error: null }; },
+        upload: async (path, bytes, o) => { (T.__files ??= []).push({ path, mimetype: o?.contentType, size: bytes.length }); return { data: { path }, error: null }; },
+        createSignedUploadUrl: async (path) => ({ data: { signedUrl: `https://x.supabase.co/storage/v1/object/upload/sign/media/${path}?token=t`, token: 't', path }, error: null }),
+        list: async (folder, o) => ({ data: (T.__files ?? []).filter((f) => f.path === `${folder}/${o.search}`).map((f) => ({ name: o.search, metadata: { mimetype: f.mimetype, size: f.size } })), error: null }),
         getPublicUrl: (p) => ({ data: { publicUrl: `https://cdn/${p}` } }),
-        remove: async () => ({ data: null, error: null }),
+        remove: async (paths) => { T.__files = (T.__files ?? []).filter((f) => !paths.includes(f.path)); return { data: null, error: null }; },
       }),
     },
   };
