@@ -17,7 +17,7 @@ Pages: Home `/`, Features, How it works, For churches, Pricing, Support, 404. Pr
 ## Edit
 - Copy and layout: edit `src/pages/<page>.html`, then `python3 website/tools/build.py` and open `dist/`. Preview with `python3 -m http.server 8080 --directory website/dist`.
 - Images in a page: `{{pic:name|alt text}}` (lazy) or `{{pic!:name|alt text}}` (above the fold). `name` is a file in `static/assets/img/` (a .webp and .png pair; sizes are read automatically).
-- Variables in pages: `{{APP}}` (https://app.churchtvos.com) and `{{CONTACT}}`. Change the contact address once, in `CONTACT` at the top of `tools/build.py`. It is currently the placeholder `hello@churchtvos.com`.
+- Variables in pages: `{{APP}}` (https://app.churchtvos.com) and `{{CONTACT}}`. Change the contact address once, in `CONTACT` at the top of `tools/build.py`. It is `support@churchtvos.com`.
 - FAQ: `<details><summary>Q</summary><div>A</div></details>` on the home page is also emitted as FAQPage structured data.
 - Colours and fonts: variables at the top of `static/assets/site.css`. Colours come from the app icon; the font is Lato (the Forward set for now), subset to Latin and self-hosted.
 - New screenshots: add the source file to `tools/build_assets.py` (needs Pillow, plus fonttools and brotli for fonts) and run it.

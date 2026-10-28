@@ -12,7 +12,7 @@ SRC, STATIC, DIST = (os.path.join(SITE, p) for p in ("src/pages", "static", "dis
 # ---- Things Keith may want to change in one place -------------------------------------------------
 DOMAIN = "https://churchtvos.com"
 APP = "https://app.churchtvos.com"
-CONTACT = "hello@churchtvos.com"   # PLACEHOLDER: confirm this mailbox exists before launch
+CONTACT = "support@churchtvos.com"
 SITE_NAME = "Church TV OS"
 DEFAULT_DESC = "Church TV OS runs the screens at your church: kids-room curriculum, lobby signage and Sunday slides, scheduled from the web and controlled from your phone."
 # ----------------------------------------------------------------------------------------------------
