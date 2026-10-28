@@ -156,7 +156,14 @@ export default function App() {
 }
 
 function Wordmark() {
-  return <span className="wordmark">Church TV OS</span>
+  return (
+    <span className="wordmark">
+      <img src="/logo-mark.png" alt="" width="32" height="32" />
+      <span>
+        Church TV <b>OS</b>
+      </span>
+    </span>
+  )
 }
 
 /** Loads who you are and which churches you can see, then picks the active one. */
@@ -406,7 +413,7 @@ function OrgApp(props: OrgAppProps) {
           </button>
           <Wordmark />
           <OrgSwitcher />
-          <a className="help-link" href={helpUrl()} target="_blank" rel="noreferrer">
+          <a className="help-link appbar-help" href={helpUrl()} target="_blank" rel="noreferrer" title="Help Center">
             ? Help
           </a>
           <ThemeSwitch />
@@ -419,7 +426,7 @@ function OrgApp(props: OrgAppProps) {
               if (!showGroup || pages.length === 0) return null
               const locked = group.module ? !state.moduleOn(group.module) : false
               return (
-                <div key={group.title} className="nav-group">
+                <div key={group.title} className="nav-group" data-module={group.module ?? 'general'}>
                   <div className="nav-title">
                     {group.title}
                     {locked && <span title="Not enabled for your church"> 🔒</span>}

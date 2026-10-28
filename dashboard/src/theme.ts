@@ -8,7 +8,7 @@ const KEY = 'churchtvos.theme'
 /** Must match --card in styles.css (the lightest dark-mode surface brand colours sit on). */
 export const DARK_SURFACE = '#1a1e24'
 /** Browser chrome colours (theme-color meta) = the app bar. */
-const CHROME: Record<Resolved, string> = { light: '#ffffff', dark: DARK_SURFACE }
+const CHROME: Record<Resolved, string> = { light: '#141824', dark: '#141824' }
 
 const media = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null
 
@@ -32,7 +32,7 @@ function apply() {
   const root = document.documentElement
   root.dataset.theme = resolved
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', CHROME[resolved])
-  document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.setAttribute('content', resolved === 'dark' ? 'black' : 'default')
+  document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.setAttribute('content', 'black')
   listeners.forEach((l) => l())
 }
 
