@@ -15,15 +15,17 @@ import { SONG_TOOLS } from "./songs.ts";
 import { SCHEDULE_TOOLS } from "./schedules.ts";
 import { CONTROL_TOOLS } from "./control.ts";
 import { ORGANIZE_TOOLS } from "./organize.ts";
+import { labelled } from "./labels.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const FUNCTION_URL = `${SUPABASE_URL}/functions/v1/mcp`;
-const SERVER = { name: "church-tv-os", version: "0.5.0" };
+const SERVER = { name: "church-tv-os", version: "0.5.1" };
 const PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 
 export const TOOLS: Tool[] = [...COMMON_TOOLS, ...SIGNAGE_TOOLS, ...CONTENT_TOOLS, ...SONG_TOOLS, ...SCHEDULE_TOOLS, ...ORGANIZE_TOOLS, ...CONTROL_TOOLS];
 const BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
+const LISTED = TOOLS.map(({ run: _run, ...t }) => labelled(t)); // fails at startup if a tool has no title
 
 const INSTRUCTIONS = [
   "Church TV OS runs church TVs. Three applications: Signage (graphics/videos on screens by time slot), Kids (playlists of videos, countdowns, lyrics for kids rooms), Slides (decks of text, media, songs, countdowns).",
@@ -56,7 +58,7 @@ async function handleRpc(msg: any, ctx: Ctx): Promise<unknown | null> {
       return ok({ protocolVersion: PROTOCOLS.includes(asked) ? asked : PROTOCOLS[0], capabilities: { tools: { listChanged: false } }, serverInfo: SERVER, instructions: INSTRUCTIONS });
     }
     case "ping": return ok({});
-    case "tools/list": return ok({ tools: TOOLS.map(({ run: _run, ...t }) => t) });
+    case "tools/list": return ok({ tools: LISTED });
     case "tools/call": {
       const tool = BY_NAME.get(msg.params?.name);
       if (!tool) return ok({ isError: true, content: [{ type: "text", text: `Unknown tool: ${msg.params?.name}` }] });

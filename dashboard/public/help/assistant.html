@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI assistant connector · Church TV OS Help</title>
+<meta name="description" content="Schedule signage, Kids and Slides by asking Claude or another AI assistant.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="/app-icon.png">
+<link rel="stylesheet" href="/help/help.css">
+</head>
+<body>
+<header class="top"><div class="in"><a class="brand" href="/help/">Church TV OS</a><span class="muted">Help Center</span><span class="space"></span><a class="nav" href="https://app.churchtvos.com">Open the dashboard</a></div></header>
+<main>
+<p class="crumb"><a href="/help/">&larr; Help Center</a></p>
+<h1>AI assistant connector</h1>
+<p class="updated">Last updated 2026-10-28</p>
+
+<p class="lead">Connect Claude (or another assistant that supports MCP connectors) to your church's Church TV OS account, then ask in plain words: "Show the youth night graphic in the lobby Friday 8 to 10pm", "Make a deck with this song", "What's on the Kids Room TV on Sunday?"</p>
+
+<h2>What you need</h2>
+<ul>
+<li>A Church TV OS account in a church, with the Signage, Kids or Slides module.</li>
+<li>Claude (web, desktop or mobile) or another assistant that can add a custom MCP connector.</li>
+</ul>
+<p>The assistant can only do what <b>you</b> can do in the dashboard. It signs in as you, and your role and campus limits apply to everything it does.</p>
+
+<h2>Connect it</h2>
+<ol class="steps">
+<li>In Claude, open <b>Settings</b>, then <b>Connectors</b>, and choose <b>Add custom connector</b> (or find <b>Church TV OS</b> in the directory, if it is listed).</li>
+<li>Name it <b>Church TV OS</b> and paste this server URL:<br><code>https://gqkefjngblgomuovaivj.supabase.co/functions/v1/mcp</code></li>
+<li>Choose <b>Connect</b>. You are sent to app.churchtvos.com: sign in and press <b>Approve</b>.</li>
+<li>Start a new chat and ask "List my screens" to check it works.</li>
+</ol>
+<p>To disconnect, remove the connector in your assistant's settings. You can also sign out of all sessions in the dashboard.</p>
+
+<h2>What it can do</h2>
+<ul>
+<li><b>Signage:</b> schedule one or more graphics on screens for a time, a date range or every week; hold one image for the whole slot; list and cancel what's scheduled.</li>
+<li><b>Kids:</b> build playlists (videos, images, countdowns, lyrics, YouTube, streams) and schedule them in rooms, once or every week; skip or swap a single week.</li>
+<li><b>Slides:</b> build decks (text, media, songs, countdowns), and schedule or play them.</li>
+<li><b>Songs:</b> paste a song's lyrics and it is added to the song library, split into verses and choruses, ready for a deck.</li>
+<li><b>Live control:</b> play something now, stop it, or show a short message on a screen.</li>
+<li><b>Organising:</b> put playlists and decks in folders, and archive ones you no longer use.</li>
+<li><b>Files:</b> bring in images and videos from a link (Canva, Google Drive, Dropbox or a web address), or get an upload link to use on your phone or computer.</li>
+</ul>
+
+<h2>Safety</h2>
+<ul>
+<li><b>Preview first.</b> Anything that changes what a screen shows, or removes something, is shown to you as a preview. Nothing happens until you say yes.</li>
+<li><b>Undo.</b> Every change the assistant makes is logged. Ask "what did you change?" and "undo that".</li>
+<li><b>Service times.</b> It warns before changing a room within 30 minutes of something it is about to replace.</li>
+<li><b>Your own work is protected.</b> It won't remove schedules you made in the dashboard unless you clearly ask.</li>
+<li>What it makes goes into a <b>Made by assistant</b> folder, so you can see it at a glance. Old one-off signage it made is tidied away a week after it finishes, unless you move it to another folder.</li>
+</ul>
+
+<h2>Example requests</h2>
+<ul>
+<li>"Put this graphic on the Gym TV every day from 6am to 10pm and keep it up the whole time." (with a Canva or Drive link)</li>
+<li>"Show these two images every 10 seconds on the lobby screens, weekdays 9 to 6."</li>
+<li>"Here are the lyrics for our new song. Add it, 2 lines per slide, and make a deck for Sunday with a welcome slide and a 5 minute countdown first."</li>
+<li>"Schedule the Week 3 Kids playlist in the Kids Room every Sunday at 9 and 11 until Christmas."</li>
+<li>"Archive the fall series decks."</li>
+</ul>
+
+<div class="heads-up"><p><b>Pictures attached in the chat can't be sent to Church TV OS.</b> Share a link instead, or use the upload link the assistant gives you. Portrait screens need tall (1080 by 1920) artwork.</p></div>
+
+<h2>Privacy</h2>
+<p>The assistant reads and changes your church's Church TV OS content only when you ask it to, using your sign-in. We keep a log of the changes it makes (so they can be undone) and the files it uploads. We don't receive your chats; your assistant provider's privacy policy covers those. See our <a href="/privacy.html">Privacy Policy</a>.</p>
+
+<p>Questions or problems? Email <a href="mailto:keith@sparrownest.com">keith@sparrownest.com</a>.</p>
+
+<nav class="pager" aria-label="Previous and next guide"><a class="prev" href="/help/control.html"><small>Previous</small>Control: the live remote</a><a class="next" href="/help/branding.html"><small>Next</small>Branding and dark mode</a></nav>
+</main>
+<footer><p><a href="/help/">Help Center</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · Questions? <a href="mailto:keith@sparrownest.com">keith@sparrownest.com</a></p></footer>
+</body></html>

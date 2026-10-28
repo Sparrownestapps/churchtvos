@@ -63,6 +63,7 @@ assert.equal((await rpc('tools/call', { name: 'list_targets' }, 'nope')).status,
 const list = (await rpc('tools/list')).body.result.tools;
 console.log(`✓ ${list.length} tools: ${list.map((t) => t.name).join(', ')}`);
 assert.ok(list.every((t) => t.inputSchema && !t.run));
+assert.ok(list.every((t) => t.title && t.annotations.title && typeof t.annotations.readOnlyHint === 'boolean' && (t.annotations.readOnlyHint || typeof t.annotations.destructiveHint === 'boolean')), 'every tool has a title and hints');
 
 // ── common ──
 let t = ok(await tool('list_targets', {}), 'list_targets');
