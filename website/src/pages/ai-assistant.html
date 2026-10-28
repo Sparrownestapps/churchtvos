@@ -1,0 +1,82 @@
+<!--
+title: AI assistant
+description: Connect Claude to Church TV OS and run your church's screens by asking: schedule signage, build Kids playlists and Sunday slide decks, add songs from pasted lyrics. Every change is previewed and can be undone.
+-->
+<section class="page-hero">
+<div class="wrap">
+<p class="eyebrow">New · AI assistant</p>
+<h1>Just ask: "Put this on the lobby TVs Friday night"</h1>
+<p class="lead">Connect Claude, or another AI assistant that supports MCP connectors, to your Church TV OS account. Then schedule signage, build Kids playlists and slide decks, and check what's on every screen, in plain words, from your phone or computer.</p>
+</div>
+</section>
+
+<section>
+<div class="wrap split">
+<div>
+<p class="eyebrow">What it looks like</p>
+<h2>Say what you want. Check the preview. Say yes.</h2>
+<p class="lead">The assistant works out the screens, days and times, then shows you exactly what will change before anything does.</p>
+<ul class="ticks">
+<li>It reads your rooms, screens and schedules, so "the lobby" and "this Sunday" mean what you'd expect</li>
+<li>Anything that changes a screen comes back as a <strong>preview</strong> first. Nothing happens until you say yes.</li>
+<li>Changed your mind? "Undo that" puts it back.</li>
+</ul>
+</div>
+<div class="chat" aria-label="Example conversation with the assistant">
+<p class="msg you">Show the Youth Night graphic on the Gym TV every Friday from 6:30 to 9:30pm, and keep it up the whole time.</p>
+<div class="msg ai"><p>Here's the plan. Nothing has changed yet:</p>
+<div class="preview"><b>Gym TV</b> · Fridays, 6:30–9:30pm, starting Fri Oct 30<br>"Youth Night", held for the whole slot<br><span>Outside that time the Gym TV plays its usual loop.</span></div>
+<p>Shall I schedule it?</p></div>
+<p class="msg you">Yes</p>
+<p class="msg ai">Done. It starts this Friday at 6:30pm. Say "undo that" if you change your mind.</p>
+</div>
+</div>
+</section>
+
+<section class="band">
+<div class="wrap">
+<div class="center"><p class="eyebrow">What you can ask for</p><h2>All three modules, plus the busywork</h2></div>
+<div class="grid g3" style="margin-top:32px">
+<div class="card"><h3><span class="dot signage"></span>Signage</h3><p>"Show these two graphics every 10 seconds on the lobby screens, weekdays 9 to 6." One-off events, weekly slots, date ranges, or one image held all day.</p></div>
+<div class="card"><h3><span class="dot kids"></span>Kids</h3><p>"Schedule Week 3 in the Kids Room every Sunday at 9 and 11 until Christmas." Build playlists of videos, countdowns and lyrics, and skip or swap a single week.</p></div>
+<div class="card"><h3><span class="dot slides"></span>Slides and songs</h3><p>Paste a song's lyrics and it's added to your song library, split into verses and choruses. "Make a Sunday deck with a welcome slide, a 5 minute countdown and this song."</p></div>
+<div class="card"><h3>Files</h3><p>Share a Canva, Google Drive or Dropbox link and the assistant brings the graphic in. Or it gives you an upload link to use on your phone.</p></div>
+<div class="card"><h3>Live</h3><p>"Play the welcome deck in the Auditorium now." "Show 'Parents to the Kids Room please' on the lobby TV."</p></div>
+<div class="card"><h3>Tidy up</h3><p>"What's on every screen this Sunday?" "Archive the fall series decks." Everything the assistant makes goes in a "Made by assistant" folder.</p></div>
+</div>
+</div>
+</section>
+
+<section>
+<div class="wrap split flip">
+<div>
+<p class="eyebrow">Safe on a Sunday morning</p>
+<h2>It can only do what you can do</h2>
+<ul class="ticks">
+<li><strong>Your sign-in, your permissions.</strong> The assistant signs in as you. A volunteer who can only edit the Kids rooms gets an assistant that can only edit the Kids rooms.</li>
+<li><strong>Preview first, always.</strong> Changes to screens, and anything that removes something, wait for your yes.</li>
+<li><strong>Undo.</strong> Every change is logged and can be reversed.</li>
+<li><strong>Service-time guard.</strong> It warns you before changing a room within 30 minutes of a service.</li>
+<li><strong>Your work is protected.</strong> It won't remove schedules your team made in the dashboard unless you clearly ask.</li>
+<li><strong>We don't see your chats.</strong> Church TV OS only receives the actions the assistant takes. See our <a href="{{APP}}/privacy.html">privacy policy</a>.</li>
+</ul>
+</div>
+<div>
+<p class="eyebrow">Set it up in two minutes</p>
+<ol class="steps">
+<li><h3>Add the connector</h3><p>In Claude, open Settings, then Connectors, and add a custom connector with this address:<br><span class="code small">https://gqkefjngblgomuovaivj.supabase.co/functions/v1/mcp</span></p></li>
+<li><h3>Approve it</h3><p>Sign in to Church TV OS when asked and press Approve.</p></li>
+<li><h3>Ask</h3><p>Start a new chat and try "List my screens".</p></li>
+</ol>
+<p><a href="{{APP}}/help/assistant.html">Full setup guide and examples</a></p>
+</div>
+</div>
+</section>
+
+<section class="cta">
+<div class="wrap">
+<h2>Try it on your own screens</h2>
+<p>The assistant comes with every Church TV OS account. Start a free trial, pair a TV, then connect Claude.</p>
+<div class="btns"><a class="btn" href="{{APP}}">Start a free trial</a><a class="btn ghost" href="{{APP}}/help/assistant.html">Read the guide</a></div>
+</div>
+</section>

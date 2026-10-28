@@ -48,7 +48,7 @@ https://app.churchtvos.com/help/assistant.html
 https://app.churchtvos.com/privacy.html
 
 **Support contact**
-keith@sparrownest.com
+support@churchtvos.com
 
 **Icon**
 dashboard/public/app-icon.png (check it is at least 512×512 and square)
@@ -82,7 +82,7 @@ Both. It reads screens, rooms, schedules, playlists, decks, songs and media, and
 
 Company name: Church TV OS (operated by Keith Sparrow, Ontario, Canada)
 Website: https://app.churchtvos.com
-Primary contact: Keith Sparrow, keith@sparrownest.com
+Primary contact: Keith Sparrow, support@churchtvos.com
 
 ## 6. Authentication
 

@@ -11,7 +11,7 @@ Everything below is ready to paste. Console labels change over time; match them 
 | Screenshots 1920x1080 (need at least 3) | `store/screenshots/` (9 images) |
 | Privacy policy URL | https://app.churchtvos.com/privacy.html |
 | Terms URL | https://app.churchtvos.com/terms.html |
-| Support email | keith@sparrownest.com |
+| Support email | support@churchtvos.com |
 
 ## 1. Developer account (you, about 30 minutes)
 1. developer.amazon.com -> Sign in / Create account using **keith@sparrownest.com** (not the church account).

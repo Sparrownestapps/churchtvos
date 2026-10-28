@@ -45,4 +45,3 @@ Delete any existing GoDaddy "parked" A record for `@` and the default `www` CNAM
 - Confirm the contact address (`CONTACT` in build.py) exists and receives mail.
 - Re-read the claims on Pricing (free trial wording), and the app availability wording (Fire TV in review, Apple apps in beta) and update when store listings go live.
 - The sitemap/canonicals already point at https://churchtvos.com.
-- Support, delete-account and the Help Center footers on app.churchtvos.com still show keith@sparrownest.com; consider switching them to the new address.

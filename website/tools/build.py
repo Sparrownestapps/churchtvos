@@ -18,11 +18,11 @@ DEFAULT_DESC = "Church TV OS runs the screens at your church: kids-room curricul
 # ----------------------------------------------------------------------------------------------------
 
 NAV = [("/features/", "Features"), ("/how-it-works/", "How it works"), ("/for-churches/", "For churches"),
-       ("/pricing/", "Pricing"), ("/support/", "Support")]
+       ("/ai-assistant/", "AI assistant"), ("/pricing/", "Pricing"), ("/support/", "Support")]
 
 PAGES = {  # source file -> URL path
     "index.html": "/", "features.html": "/features/", "how-it-works.html": "/how-it-works/",
-    "for-churches.html": "/for-churches/", "pricing.html": "/pricing/", "support.html": "/support/",
+    "for-churches.html": "/for-churches/", "pricing.html": "/pricing/", "support.html": "/support/", "ai-assistant.html": "/ai-assistant/",
     "404.html": "/404.html",
 }
 

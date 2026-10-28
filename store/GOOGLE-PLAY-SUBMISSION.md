@@ -13,7 +13,7 @@ Same app and package name as the Amazon build (`com.churchtvos.tv`). Console lab
 | Screenshots 1920x1080 (TV) | `store/screenshots/` |
 | Privacy policy | https://app.churchtvos.com/privacy.html |
 | Account/data deletion page | https://app.churchtvos.com/delete-account.html |
-| Support email | keith@sparrownest.com |
+| Support email | support@churchtvos.com |
 
 Amazon: if you have not yet uploaded the 1.1.0 update to the Amazon Appstore, upload **1.2.0** instead. It contains everything in 1.1.0 plus the Google TV changes (settings without a Menu button; auto-launch only offered on Amazon devices).
 
@@ -43,7 +43,7 @@ The manifest marks leanback and touchscreen as not required so one build serves 
   "Works on Google TV and Android TV devices. Create your church's free account at app.churchtvos.com. Open Settings from the pairing screen for a built-in demo that needs no account."
 - **Category:** Tools or Productivity (Lifestyle also fits). **Tags:** as offered.
 - **Graphics:** icon 512, feature graphic 1024x500, TV banner 1280x720, TV screenshots (1920x1080 landscape; Play wants several, upload 4-8).
-- **Contact:** keith@sparrownest.com, website https://app.churchtvos.com, privacy policy URL above.
+- **Contact:** support@churchtvos.com, website https://app.churchtvos.com, privacy policy URL above.
 
 ## 5. App content forms
 - **Privacy policy:** URL above.

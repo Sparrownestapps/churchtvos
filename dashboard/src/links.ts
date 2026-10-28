@@ -5,7 +5,7 @@
 export const AMAZON_APPSTORE_URL = '' // e.g. https://www.amazon.com/dp/...
 export const GOOGLE_PLAY_URL = '' // e.g. https://play.google.com/store/apps/details?id=com.churchtvos.tv
 export const SIDELOAD_URL = '/install.html'
-export const SUPPORT_EMAIL = 'keith@sparrownest.com'
+export const SUPPORT_EMAIL = 'support@churchtvos.com'
 
 /** Static help pages in public/help/. Keys are used by `helpUrl`. */
 export const HELP_PAGES = {
