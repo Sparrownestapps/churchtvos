@@ -1,12 +1,12 @@
-# Google Play (Google TV / Android TV) submission kit: Church TV OS 1.2.0
+# Google Play (Google TV / Android TV) submission kit: Church TV OS 1.7.0
 
 Same app and package name as the Amazon build (`com.churchtvos.tv`). Console labels change; match by meaning. Items marked **VERIFY** are current-policy details to confirm in Play Console.
 
 ## Files
 | What | Where |
 |---|---|
-| Signed app bundle (upload this) | `store/build/church-tv-os-1.2.0.aab` (version 1.2.0, code 3) |
-| Signed APK (for sideloading/testing and Amazon) | `store/build/church-tv-os-1.2.0.apk` |
+| Signed app bundle (upload this) | `store/build/church-tv-os-1.7.0.aab` (version 1.7.0, code 8; the "store" flavor, no NDI) |
+| Signed APK (for sideloading/testing and Amazon) | `store/build/church-tv-os-1.7.0.apk` |
 | App icon 512x512 | `store/assets/icon-512.png` |
 | Feature graphic 1024x500 | `store/assets/promo-1024x500.png` |
 | TV banner 1280x720 | `store/assets/firetv-app-icon-1280x720.png` |
@@ -62,7 +62,7 @@ The manifest marks leanback and touchscreen as not required so one build serves 
 No Google TV device yet. Options: a Chromecast with Google TV or an onn 4K box (adb install, see below), or an Android Studio "Google TV" emulator image (a download of roughly 1.5 GB from Google; not installed).
 ```
 adb connect <TV-IP>:5555
-adb install -r store/build/church-tv-os-1.2.0.apk
+adb install -r store/build/church-tv-os-1.7.0.apk
 ```
 Enable Developer options (tap Android TV OS build seven times), then USB/Wireless debugging.
 Checklist on a real Google TV: pairing screen and code, Settings button, hold OK, demo, a paired Kids playlist, a Signage loop, a stream slide, portrait screen, HDMI-CEC/standby wake (the app should resume from the Google TV home screen only when the user opens it).
