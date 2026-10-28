@@ -249,4 +249,23 @@ assert.ok(!T.playlists.find((p) => p.id === AM.id).archived_at);
 t = ok(await tool('save_deck', { organization_id: ORG, name: 'Top deck', slides: [], folder_id: 'top' }), 'deck at top level when asked');
 assert.equal(T.decks.at(-1).folder_id, null);
 
+// ── songs from pasted lyrics ──
+const LYRICS = 'Great Is Thy Faithfulness\n\nVerse 1\nLine a\nLine b\nLine c\nLine d\n\n[Chorus]\nGreat is Thy faithfulness\nMorning by morning\n\nVerse 2\nLine e\nLine f\n\nChorus\nGreat is Thy faithfulness\nMorning by morning\n\nCCLI Song # 18723\n© Public Domain\n';
+t = ok(await tool('save_song', { organization_id: ORG, lyrics: LYRICS, authors: 'Thomas Chisholm', lines_per_slide: 2 }), 'save_song from pasted lyrics');
+const NS = T.songs.at(-1);
+assert.equal(NS.title, 'Great Is Thy Faithfulness'); assert.equal(NS.ccli_number, '18723'); assert.equal(NS.source, 'mcp');
+assert.deepEqual(NS.sections.map((s) => s.label), ['Verse 1', 'Chorus', 'Verse 2'], 'repeated chorus kept once');
+assert.deepEqual(NS.arrangement, ['s1', 's2', 's3', 's2']);
+assert.match(t, /5 slides/); assert.match(t, /Verse 1 → Chorus → Verse 2 → Chorus/);
+bad(await tool('save_song', { organization_id: ORG, lyrics: LYRICS }), /already in the library/, 'duplicate title refused');
+t = ok(await tool('save_song', { song_id: NS.id, arrangement: ['Verse 1', 'Chorus', 'Verse 2', 'Chorus', 'Chorus'] }), 'edit song preview');
+assert.match(t, /PREVIEW/); assert.equal(NS.arrangement.length, 4);
+ok(await tool('save_song', { song_id: NS.id, arrangement: ['Verse 1', 'Chorus', 'Verse 2', 'Chorus', 'Chorus'], confirm: true }), 'edit song confirm');
+assert.equal(T.songs.at(-1).arrangement.length, 5);
+bad(await tool('save_song', { song_id: NS.id, arrangement: ['Tag'] }), /isn't one of this song's sections/, 'unknown arrangement label');
+assert.match(ok(await tool('get_song', { song_id: NS.id }), 'get_song'), /\[Chorus\]\nGreat is Thy faithfulness/);
+ok(await tool('save_deck', { organization_id: ORG, name: 'Sunday worship', slides: [{ kind: 'song', song_id: NS.id, show_title: true }] }), 'deck from the new song');
+t = ok(await tool('save_song', { organization_id: ORG, title: 'Structured', sections: [{ label: 'Verse', text: 'x\ny' }, { label: 'Chorus', text: 'z' }], arrangement: ['verse', 'chorus', 'chorus'] }), 'save_song from sections');
+assert.deepEqual(T.songs.at(-1).arrangement, ['s1', 's2', 's2']);
+
 console.log('\nAll tests passed.');

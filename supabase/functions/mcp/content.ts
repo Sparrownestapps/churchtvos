@@ -192,7 +192,7 @@ async function searchSongs({ db }: Ctx, a: any) {
   if (s) q = q.or(`title.ilike.%${s}%,authors.ilike.%${s}%`);
   const rows = must(await q.order("title").limit(30), "search songs") as any[];
   return rows.length ? rows.map((r) => `- ${r.title}${r.authors ? ` — ${r.authors}` : ""}${r.ccli_number ? ` (CCLI ${r.ccli_number})` : ""}  song_id: ${r.id}`).join("\n")
-    : "No matching songs in the library. Songs are added in the dashboard (Songs) so their lyrics and licensing details are right.";
+    : "No matching songs in the library. If the user pastes the lyrics, add it with save_song.";
 }
 
 const KIDS_ITEM_DOC =
@@ -239,7 +239,7 @@ export const CONTENT_TOOLS: Tool[] = [
   { name: "list_themes", description: "Lists a church's slide themes (for save_deck theme_id).", inputSchema: { type: "object", properties: { organization_id: { type: "string" } }, required: ["organization_id"], additionalProperties: false }, annotations: { readOnlyHint: true }, run: listThemes },
   {
     name: "search_songs",
-    description: "Searches the church's song library by title or author (for lyrics items and song slides). Songs themselves are added in the dashboard.",
+    description: "Searches the church's song library by title or author (for lyrics items and song slides). New songs: save_song with the lyrics the user pastes.",
     inputSchema: { type: "object", properties: { organization_id: { type: "string" }, query: { type: "string" } }, required: ["organization_id"], additionalProperties: false },
     annotations: { readOnlyHint: true },
     run: searchSongs,

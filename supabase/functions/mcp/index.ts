@@ -11,6 +11,7 @@ import { ToolError, type Ctx, type Tool } from "./lib.ts";
 import { COMMON_TOOLS } from "./common.ts";
 import { SIGNAGE_TOOLS } from "./signage.ts";
 import { CONTENT_TOOLS } from "./content.ts";
+import { SONG_TOOLS } from "./songs.ts";
 import { SCHEDULE_TOOLS } from "./schedules.ts";
 import { CONTROL_TOOLS } from "./control.ts";
 import { ORGANIZE_TOOLS } from "./organize.ts";
@@ -18,10 +19,10 @@ import { ORGANIZE_TOOLS } from "./organize.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const FUNCTION_URL = `${SUPABASE_URL}/functions/v1/mcp`;
-const SERVER = { name: "church-tv-os", version: "0.4.0" };
+const SERVER = { name: "church-tv-os", version: "0.5.0" };
 const PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 
-export const TOOLS: Tool[] = [...COMMON_TOOLS, ...SIGNAGE_TOOLS, ...CONTENT_TOOLS, ...SCHEDULE_TOOLS, ...ORGANIZE_TOOLS, ...CONTROL_TOOLS];
+export const TOOLS: Tool[] = [...COMMON_TOOLS, ...SIGNAGE_TOOLS, ...CONTENT_TOOLS, ...SONG_TOOLS, ...SCHEDULE_TOOLS, ...ORGANIZE_TOOLS, ...CONTROL_TOOLS];
 const BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
 
 const INSTRUCTIONS = [
@@ -30,6 +31,7 @@ const INSTRUCTIONS = [
   "Signage is scheduled on screens (screen_ids); Kids and Slides are scheduled into rooms (location_id). A screen only shows a module while its rules say so; previews warn when they don't (set_screen_module fixes it).",
   "Playlists and decks live in folders; what you create goes into \"Made by assistant\" unless the user names a folder (list_folders, organize_content). " +
     "Every tool that changes what screens show, or removes something, returns a PREVIEW first. Show the preview to the user in plain words (what, which screens/rooms, day and date, local times, and any warnings or what it takes over from) and only call again with confirm=true after they say yes. Never confirm on your own.",
+  "Songs: when the user pastes lyrics, add them with save_song (pass the text as given), show the slides it makes, then build the deck with save_deck using a {kind:'song'} slide. Search first (search_songs) so a song isn't added twice.",
   "Getting files in: images the user attaches in chat can NOT be passed to this server. If the file is online (a Canva design you can export, a Drive/Dropbox share link, a web link) use upload_from_url. " +
     "If you can run shell commands and the file is on disk, use create_upload_url. Otherwise give the user the upload page: for signage use schedule_signage with `upload` " +
     "(they upload and confirm in one step, on their phone or computer); for anything else request_upload. Portrait screens need upright portrait artwork. Mistakes can be reversed with undo_change.",
