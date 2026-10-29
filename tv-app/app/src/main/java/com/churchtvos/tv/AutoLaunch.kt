@@ -22,9 +22,10 @@ import androidx.core.app.ServiceCompat
 object AutoLaunch {
     /**
      * Fire OS lets an app reopen itself when the TV turns on. Google TV / Android TV (Android 10+) blocks apps from
-     * starting screens from the background, so auto-launch is only offered on Amazon devices.
+     * starting screens from the background, so auto-launch is only offered on Amazon devices, and never in the
+     * Google Play build (which leaves the boot receiver and the service out of its manifest).
      */
-    val supported: Boolean get() = Build.MANUFACTURER.equals("Amazon", ignoreCase = true)
+    val supported: Boolean get() = BuildConfig.AUTO_LAUNCH_AVAILABLE && Build.MANUFACTURER.equals("Amazon", ignoreCase = true)
 
     fun isEnabled(context: Context): Boolean = supported && DeviceStore(context).let { it.isPaired && it.autoLaunch }
 

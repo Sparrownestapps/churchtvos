@@ -26,13 +26,23 @@ android {
             dimension = "distribution"
             isDefault = true
             buildConfigField("boolean", "NDI_AVAILABLE", "false")
+            buildConfigField("boolean", "AUTO_LAUNCH_AVAILABLE", "true")
+        }
+        // Google Play: the store build without auto-launch (Fire OS only), so it declares no boot receiver and no
+        // special-use foreground service. Its manifest (src/play) removes them; the code is shared with store.
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("boolean", "NDI_AVAILABLE", "false")
+            buildConfigField("boolean", "AUTO_LAUNCH_AVAILABLE", "false")
         }
         create("ndi") {
             dimension = "distribution"
             versionNameSuffix = "-ndi" // shows in Settings and in the dashboard's screen list (app_version)
             buildConfigField("boolean", "NDI_AVAILABLE", "true")
+            buildConfigField("boolean", "AUTO_LAUNCH_AVAILABLE", "true")
         }
     }
+    sourceSets.getByName("play") { java.directories.add("src/store/java"); kotlin.directories.add("src/store/java") } // the no-NDI stub
 
     val signing = rootProject.file("keystore/keystore.properties").takeIf { it.exists() }?.let { file ->
         Properties().apply { file.inputStream().use(::load) }

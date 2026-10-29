@@ -5,8 +5,9 @@ Same app and package name as the Amazon build (`com.churchtvos.tv`). Console lab
 ## Files
 | What | Where |
 |---|---|
-| Signed app bundle (upload this) | `store/build/church-tv-os-1.7.0.aab` (version 1.7.0, code 8; the "store" flavor, no NDI) |
-| Signed APK (for sideloading/testing and Amazon) | `store/build/church-tv-os-1.7.0.apk` |
+| Signed app bundle (upload this) | `store/build/church-tv-os-1.7.0-play.aab` (version 1.7.0, code 8; the "play" flavor: no NDI, no auto-launch) |
+| Same build as an APK (sideload test) | `store/build/church-tv-os-1.7.0-play.apk` |
+| Amazon build (keeps auto-launch) | `store/build/church-tv-os-1.7.0.apk` |
 | App icon 512x512 | `store/assets/icon-512.png` |
 | Feature graphic 1024x500 | `store/assets/promo-1024x500.png` |
 | TV banner 1280x720 | `store/assets/firetv-app-icon-1280x720.png` |
@@ -55,7 +56,7 @@ The manifest marks leanback and touchscreen as not required so one build serves 
   - Collected: device or other IDs (a random device identifier), app info (version), device model; purpose: app functionality; not shared with third parties for advertising or analytics; processed by service providers (Supabase, Netlify); encrypted in transit; users can request deletion at https://app.churchtvos.com/delete-account.html. No personal info, location, contacts or financial info collected by the TV app.
   - Accounts: created on the web dashboard, not in the app. Provide the deletion URL above where Play asks for an account deletion link.
 - **Government apps / financial features / health:** none.
-- **Foreground service permission (`FOREGROUND_SERVICE_SPECIAL_USE`):** declare it with this description: "Only when the user turns on auto-launch (offered on Amazon Fire OS devices only): a small service keeps a screen-on listener alive so the display app reopens when the TV is switched on. On Google TV the service is never started." **VERIFY:** if Play asks for a video or rejects it, remove the permission and the boot receiver from a Google build (a product flavor) since they are unused on Google TV.
+- **Permissions:** the Play build asks only for internet, network state and wake lock. It has no boot receiver and no foreground service (auto-launch is Fire OS only and lives in the Amazon build), so no special-use declaration is needed.
 - **Target API level:** the app targets API 36. **VERIFY** Play's current minimum.
 
 ## 6. Testing on Google TV
@@ -71,3 +72,9 @@ Checklist on a real Google TV: pairing screen and code, Settings button, hold OK
 - No auto-launch on boot/wake (platform restriction).
 - Google TV home shows the app in the Apps row; users may want to pin it to Favorite apps.
 - The newest Amazon Vega OS sticks still cannot run this APK; Google TV has no such restriction.
+
+## Building
+Google Play: `cd tv-app && JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew bundlePlayRelease assemblePlayRelease` (flavor `play`). Amazon: `bundleStoreRelease assembleStoreRelease` (flavor `store`). Both are signed with the same upload key.
+
+## Test TV
+The Community Room TV at Forward (TCL 98" Google TV, has the Play Store) runs a sideloaded 1.7.0. Once Play App Signing is on, the Play copy is signed by Google's key, so the sideloaded app must be uninstalled first (the TV then needs pairing again).
