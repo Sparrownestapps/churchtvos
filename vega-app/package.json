@@ -1,0 +1,63 @@
+{
+  "name": "church-tv-os-vega",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "tsx --test test/*.test.ts",
+    "typecheck:core": "tsc --noEmit -p tsconfig.core.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "start": "react-native start",
+    "build:release": "react-native build-kepler --build-type Release",
+    "build:debug": "react-native build-kepler --build-type Debug",
+    "build:app": "npm run build:release && npm run build:debug",
+    "vvd:start": "vega virtual-device start --display-res=1920,1080",
+    "vvd:run": "vega run-app build/aarch64-release/church-tv-os-vega_aarch64.vpkg com.churchtvos.tv.main -d VirtualDevice",
+    "device:install": "vega device install-app --packagePath build/armv7-release/church-tv-os-vega_armv7.vpkg",
+    "device:launch": "vega device launch-app --appName com.churchtvos.tv.main"
+  },
+  "dependencies": {
+    "@amazon-devices/expo-asset": "~3.0.0",
+    "@amazon-devices/expo-constants": "~3.0.0",
+    "@amazon-devices/expo-file-system": "~3.0.0",
+    "@amazon-devices/expo-font": "~3.0.0",
+    "@amazon-devices/keplerscript-turbomodule-api": "~1.2.5",
+    "@amazon-devices/react-native-kepler": "~4.0.0+rn0.83.0",
+    "@amazon-devices/react-native-w3cmedia": "~2.3.2",
+    "@react-native-async-storage/async-storage": "npm:@amazon-devices/react-native-async-storage__async-storage@~2.1.0",
+    "expo": "~50.0.0",
+    "qrcode": "1.5.4",
+    "react": "19.2.0",
+    "react-native": "0.83.0"
+  },
+  "overrides": {
+    "@react-native-async-storage/async-storage": "npm:@amazon-devices/react-native-async-storage__async-storage@~2.1.0"
+  },
+  "devDependencies": {
+    "@amazon-devices/kepler-cli-platform": "~0.22.7",
+    "@babel/core": "^7.25.2",
+    "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "^20.0.0",
+    "@react-native/babel-preset": "0.83.0",
+    "@react-native/metro-config": "0.83.0",
+    "@react-native/typescript-config": "0.83.0",
+    "@types/node": "22.10.2",
+    "@types/qrcode": "1.5.5",
+    "@types/react": "^19.2.0",
+    "tsx": "4.19.2",
+    "typescript": "5.8.3"
+  },
+  "engines": {
+    "node": ">=22.14"
+  },
+  "kepler": {
+    "projectType": "application",
+    "appName": "church-tv-os-vega",
+    "targets": [
+      "tv"
+    ],
+    "os": [
+      "vega"
+    ],
+    "api": 0.1
+  }
+}

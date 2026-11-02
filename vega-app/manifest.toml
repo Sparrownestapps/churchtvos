@@ -1,0 +1,49 @@
+# Church TV OS for Vega OS (Fire TV). Check with: vega exec vpt validate manifest.toml
+schema-version = 1
+
+[package]
+# Same id as the Fire OS app (com.churchtvos.tv) so both binaries share one Appstore listing.
+id = "com.churchtvos.tv"
+title = "Church TV OS"
+version = "1.0.0"
+icon = "@image/icon.png"
+
+[os.version]
+min = "2.0"
+target = "2.0"
+
+[components]
+[[components.interactive]]
+id = "com.churchtvos.tv.main"
+runtime-module = "/com.amazon.kepler.runtime.react_native_kepler_4@IReactNativeKepler_0"
+launch-type = "singleton"
+categories = ["com.amazon.category.main"]
+
+[processes]
+[[processes.group]]
+component-ids = ["com.churchtvos.tv.main"]
+
+# Services the media player (w3cmedia) needs, from Amazon's media player setup page and vega-video-sample.
+[wants]
+[[wants.service]]
+id = "com.amazon.inputd.service"
+[[wants.service]]
+id = "com.amazon.network.service"
+[[wants.service]]
+id = "com.amazon.media.server"
+[[wants.service]]
+id = "com.amazon.mediametrics.service"
+[[wants.service]]
+id = "com.amazon.media.playersession.service"
+[[wants.service]]
+id = "com.amazon.mediabuffer.service"
+[[wants.service]]
+id = "com.amazon.mediatransform.service"
+[[wants.service]]
+id = "com.amazon.audio.stream"
+[[wants.service]]
+id = "com.amazon.audio.control"
+[[wants.service]]
+id = "com.amazon.audio.system"
+[[wants.privilege]]
+id = "com.amazon.devconf.privilege.accessibility"
