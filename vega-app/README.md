@@ -4,8 +4,8 @@ Native React Native build of the Church TV OS TV player for Amazon's Vega OS, th
 (Fire TV Stick 4K Select, the 2026 Fire TV Stick HD). The Android app in `tv-app/` can't run there. This app follows `tv-app` 1.7.0
 and talks to the same Supabase device functions. App version 1.0.0; it reports `1.7.0-vega` to the server (see `src/core/config.ts`).
 
-**Status (2026-11-02):** builds with SDK 2.0.13986 (packages for Vega OS 1.2 and 2.0) and runs on the Vega Virtual Device: it registers
-with the server and shows the pairing screen with code and QR. Not yet paired or played content, and never run on a real stick. Earlier checks: It type-checks against the real Vega packages, bundles with Metro for the
+**Status (2026-11-02):** builds with SDK 2.0.13986 (packages for Vega OS 1.2 and 2.0) and runs on the Vega Virtual Device: Keith paired it ("Keith Virtual Test")
+and checked the Kids home screen, playback, the phone remote, Settings and demo mode. Never run on a real stick yet. Earlier checks: It type-checks against the real Vega packages, bundles with Metro for the
 `kepler` platform, and the platform-neutral core passes its tests. It has **never run on the Vega Virtual Device or a real stick**.
 
 ## Layout
