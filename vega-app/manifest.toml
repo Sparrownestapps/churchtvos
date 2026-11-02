@@ -6,12 +6,14 @@ schema-version = 1
 id = "com.churchtvos.tv"
 title = "Church TV OS"
 version = "1.0.0"
+build-number = 1
 icon = "@image/icon.png"
 
 [os.version]
 min = "2.0"
 target = "2.0"
 
+[needs]
 [components]
 [[components.interactive]]
 id = "com.churchtvos.tv.main"
@@ -25,6 +27,8 @@ component-ids = ["com.churchtvos.tv.main"]
 
 # Services the media player (w3cmedia) needs, from Amazon's media player setup page and vega-video-sample.
 [wants]
+[[wants.module]]
+id = "/com.amazon.kepler.net.net_manager@INetManager"
 [[wants.service]]
 id = "com.amazon.inputd.service"
 [[wants.service]]
