@@ -4,9 +4,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Image, View } from 'react-native'
 import { slideLabel, type Slide } from '../core/model'
 import { Remote } from '../core/remote'
-import { localUri, useBack, useKeepAwake, useRemoteKeys, VideoView } from '../platform'
+import { BUNDLED, localUri, useBack, useKeepAwake, useRemoteKeys, VideoView } from '../platform'
 import { KidsCountdown, KidsLyric, NoticeView, Picture, SignView, SongTitleView } from './slides'
-import { BUNDLED } from './bundled'
 
 /** What a player tells remotes about itself. Null means "do not report" (demo mode). */
 export interface PlayerReport { module: string; title: string; refKind?: string; refId?: string }

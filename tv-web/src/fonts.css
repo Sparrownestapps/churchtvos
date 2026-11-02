@@ -1,0 +1,5 @@
+/* Lato and Julius Sans One (SIL OFL), the same files as the Android and Vega apps. */
+@font-face { font-family: 'Lato-Regular'; src: url('../../vega-app/assets/fonts/Lato-Regular.ttf') format('truetype'); font-display: block; }
+@font-face { font-family: 'Lato-Bold'; src: url('../../vega-app/assets/fonts/Lato-Bold.ttf') format('truetype'); font-display: block; }
+@font-face { font-family: 'Lato-Black'; src: url('../../vega-app/assets/fonts/Lato-Black.ttf') format('truetype'); font-display: block; }
+@font-face { font-family: 'JuliusSansOne-Regular'; src: url('../../vega-app/assets/fonts/JuliusSansOne-Regular.ttf') format('truetype'); font-display: block; }

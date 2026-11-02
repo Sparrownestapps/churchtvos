@@ -1,6 +1,6 @@
 // Pieces several screens share: the focusable button, the church logo, branded frames, splash and message screens.
-import React, { useState } from 'react'
-import { Image, Pressable, Text, View } from 'react-native'
+import React, { useEffect, useRef, useState } from 'react'
+import { Image, Platform, Pressable, Text, View } from 'react-native'
 import { logoOn } from '../core/brand'
 import { FONT, GREYSCALE, useBrand, useDp } from './context'
 
@@ -9,9 +9,15 @@ export function TvButton(props: { text: string; onPress: () => void; focus?: boo
   const dp = useDp()
   const brand = useBrand()
   const [focused, setFocused] = useState(false)
+  // TVs move focus to hasTVPreferredFocus themselves; in the web build (LG, Samsung) the button takes focus itself.
+  const ref = useRef<View>(null)
+  useEffect(() => {
+    if (Platform.OS === 'web' && props.focus && !props.disabled) (ref.current as unknown as { focus?: () => void } | null)?.focus?.()
+  }, [props.focus, props.disabled])
   const bg = props.disabled ? 'rgba(27,42,74,0.2)' : focused ? brand.accent : brand.primary
   return (
     <Pressable
+      ref={ref}
       hasTVPreferredFocus={props.focus}
       disabled={props.disabled}
       focusable={!props.disabled}

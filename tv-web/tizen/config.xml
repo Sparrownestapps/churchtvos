@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://churchtvos.com/tv" version="1.0.0" viewmodes="maximized">
+  <tizen:application id="CHTVOS0001.ChurchTVOS" package="CHTVOS0001" required_version="5.5"/>
+  <content src="index.html"/>
+  <feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/>
+  <icon src="icon.png"/>
+  <name>Church TV OS</name>
+  <author href="https://churchtvos.com" email="support@churchtvos.com">Church TV OS</author>
+  <description>Run your church's kids rooms, lobby signs and Sunday slides on this TV.</description>
+  <access origin="*" subdomains="true"/>
+  <tizen:allow-navigation>*</tizen:allow-navigation>
+  <tizen:privilege name="http://tizen.org/privilege/internet"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+  <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
+  <tizen:privilege name="http://developer.samsung.com/privilege/productinfo"/>
+  <tizen:privilege name="http://developer.samsung.com/privilege/network.public"/>
+  <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
+  <tizen:profile name="tv-samsung"/>
+</widget>

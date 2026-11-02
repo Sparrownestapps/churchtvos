@@ -7,6 +7,7 @@ import React, { useEffect, useRef } from 'react'
 import { BackHandler, View } from 'react-native'
 import { useTVEventHandler, type HWEvent } from '@amazon-devices/react-native-kepler'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useFonts } from '@amazon-devices/expo-font'
 import * as FileSystem from '@amazon-devices/expo-file-system'
 import { KeplerVideoSurfaceView, VideoPlayer } from '@amazon-devices/react-native-w3cmedia'
 import { cacheName } from '../core/cacheName'
@@ -250,4 +251,24 @@ export function VideoView(props: {
       />
     </View>
   )
+}
+
+// ---------------------------------------------------------------- fonts and bundled pictures
+
+/** Lato and Julius Sans One, as in the Android app (assets/fonts, loaded at start as Amazon's expo-font page describes). */
+export function useAppFonts(): boolean {
+  const [loaded] = useFonts({
+    'Lato-Regular': require('../../assets/fonts/Lato-Regular.ttf'),
+    'Lato-Bold': require('../../assets/fonts/Lato-Bold.ttf'),
+    'Lato-Black': require('../../assets/fonts/Lato-Black.ttf'),
+    'JuliusSansOne-Regular': require('../../assets/fonts/JuliusSansOne-Regular.ttf'),
+  })
+  return loaded
+}
+
+/** Pictures shipped inside the app for demo mode (the same ones as the Android app). */
+export const BUNDLED: Record<string, number> = {
+  welcome: require('../../assets/demo/demo_welcome.png'),
+  events: require('../../assets/demo/demo_events.png'),
+  info: require('../../assets/demo/demo_info.png'),
 }

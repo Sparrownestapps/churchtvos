@@ -12,8 +12,7 @@ import { TvSync, type MediaStore, type TvUiState } from './core/sync'
 import { formatWhen, isoMillis } from './core/time'
 import type { Deck, DeviceState, OverrideInfo, Playlist } from './core/types'
 import { fitFontSize } from './core/textFit'
-import { useFonts } from '@amazon-devices/expo-font'
-import { createPlatform, useRemoteKeys } from './platform'
+import { createPlatform, useAppFonts, useRemoteKeys } from './platform'
 import { Black, MessageScreen, SplashScreen } from './ui/common'
 import { BrandProvider, FONT, NdiContext, TimeZoneContext, useDp, useScreen } from './ui/context'
 import { HomeScreen } from './ui/HomeScreens'
@@ -291,13 +290,7 @@ function Root({ sync, media }: { sync: TvSync; media: MediaStore }) {
 }
 
 export default function App() {
-  // Lato and Julius Sans One, as in the Android app (assets/fonts, loaded at start as Amazon's expo-font page describes).
-  const [fontsLoaded] = useFonts({
-    'Lato-Regular': require('../assets/fonts/Lato-Regular.ttf'),
-    'Lato-Bold': require('../assets/fonts/Lato-Bold.ttf'),
-    'Lato-Black': require('../assets/fonts/Lato-Black.ttf'),
-    'JuliusSansOne-Regular': require('../assets/fonts/JuliusSansOne-Regular.ttf'),
-  })
+  const fontsLoaded = useAppFonts()
   const [boot, setBoot] = useState<{ sync: TvSync; media: MediaStore } | null>(null)
   useEffect(() => {
     let sync: TvSync | null = null
