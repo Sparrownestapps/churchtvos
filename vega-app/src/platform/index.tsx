@@ -4,12 +4,12 @@
 // Checked against the Vega SDK 2.0 docs (2026-11-02). Items marked VERIFY are not confirmed by the docs and need a first
 // run on a Fire TV Stick 4K Select (see README "Never run on a real device").
 import React, { useEffect, useRef } from 'react'
-import { BackHandler, View } from 'react-native'
+import { AppState, BackHandler, Image, View } from 'react-native'
 import { useTVEventHandler, type HWEvent } from '@amazon-devices/react-native-kepler'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useFonts } from '@amazon-devices/expo-font'
 import * as FileSystem from '@amazon-devices/expo-file-system'
-import { KeplerVideoSurfaceView, VideoPlayer } from '@amazon-devices/react-native-w3cmedia'
+import { AudioPlayer, KeplerVideoSurfaceView, VideoPlayer } from '@amazon-devices/react-native-w3cmedia'
 import { cacheName } from '../core/cacheName'
 import { REPORTED_APP_VERSION } from '../core/config'
 import type { KeyValue, MediaStore, Platform } from '../core/sync'
@@ -156,10 +156,49 @@ export function useBack(handler: () => boolean, enabled = true) {
 }
 
 /**
- * Vega has no API to keep the screen on (release notes). The screensaver starts after 5 minutes without remote input.
- * VERIFY whether playing video holds it off. Kept as a hook so a future API slots in without touching the players.
+ * Vega has no API to keep the screen on, and no "Never" screensaver setting (Amazon staff, Amazon Developer Community,
+ * 2026). It only holds the screensaver off during an audio or video playback session. So while a player shows pictures,
+ * signs or slides, this loops a silent MP3 through an AudioPlayer (the community stopgap, thread 29861). It is unofficial:
+ * the silent player takes media-control focus (Alexa play/pause won't reach the app), and on some 4K Select units the
+ * display has still been reported to switch off. While a video plays, the silence pauses (VideoView counts them).
  */
-export function useKeepAwake() {}
+const SILENCE = require('../../assets/raw/silence.mp3')
+let silent: AudioPlayer | null = null
+let starting: Promise<void> | null = null
+let holders = 0
+/** Videos playing right now; their own playback session holds the screensaver off, so the silence pauses. */
+let videosPlaying = 0
+
+async function startSilence() {
+  if (silent || starting) return starting ?? undefined
+  starting = (async () => {
+    const p = new AudioPlayer()
+    await p.initialize()
+    p.loop = true
+    // The player wants a plain path, not file:// (community stopgap).
+    p.src = Image.resolveAssetSource(SILENCE).uri.replace(/^file:\/\//, '')
+    silent = p
+    if (holders > 0 && videosPlaying === 0 && AppState.currentState === 'active') await p.play()
+  })().catch(() => { silent = null }).finally(() => { starting = null })
+  return starting
+}
+
+function syncSilence() {
+  if (!silent) return
+  if (holders > 0 && videosPlaying === 0 && AppState.currentState === 'active') void silent.play().catch(() => undefined)
+  else silent.pause()
+}
+
+AppState.addEventListener('change', syncSilence)
+
+export function useKeepAwake(active = true) {
+  useEffect(() => {
+    if (!active) return
+    holders++
+    void startSilence().then(syncSilence)
+    return () => { holders--; syncSilence() }
+  }, [active])
+}
 
 // ---------------------------------------------------------------- video and audio
 
@@ -231,8 +270,12 @@ export function VideoView(props: {
   useEffect(() => {
     const p = player.current
     if (!p || !ready) return
-    if (props.paused || silent) p.pause()
-    else void p.play().catch(() => cb.current.onError?.())
+    if (props.paused || silent) { p.pause(); return }
+    void p.play().catch(() => cb.current.onError?.())
+    if (props.audioOnly) return
+    videosPlaying++
+    syncSilence()
+    return () => { videosPlaying--; syncSilence() }
   }, [props.paused, silent, ready])
 
   useEffect(() => {

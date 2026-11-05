@@ -12,7 +12,7 @@ import { TvSync, type MediaStore, type TvUiState } from './core/sync'
 import { formatWhen, isoMillis } from './core/time'
 import type { Deck, DeviceState, OverrideInfo, Playlist } from './core/types'
 import { fitFontSize } from './core/textFit'
-import { createPlatform, useAppFonts, useRemoteKeys } from './platform'
+import { createPlatform, useAppFonts, useKeepAwake, useRemoteKeys } from './platform'
 import { Black, MessageScreen, SplashScreen } from './ui/common'
 import { BrandProvider, FONT, NdiContext, TimeZoneContext, useDp, useScreen } from './ui/context'
 import { HomeScreen } from './ui/HomeScreens'
@@ -245,6 +245,9 @@ function Root({ sync, media }: { sync: TvSync; media: MediaStore }) {
     }
     return false
   })
+
+  // Every screen stays awake (pairing, home screens, black signage gaps), as the Android app's keep-screen-on does.
+  useKeepAwake()
 
   const zone = device?.timezone ?? 'America/Toronto'
   const override = device?.override
