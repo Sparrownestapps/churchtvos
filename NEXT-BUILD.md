@@ -94,7 +94,7 @@ which really schedules the whole room.
   label it as its room.
 - When Signage is chosen with a room selected, say it will add one slot for each TV in the room, or suggest a group.
 - Help text: two TVs in one room that need different Kids content → make them two rooms.
-- Decision for Keith: confirm keeping both models (recommended).
+- **Decided 2026-11-06 (Keith): keep both models.**
 
 ## 10. Bug: messages show landscape on portrait TVs (Android)
 Found 2026-11-06.
