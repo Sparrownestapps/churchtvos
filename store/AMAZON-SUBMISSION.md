@@ -23,7 +23,7 @@ Everything below is ready to paste. Console labels change over time; match them 
 - **Title:** Church TV OS
 - **Package name:** com.churchtvos.tv (permanent once published)
 - **Price:** Free. No in-app purchases.
-- **Category:** Lifestyle (alternatives: Productivity / Business)
+- **Category:** Business (Amazon rejected the 1.7.0 update on 2026-10-30 for being under Utilities: "incorrectly categorized as Utilities instead of Business")
 - **Target:** Fire TV only. Deselect phones and tablets if offered.
 - **Device support:** whatever the console computes for an Android/Fire OS APK. Expect Fire OS devices only (newer Vega OS sticks cannot run it).
 - **Keywords:** church, signage, digital signage, kids, classroom, display, announcements, lyrics, countdown

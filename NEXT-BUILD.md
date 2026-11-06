@@ -1,3 +1,114 @@
+# Next build: TV screen changes (Android 1.7.1, Vega 1.0.1, LG/Samsung)
+
+Requested by Keith on 2026-11-05. App changes only: the server already sends everything needed, so no dashboard or database work.
+Each kind of TV needs the new build installed (Android: store update plus reinstall on the sideloaded TCLs; Vega: rebuild and reinstall; LG/Samsung: next package).
+
+## 1. Show the TV name on the Kids screen (and Slides)
+- **Today:** the Kids home screen shows the site (small caps) and the room (large). The TV's own name is missing.
+- **Change:** add the screen name as a third line under the room, smaller and muted, so it reads site, then room, then TV name.
+  Hide the line when the TV has no name. The Slides home screen shares the same header, so give it the same line.
+- **Data:** already in device state (`screen.name`), and already shown in Settings.
+- **Where:** Android `tv-app/.../HomeScreen.kt` and `SlidesModule.kt` (pass `device.screen.name`); Vega and LG/Samsung
+  `vega-app/src/ui/HomeScreens.tsx` plus the two call sites in `vega-app/src/App.tsx` (lines ~79 and ~133).
+- **Check:** landscape and portrait, a long TV name (should shrink or truncate, never wrap into the playlist card).
+
+## 2. Bigger church logo at the top
+- **Today:** the logo box is 300 x 72 (dp), top-left, on the Kids home screen and the branded frames.
+- **Change:** make it noticeably bigger, about 480 x 120 in landscape (portrait similar, kept within the screen width),
+  still inside the TV-safe margins. Adjust the spacing below it so the playlist card doesn't get pushed off screen.
+- **Where:** `OrgLogo` in Android `tv-app/.../HomeScreen.kt` and Vega/web `vega-app/src/ui/common.tsx`.
+- **Check:** a wide logo, a tall/square logo, the name-only fallback (no logo set), and the pairing and splash screens
+  still look right.
+
+## 3. Slides: "Loop" option on video slides
+Requested 2026-11-06.
+- **Today:** a video slide plays once, then moves to the next slide. Only video *backgrounds* loop, and they're always muted.
+- **Change:** add **Loop** to video slides. **Off by default**, which keeps today's behaviour. When it's on, the video repeats,
+  with sound if audio is on, until someone presses Next.
+- **Data:** `MediaSlide.loop?: boolean` (videos only; missing = false). Older TVs ignore the field and play once.
+- **Dashboard:** a "Loop until Next" checkbox on video slides in the deck editor. Show "loops" on the slide in the slide list.
+- **TV (Android, Vega, LG/Samsung):** when `loop` is true, set the player to repeat and don't advance on end (Android:
+  `repeatMode = REPEAT_MODE_ONE` and skip the `STATE_ENDED -> next()` in `SlidesPlayer.kt`; Vega/web: the `loop` prop on `VideoView`).
+- **Check:** a looping video with sound; Next and Previous still work; a looping video as the last slide of a deck that loops.
+
+## 4. Slides: background audio for a deck
+Requested 2026-11-06.
+- **Change:** an optional music track for a whole deck that plays under the slides. Audio file from the media library (same as countdown audio).
+- **Settings (deck editor):** track, volume, and **At the end of the track: Stop (default) / Loop**. Plus a fade-out of about 2 s when
+  the deck ends or the TV leaves Slides.
+- **Data (proposal):** `decks.audio jsonb` = `{ media_id, url, volume, loop: false }`, null = no music. One migration;
+  include the audio in the TV's download list so it plays offline.
+- **Rules to settle while building:**
+  - Video slides with sound and countdowns with their own audio: duck (lower) the deck music, or pause it, while they play.
+    Recommend **pause and resume**.
+  - The track keeps playing across slide changes (doesn't restart on each slide).
+  - "Audio off" from the remote mutes it too.
+- **TV:** a second audio player in `SlidesPlayer` (Android) and the shared Slides player (Vega and LG/Samsung).
+  Vega has no volume control, so the volume setting applies on Android and LG/Samsung only.
+- **Check:** stop vs loop, offline playback, pause/resume around a video with sound and a countdown with audio, leaving the deck mid-track.
+
+## 5. Phone app: more settings when pairing a TV
+Requested 2026-11-06. iPhone app (`apple/ChurchTVRemote`, "Pair a TV" sheet in `App/Pairing/PairTVSheet.swift`).
+- **Today:** the pair sheet asks for the code, location and name. Everything else is set afterwards on the screen's detail page.
+- **Add to the pair sheet, all optional, with the current defaults pre-filled:**
+  - **Orientation:** Landscape (default) / Portrait / Portrait (flipped).
+  - **Default module:** the church's modules plus Off (default: what a new screen gets today).
+  - **Group:** None (default) or one of the church's groups.
+  - **Signage default playlist:** shown only when the default module is Signage. None or a signage playlist,
+    sorted and searchable the same way as the dashboard's new playlist picker (site first, then folders).
+  - Put these under an "More settings" section that's collapsed by default, so the quick pair stays one screen.
+- **How:** `claim_screen` already returns the new screen's id. Right after it succeeds, save the chosen settings to that screen
+  with the same update the screen detail page uses (`OperationsService`). No database change.
+  If that second save fails, the TV is still paired: say "Paired, but some settings didn't save" and open the screen's detail page.
+- **Same options in the dashboard:** add the same "More settings" to the web "Pair a TV" form (`dashboard/src/pages/ScreensPage.tsx`)
+  and the phone-friendly pair page (`PairPage.tsx`), so all three ways of pairing match. Dashboard only, so it can go out before the TV build.
+- **Release:** a new iPhone build through TestFlight / the App Store. TVs don't need updating for this item.
+
+## 6. iPhone app: edit a screen
+Requested 2026-11-06. The Mac app already edits screens (`ChurchTVMac/App/Native/ScreensSection.swift`); the iPhone app can't.
+- Add **Edit** to each screen in the Screens tab (`ChurchTVRemote/App/ScreensView.swift`): name, room, orientation, default module,
+  group, signage default playlist (only when the default is Signage), autoplay, and Unpair (with a confirm).
+- Share one form with item 5's "More settings" when pairing, so pairing and editing match. Reuse the update the Mac app uses.
+- Owners and admins edit; everyone else sees the details read-only.
+
+## 7. Bug: iPhone "Today" schedule misses Signage
+Found 2026-11-06 (screenshot: Cameron Hall (Maps) shows "Nothing scheduled today" though it has a daily 8:00-10:00 Maps slot).
+- **Cause:** `SupabaseService.schedule(...)` in `ChurchTVCore` loads Kids and Slides one-offs and repeats plus module switches,
+  but never `signage_slots`, and ignores a screen's default signage content.
+- **Fix:** load `signage_slots` for today (weekly days, plus the dated start/end range) for each screen and its group, with playlist names;
+  add an "Otherwise: <default content>" line when a screen has a signage default playlist; sort entries by start time.
+- Same check for the Mac app if it uses the same function.
+
+## 8. Folders in the iPhone and Mac apps
+Requested 2026-11-06.
+- Wherever the apps list Kids playlists, Signage playlists or Slides decks (Play now, scheduling, Create), group them by the website's
+  folders (`content_folders`, `folder_id` on each), hide archived ones, and add search.
+- Put "On this TV" and "Recently used" at the top, the same as the dashboard's new playlist picker (`dashboard/src/calendar/pickerGroups.ts`
+  has the ordering rules to copy).
+
+## 9. Make room vs TV scheduling clear (dashboard and apps)
+Discussed 2026-11-06. Keep both models: **Kids and Slides are scheduled per room** (every TV in the room shows the same thing),
+**Signage and module switches per TV or group**. The confusion is that the calendar lets you pick a TV and then schedule Kids for it,
+which really schedules the whole room.
+- When Kids or Slides is chosen, say so plainly: "This plays on every TV in Preschool (2 TVs)." When a single TV is selected,
+  label it as its room.
+- When Signage is chosen with a room selected, say it will add one slot for each TV in the room, or suggest a group.
+- Help text: two TVs in one room that need different Kids content → make them two rooms.
+- Decision for Keith: confirm keeping both models (recommended).
+
+## 10. Bug: messages show landscape on portrait TVs (Android)
+Found 2026-11-06.
+- **Cause:** in `tv-app/.../MainActivity.kt`, `MessageOverlay(message)` is drawn after (outside) the `Oriented(...)` wrapper,
+  so it never rotates. Vega and LG/Samsung already draw it inside the wrapper.
+- **Fix:** move `MessageOverlay` inside `Oriented`. Check on a portrait and a flipped-portrait screen, with short and long messages.
+
+## Install after building
+- TCL TVs (172.16.51.242, .244, .76): reinstall over adb.
+- VEGA stick (192.168.0.246): rebuild with `vega-app/tools/build.sh` and reinstall.
+- Fire TV / Google Play: submit 1.7.1 as an update.
+
+---
+
 # Next build: Church TV OS 1.1.0
 
 Written 2026-10-14. Version 1.0.0 (versionCode 1) is with Amazon for review (estimated approval by 2026-10-19). Everything here needs a new TV build, so the plan is to let 1.0.0 get approved, then ship these together as **1.1.0** (versionCode 2) through Amazon's update review. Fixed builds can be sideloaded to the test TV (172.16.51.193) in the meantime.
