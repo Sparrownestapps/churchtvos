@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { useApp } from '../context'
 import { supabase } from '../supabase'
 import { DayPicker } from '../ScheduleRules'
-import { MODULE_NAME, attempt, daysLabel, must, unarchived } from '../lib'
+import { MODULE_NAME, attempt, daysLabel, must } from '../lib'
 import type { Block, Domain, NamedRow, PanelState, Prefill, ResolvedTarget } from '../calendarTypes'
 import { DOMAINS, exceptionRow, locationRuns } from './domain'
 import type { Screen, ScreenGroup, ScreenSchedule, ScreenModule, SignageSlot } from '../types'
 import { RotationEditor } from './parts'
+import PlaylistPicker from './PlaylistPicker'
 import { DAY_NAMES, addDays, fmtClock, fmtDay, fromWall, hm, safeTz, toWall, wallOf, weekStartOf, ymd } from './tz'
 import '../calendar.css'
 
@@ -236,14 +237,7 @@ export function CreatePanel({ ctx, state, onClose }: { ctx: CalCtx; state: Extra
       ) : (
         <label className="field">
           <span>{dom && repeat === 'weekly' ? `Week 1 ${dn.item}` : dom === 'slides' ? 'Deck' : 'Playlist'}</span>
-          <select value={playlistId} onChange={(e) => setPlaylistId(e.target.value)}>
-            <option value="">Choose…</option>
-            {playlistsForType.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <PlaylistPicker kind={type === 'kids' ? 'kids' : type === 'slides' ? 'slides' : 'signage'} items={playlistsForType} value={playlistId} onChange={setPlaylistId} />
         </label>
       )}
 
@@ -429,13 +423,7 @@ function OneOffEdit({ ctx, block, done }: { ctx: CalCtx; block: Extract<Block, {
       </p>
       <label className="field">
         <span>{block.domain === 'slides' ? 'Deck' : 'Playlist'}</span>
-        <select value={playlistId} disabled={ro} onChange={(e) => setPlaylistId(e.target.value)}>
-          {itemList.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+        <PlaylistPicker kind={block.domain} items={itemList} value={playlistId} disabled={ro} onChange={setPlaylistId} />
       </label>
       <div className="row wrap">
         <label className="field">
@@ -511,13 +499,7 @@ function SeriesOccEdit({ ctx, block, done }: { ctx: CalCtx; block: Extract<Block
           <div className="row wrap">
             <label className="field grow">
               <span>Play a different {dn.item}</span>
-              <select value={playlistId} onChange={(e) => setPlaylistId(e.target.value)}>
-                {itemList.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              <PlaylistPicker kind={block.domain} items={itemList} value={playlistId} onChange={setPlaylistId} />
             </label>
             <button
               className="btn align-end"
@@ -606,13 +588,7 @@ function RuleEdit({ ctx, block, done }: { ctx: CalCtx; block: Extract<Block, { k
       {isSlot ? (
         <label className="field">
           <span>Playlist</span>
-          <select value={playlistId} disabled={ro} onChange={(e) => setPlaylistId(e.target.value)}>
-            {unarchived(ctx.signagePlaylists).map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <PlaylistPicker kind="signage" items={ctx.signagePlaylists} value={playlistId} disabled={ro} onChange={setPlaylistId} />
         </label>
       ) : (
         <label className="field">

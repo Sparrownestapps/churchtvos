@@ -200,3 +200,20 @@
 .cal-lg-deckser { background: var(--cal-deckser-bg); border-color: var(--cal-deckser-bd); }
 .cal-band-slides { background: var(--cal-band-slides); }
 .cal-series-heading { margin: 8px 0 0; color: var(--primary); }
+
+/* Playlist / deck picker */
+.picker { position: relative; min-width: 0; }
+.picker-button { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: inherit; font: inherit; cursor: pointer; }
+.picker-button:disabled { opacity: 0.6; cursor: default; }
+.picker-button > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-caret { color: var(--grey); }
+.picker-pop { position: absolute; z-index: 50; left: 0; right: 0; top: calc(100% + 4px); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18); padding: 8px; display: grid; gap: 6px; }
+.picker-pop input[type='search'] { width: 100%; }
+.picker-list { max-height: 340px; overflow-y: auto; }
+.picker-title { font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--grey); padding: 8px 8px 4px; }
+.picker-option { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border: 0; background: none; color: inherit; font: inherit; padding: 7px 8px; border-radius: 6px; cursor: pointer; }
+.picker-option.active { background: color-mix(in srgb, var(--primary) 12%, transparent); }
+.picker-option.chosen { font-weight: 700; }
+.picker-check { width: 14px; color: var(--primary); flex: none; }
+.picker-empty { padding: 8px; }
+.picker-sites { display: flex; align-items: center; gap: 8px; font-size: 14px; padding: 6px 8px 2px; border-top: 1px solid var(--line); }

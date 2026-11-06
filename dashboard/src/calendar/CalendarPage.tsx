@@ -17,6 +17,8 @@ const SlidesSchedulePage = lazy(() => import('../slides/SlidesSchedulePage'))
 import { ChoiceDialog, Drawer, type DialogState } from './parts'
 import { CreatePanel, EditPanel, type CalCtx } from './CalendarPanel'
 import SeriesManager from './SeriesManager'
+import { PickerContext, type PickerContextValue, type PickerKind } from './PlaylistPicker'
+import type { PickerFolder } from './pickerGroups'
 import { EmptyState } from '../ui'
 import CopyWeek from './CopyWeek'
 import { DAY_NAMES, addDays, browserTz, endToRule, fromWall, hm, hourDiff, ruleEnd, safeTz, toWall, tzAbbr, wallOf, weekStartOf, ymd } from './tz'
@@ -130,16 +132,17 @@ function CalendarView() {
 
   const base = useLoad(async () => {
     const none = Promise.resolve({ data: [], error: null })
-    const [screens, groups, kp, sp, slots, rules, series, decks, dseries] = await Promise.all([
+    const [screens, groups, kp, sp, slots, rules, series, decks, dseries, folders] = await Promise.all([
       supabase.from('screens').select('*').eq('organization_id', org.id).order('name'),
       supabase.from('screen_groups').select('*').eq('organization_id', org.id).order('name'),
-      kidsOn ? supabase.from('playlists').select('id, name, site_id, archived_at').eq('organization_id', org.id).order('name') : none,
-      signageOn ? supabase.from('signage_playlists').select('id, name, site_id, archived_at').eq('organization_id', org.id).order('name') : none,
+      kidsOn ? supabase.from('playlists').select('id, name, site_id, archived_at, folder_id').eq('organization_id', org.id).order('name') : none,
+      signageOn ? supabase.from('signage_playlists').select('id, name, site_id, archived_at, folder_id').eq('organization_id', org.id).order('name') : none,
       signageOn ? supabase.from('signage_slots').select('*').eq('organization_id', org.id) : none,
       supabase.from('screen_schedules').select('*').eq('organization_id', org.id),
       kidsOn ? supabase.from('kids_series').select('*').eq('organization_id', org.id) : none,
-      slidesOn ? supabase.from('decks').select('id, name, site_id, archived_at').eq('organization_id', org.id).order('name') : none,
+      slidesOn ? supabase.from('decks').select('id, name, site_id, archived_at, folder_id').eq('organization_id', org.id).order('name') : none,
       slidesOn ? supabase.from('deck_series').select('*').eq('organization_id', org.id) : none,
+      supabase.from('content_folders').select('id, parent_id, name, site_id, module').eq('organization_id', org.id),
     ])
     return {
       screens: must(screens) as Screen[],
@@ -149,6 +152,7 @@ function CalendarView() {
       slots: must(slots) as SignageSlot[],
       rules: must(rules) as ScreenSchedule[],
       decks: must(decks) as NamedRow[],
+      folders: must(folders) as (PickerFolder & { module: PickerKind })[],
       series: {
         kids: (must(series) as unknown[]).map((r) => normSeries('kids', r)),
         slides: (must(dseries) as unknown[]).map((r) => normSeries('slides', r)),
@@ -440,6 +444,22 @@ function CalendarView() {
     calRef.current?.getApi().unselect()
   }, [])
 
+  // For the playlist picker: what's already scheduled on the screen / group / room being shown, and its sites.
+  const picker = useMemo<PickerContextValue | null>(() => {
+    if (!b || !target) return null
+    const inUse: Record<PickerKind, Set<string>> = { kids: new Set(), signage: new Set(), slides: new Set() }
+    for (const sl of b.slots) if ((sl.screen_id && target.screenIds.includes(sl.screen_id)) || (sl.group_id && target.groupIds.includes(sl.group_id))) inUse.signage.add(sl.playlist_id)
+    for (const s of b.screens) if (target.screenIds.includes(s.id) && s.signage_default_playlist_id) inUse.signage.add(s.signage_default_playlist_id)
+    for (const d of ['kids', 'slides'] as Domain[]) {
+      for (const se of b.series[d]) if (target.locationIds.includes(se.location_id)) se.playlist_ids.forEach((id) => inUse[d].add(id))
+      for (const sc of dated.data?.schedules[d] ?? []) if (target.locationIds.includes(sc.location_id)) inUse[d].add(sc.playlist_id)
+    }
+    const siteIds = [...new Set(target.locationIds.map((id) => locations.find((l) => l.id === id)?.site_id).filter((x): x is string => !!x))]
+    const folders = { kids: [], signage: [], slides: [] } as Record<PickerKind, PickerFolder[]>
+    for (const f of b.folders) folders[f.module]?.push(f)
+    return { orgId: org.id, folders, inUse, siteIds }
+  }, [b, target, dated.data, locations, org.id])
+
   const ctx: CalCtx | null =
     b && target
       ? { tz, target, screens: b.screens, groups: b.groups, kidsPlaylists: b.kidsPlaylists, decks: b.decks, signagePlaylists: b.signagePlaylists, slots: b.slots, rules: b.rules, reload: reloadAll, openPanel }
@@ -585,6 +605,7 @@ function CalendarView() {
   const panelTitle = panel?.mode === 'create' ? 'Add to the calendar' : panel?.mode === 'series' ? 'Repeating schedules' : panel?.mode === 'edit' ? 'Edit' : ''
 
   return (
+    <PickerContext.Provider value={picker}>
     <div className="stack-sm">
       <div className="cal-bar">
         <label className="field cal-target">
@@ -778,5 +799,6 @@ function CalendarView() {
       )}
       {dialog && <ChoiceDialog dialog={dialog} close={() => setDialog(null)} />}
     </div>
+    </PickerContext.Provider>
   )
 }

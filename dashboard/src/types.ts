@@ -68,7 +68,7 @@ export type Entitlement = {
 
 export type Site = { id: string; organization_id: string; name: string; timezone: string }
 /** `modules` tags which applications use the location (it may carry several, or none). */
-export type Location = { id: string; organization_id: string; site_id: string; name: string; modules: Module[] }
+export type Location = { id: string; organization_id: string; site_id: string; name: string; modules: Module[]; area?: string | null }
 
 export type Media = {
   id: string

@@ -7,19 +7,21 @@ import { EmptyState, ModuleChips } from '../ui'
 
 const zones: string[] = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
 
-type LocationEdit = { key: string; id: string; name: string; modules: Module[] }
+type LocationEdit = { key: string; id: string; name: string; area: string; modules: Module[] }
 
 function AddLocation({ site, preset }: { site: Site; preset: Module }) {
   const { org, moduleName, reloadOrg } = useApp()
   const [name, setName] = useState('')
+  const [area, setArea] = useState('')
   const [tags, setTags] = useState<Module[]>([preset])
   const add = async () => {
     if (!name.trim()) return
     const ok = await attempt(async () =>
-      must(await supabase.from('locations').insert({ organization_id: org.id, site_id: site.id, name: name.trim(), modules: tags })),
+      must(await supabase.from('locations').insert({ organization_id: org.id, site_id: site.id, name: name.trim(), area: area.trim() || null, modules: tags })),
     )
     if (ok) {
       setName('')
+      setArea('')
       reloadOrg()
     }
   }
@@ -33,6 +35,13 @@ function AddLocation({ site, preset }: { site: Site; preset: Module }) {
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && add()}
         />
+        <input
+          list={`areas-${site.id}`}
+          placeholder="Area (optional), e.g. Kids Wing"
+          value={area}
+          onChange={(e) => setArea(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && add()}
+        />
         <button className="btn" onClick={add}>
           Add
         </button>
@@ -42,6 +51,18 @@ function AddLocation({ site, preset }: { site: Site; preset: Module }) {
         <ModuleChips value={tags} onChange={setTags} />
       </div>
     </div>
+  )
+}
+
+/** Areas already used at a site, offered as suggestions so the same area is spelled the same way. */
+function AreaList({ site, locations }: { site: Site; locations: Location[] }) {
+  const areas = [...new Set(locations.filter((l) => l.site_id === site.id && l.area).map((l) => l.area as string))].sort()
+  return (
+    <datalist id={`areas-${site.id}`}>
+      {areas.map((a) => (
+        <option key={a} value={a} />
+      ))}
+    </datalist>
   )
 }
 
@@ -74,8 +95,8 @@ export default function SitesPage() {
 
   async function saveLocation() {
     if (!editingLocation || !editingLocation.name.trim()) return
-    const { id, name, modules: tags } = editingLocation
-    if (await run(async () => must(await supabase.from('locations').update({ name: name.trim(), modules: tags }).eq('id', id)))) {
+    const { id, name, area, modules: tags } = editingLocation
+    if (await run(async () => must(await supabase.from('locations').update({ name: name.trim(), area: area.trim() || null, modules: tags }).eq('id', id)))) {
       setEditingLocation(null)
     }
   }
@@ -101,6 +122,15 @@ export default function SitesPage() {
             <span>Name</span>
             <input value={editingLocation.name} onChange={(e) => setEditingLocation({ ...editingLocation, name: e.target.value })} />
           </label>
+          <label className="field">
+            <span>Area (optional)</span>
+            <input
+              list={`areas-${l.site_id}`}
+              placeholder="e.g. Kids Wing"
+              value={editingLocation.area}
+              onChange={(e) => setEditingLocation({ ...editingLocation, area: e.target.value })}
+            />
+          </label>
           <div className="field">
             <span>Used by</span>
             <ModuleChips value={editingLocation.modules} onChange={(v) => setEditingLocation({ ...editingLocation, modules: v })} />
@@ -119,6 +149,7 @@ export default function SitesPage() {
     return (
       <div key={key} className="row spread list-row wrap-sm">
         <span>
+          {l.area && <span className="muted">{l.area} · </span>}
           {l.name}
           {others.map((m) => (
             <span key={m} className="badge">
@@ -128,7 +159,7 @@ export default function SitesPage() {
         </span>
         {isAdmin && (
           <span className="row">
-            <button className="link" onClick={() => setEditingLocation({ key, id: l.id, name: l.name, modules: l.modules })}>
+            <button className="link" onClick={() => setEditingLocation({ key, id: l.id, name: l.name, area: l.area ?? '', modules: l.modules })}>
               Edit
             </button>
             <button className="link danger" onClick={() => removeLocation(l)}>
@@ -153,6 +184,7 @@ export default function SitesPage() {
         const unassigned = here.filter((l) => !l.modules.some((m) => modules.some((d) => d.id === m)))
         return (
           <div key={site.id} className="card stack-sm">
+            <AreaList site={site} locations={locations} />
             <div className="row spread wrap-sm">
               <div>
                 <h3>{site.name}</h3>

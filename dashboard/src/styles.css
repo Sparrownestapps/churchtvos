@@ -434,3 +434,20 @@ tr.faded td { opacity: 0.45; }
 .ndi-preview { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; aspect-ratio: 16 / 9; max-width: 360px; width: 100%; padding: 12px; border-radius: 10px; background: #0b0f1a; color: #fff; font-size: 13px; }
 .ndi-preview .muted { color: rgba(255, 255, 255, 0.7); font-size: 12px; }
 .ndi-badge { font-weight: 800; letter-spacing: 2px; font-size: 12px; border: 1.5px solid currentColor; border-radius: 4px; padding: 1px 8px; }
+
+/* Screens page: problems banner, filters, and site / area / room grouping. */
+.problems { align-items: center; gap: 10px; border-left: 4px solid var(--warn); }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 12px; font-weight: 700; cursor: pointer; color: inherit; font: inherit; font-size: 14px; }
+.chip.warn { border-color: var(--warn); color: var(--warn); }
+.screen-filters { align-items: center; }
+.screen-filters input[type='search'] { min-width: 200px; }
+.screen-site { display: grid; gap: 12px; }
+.screen-area { display: grid; gap: 10px; padding-left: 14px; border-left: 2px solid var(--line); }
+.screen-room { display: grid; gap: 10px; }
+.group-heading { display: flex; align-items: baseline; gap: 10px; background: none; border: 0; padding: 4px 0; cursor: pointer; color: inherit; text-align: left; font: inherit; }
+.group-heading h2, .group-heading h3, .group-heading h4 { margin: 0; }
+.group-heading.site h2 { font-size: 22px; }
+.group-heading.area h3 { font-size: 18px; }
+.group-heading.room h4 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--grey); }
+.group-heading .caret { width: 14px; color: var(--grey); }
+.warn-text { color: var(--warn); }

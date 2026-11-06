@@ -1,7 +1,8 @@
 import { useEffect, type ReactNode } from 'react'
-import { moveItem, unarchived } from '../lib'
+import { moveItem } from '../lib'
 import type { NamedRow } from '../calendarTypes'
 import '../calendar.css'
+import PlaylistPicker from './PlaylistPicker'
 
 /** Side panel on desktop, bottom sheet on phones. */
 export function Drawer({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
@@ -90,14 +91,13 @@ export function RotationEditor({
             <span>{nameOf(id)}</span>
           ) : (
             <>
-              <select className="grow" value={id} onChange={(e) => onChange(value.map((v, j) => (j === i ? e.target.value : v)))}>
-                <option value="">Choose…</option>
-                {unarchived(playlists).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              <PlaylistPicker
+                className="grow"
+                kind={itemName === 'deck' ? 'slides' : 'kids'}
+                items={playlists}
+                value={id}
+                onChange={(next) => onChange(value.map((v, j) => (j === i ? next : v)))}
+              />
               <button type="button" className="icon" aria-label="Move up" disabled={i === 0} onClick={() => onChange(moveItem(value, i, -1))}>
                 ↑
               </button>

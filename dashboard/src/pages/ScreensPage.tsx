@@ -8,6 +8,7 @@ import ScheduleRules from '../ScheduleRules'
 import { friendlyPairError } from '../pairLink'
 import { claimFailedAfterCreate } from '../pairRoom'
 import { PairLocationField, usePairTarget } from '../PairRoomFields'
+import { NO_FILTER, groupScreens, isOlderApp, isOnline, type Filter, type StatusFilter } from '../screenGroups'
 
 const ORIENTATION: Record<Orientation, string> = {
   landscape: 'Landscape',
@@ -15,7 +16,6 @@ const ORIENTATION: Record<Orientation, string> = {
   portrait_flipped: 'Portrait (flipped)',
 }
 
-const isOnline = (s: Screen) => !!s.last_seen_at && Date.now() - new Date(s.last_seen_at).getTime() < 90_000
 
 export default function ScreensPage() {
   const { org, isAdmin, hasModule } = useApp()
@@ -84,6 +84,10 @@ function ScreensTab({ data, reload, isAdmin }: TabProps) {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
+  const { sites, locations, mySites } = useApp()
+  const [pairing, setPairing] = useState(false)
+  const [filter, setFilter] = useState<Filter>(NO_FILTER)
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
 
   async function pair(e: FormEvent) {
     e.preventDefault()
@@ -106,16 +110,62 @@ function ScreensTab({ data, reload, isAdmin }: TabProps) {
       return setError(room.created ? claimFailedAfterCreate(room.label, why) : why)
     }
     setMessage(`Paired with ${room.label}. The TV will update in a few seconds.`)
+    setFilter(NO_FILTER)
     setCode('')
     setName('')
     reload()
   }
 
+  const showPair = isAdmin && (pairing || data.screens.length === 0)
+  const groups = groupScreens(data.screens, sites, locations, filter)
+  const stale = data.screens.filter((s) => isOlderApp(s, data.screens))
+  const offline = data.screens.filter((s) => !isOnline(s))
+  const filtering = filter.text.trim() !== '' || filter.site !== '' || filter.status !== 'all'
+  const shown = groups.reduce((n, g) => n + g.count, 0)
+  const toggle = (key: string) =>
+    setCollapsed((c) => {
+      const next = new Set(c)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  const isOpen = (key: string) => filtering || !collapsed.has(key)
+
   return (
     <>
-      {isAdmin && (
+      {(offline.length > 0 || stale.length > 0) && (
+        <div className="card problems row wrap-sm">
+          <b>Needs attention:</b>
+          {offline.length > 0 && (
+            <button className="chip warn" onClick={() => setFilter({ ...filter, status: 'offline' })}>
+              {offline.length} TV{offline.length === 1 ? '' : 's'} offline
+            </button>
+          )}
+          {stale.length > 0 && (
+            <button className="chip warn" onClick={() => setFilter({ ...filter, status: 'old' })}>
+              {stale.length} on an older app version
+            </button>
+          )}
+        </div>
+      )}
+
+      {isAdmin && !showPair && (
+        <div className="row">
+          <button className="btn primary" onClick={() => setPairing(true)}>
+            + Pair a TV
+          </button>
+        </div>
+      )}
+      {showPair && (
         <form className="card stack-sm" onSubmit={pair}>
-          <h3>Pair a TV</h3>
+          <div className="row spread">
+            <h3>Pair a TV</h3>
+            {data.screens.length > 0 && (
+              <button type="button" className="link" onClick={() => setPairing(false)}>
+                Close
+              </button>
+            )}
+          </div>
           <p className="muted">
             Open the Church TV OS app on the TV. It shows a 6-character code; enter it here and choose where the TV is.
             New TV?{' '}
@@ -149,27 +199,98 @@ function ScreensTab({ data, reload, isAdmin }: TabProps) {
         </form>
       )}
 
+      {data.screens.length > 0 && (
+        <div className="card row wrap screen-filters">
+          <input
+            className="grow"
+            type="search"
+            placeholder="Search TVs, rooms or areas"
+            value={filter.text}
+            onChange={(e) => setFilter({ ...filter, text: e.target.value })}
+          />
+          {mySites.length > 1 && (
+            <select value={filter.site} onChange={(e) => setFilter({ ...filter, site: e.target.value })}>
+              <option value="">All sites</option>
+              {mySites.map((site) => (
+                <option key={site.id} value={site.id}>
+                  {site.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <select value={filter.status} onChange={(e) => setFilter({ ...filter, status: e.target.value as StatusFilter })}>
+            <option value="all">Any status</option>
+            <option value="online">Online</option>
+            <option value="offline">Offline</option>
+            <option value="old">Older app version</option>
+          </select>
+          {filtering && (
+            <button className="link" onClick={() => setFilter(NO_FILTER)}>
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+
       <p className="muted">
+        {filtering ? `Showing ${shown} of ` : ''}
         {data.screens.length} screen{data.screens.length === 1 ? '' : 's'}
-        {data.limit !== null && ` of ${data.limit} allowed on your plan`}
+        {data.limit !== null && ` (${data.limit} allowed on your plan)`}
       </p>
       {data.screens.length === 0 && (
         <EmptyState help="screens">
           A screen is one TV running the Church TV OS app. Open the app on a TV, then enter the code it shows in the box above to pair it.
         </EmptyState>
       )}
-      {data.screens.map((s) => (
-        <ScreenCard
-          key={s.id}
-          screen={s}
-          data={data}
-          isAdmin={isAdmin}
-          open={openId === s.id}
-          onToggle={() => setOpenId(openId === s.id ? null : s.id)}
-          reload={reload}
-        />
+      {filtering && shown === 0 && data.screens.length > 0 && <p className="muted">No TVs match.</p>}
+
+      {groups.map((site) => (
+        <section key={site.key} className="screen-site">
+          <GroupHeading level="site" label={site.label} count={site.count} offline={site.offline} open={isOpen(site.key)} onToggle={() => toggle(site.key)} />
+          {isOpen(site.key) &&
+            site.areas.map((area) => {
+              const rooms = area.rooms.map((room) => (
+                <div key={room.key} className="screen-room">
+                  <GroupHeading level="room" label={room.label} count={room.screens.length} offline={room.screens.filter((s) => !isOnline(s)).length} open={isOpen(room.key)} onToggle={() => toggle(room.key)} />
+                  {isOpen(room.key) &&
+                    room.screens.map((s) => (
+                      <ScreenCard
+                        key={s.id}
+                        screen={s}
+                        data={data}
+                        isAdmin={isAdmin}
+                        open={openId === s.id}
+                        onToggle={() => setOpenId(openId === s.id ? null : s.id)}
+                        reload={reload}
+                      />
+                    ))}
+                </div>
+              ))
+              if (!area.label) return <div key={area.key}>{rooms}</div>
+              return (
+                <div key={area.key} className="screen-area">
+                  <GroupHeading level="area" label={area.label} count={area.count} offline={area.offline} open={isOpen(area.key)} onToggle={() => toggle(area.key)} />
+                  {isOpen(area.key) && rooms}
+                </div>
+              )
+            })}
+        </section>
       ))}
     </>
+  )
+}
+
+function GroupHeading(props: { level: 'site' | 'area' | 'room'; label: string; count: number; offline: number; open: boolean; onToggle: () => void }) {
+  const Tag = props.level === 'site' ? 'h2' : props.level === 'area' ? 'h3' : 'h4'
+  return (
+    <button className={`group-heading ${props.level}`} onClick={props.onToggle} aria-expanded={props.open}>
+      <span className="caret">{props.open ? '▾' : '▸'}</span>
+      <Tag>{props.label}</Tag>
+      <span className="muted">
+        {props.count} TV{props.count === 1 ? '' : 's'}
+        {props.offline > 0 && <span className="warn-text"> · {props.offline} offline</span>}
+      </span>
+    </button>
   )
 }
 
